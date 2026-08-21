@@ -258,8 +258,14 @@ func calculateRisk(seed string) [sha256.Size * 2]byte {
 // store. The table is laid out for the current byte order, while the backing
 // uint16 array guarantees aligned stores on every supported architecture.
 func encodeDigest(destination *[sha256.Size]uint16, digest *[sha256.Size]byte) {
-	for index, value := range digest {
-		destination[index] = lowercaseHexPairs[value]
+	// SHA-256 has a fixed 32-byte output. Four stores per iteration reduce loop
+	// bookkeeping while keeping this helper small enough for the compiler to
+	// inline into the 50,000-round feedback chain.
+	for index := 0; index < sha256.Size; index += 4 {
+		destination[index] = lowercaseHexPairs[digest[index]]
+		destination[index+1] = lowercaseHexPairs[digest[index+1]]
+		destination[index+2] = lowercaseHexPairs[digest[index+2]]
+		destination[index+3] = lowercaseHexPairs[digest[index+3]]
 	}
 }
 
