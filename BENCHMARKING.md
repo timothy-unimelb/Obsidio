@@ -91,8 +91,22 @@ VM — treat same-machine numbers as directional and rely on relative deltas.
 
 ## Comparing two implementations (the A/B protocol)
 
-Use this whenever you want to say "X is faster than Y" and the expected gap is
-under ~2×. Budget ~45 minutes.
+**This is not the default workflow — most of the time, don't do this.**
+work_score is stable enough (~10% run-to-run) that a single 6-minute run
+reliably resolves any change bigger than ~15%, and most optimisation attempts
+either clear that easily or do nothing. Day to day: one run, compare against
+history, move on.
+
+Reserve this protocol for the two cases where a single run genuinely can't
+answer the question — expect to use it maybe twice in the whole hackathon:
+
+- **Close rankings:** two implementations within ~10–30% of each other, where
+  one run is a coin flip.
+- **Final write-up numbers:** the once-at-the-end measurement where citing a
+  median and range makes the judged claim defensible.
+
+Budget ~45 minutes (or drop to 2 runs each, ~30 minutes, at some confidence
+cost).
 
 1. **Warm-up:** one throwaway run (either variant). Discard the numbers — it
    pays the thermal ramp and cache warming so run 1 isn't privileged.
