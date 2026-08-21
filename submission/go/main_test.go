@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"unsafe"
 )
 
 func TestHealth(t *testing.T) {
@@ -68,6 +70,23 @@ func TestRisk(t *testing.T) {
 		want := referenceRisk(seed)
 		if string(got[:]) != want {
 			t.Fatalf("wrong risk hash for %q:\n got %s\nwant %s", seed, got, want)
+		}
+	}
+}
+
+func TestPackedHexEncoding(t *testing.T) {
+	for value := range 256 {
+		var digest [sha256.Size]byte
+		for index := range digest {
+			digest[index] = byte(value)
+		}
+		var words [sha256.Size]uint16
+		encodeDigest(&words, &digest)
+		got := unsafe.Slice((*byte)(unsafe.Pointer(&words[0])), sha256.Size*2)
+		want := make([]byte, sha256.Size*2)
+		hex.Encode(want, digest[:])
+		if !bytes.Equal(got, want) {
+			t.Fatalf("wrong encoding for byte %#x: got %q, want %q", value, got, want)
 		}
 	}
 }
@@ -165,10 +184,36 @@ func BenchmarkRisk(b *testing.B) {
 	}
 }
 
+func BenchmarkRiskStandardHex(b *testing.B) {
+	for index := 0; index < b.N; index++ {
+		_ = calculateRiskStandardHex(strconv.Itoa(index))
+	}
+}
+
 func BenchmarkRiskStarter(b *testing.B) {
 	for index := 0; index < b.N; index++ {
 		_ = referenceRisk(strconv.Itoa(index))
 	}
+}
+
+var benchmarkHexSink uint16
+
+func BenchmarkHexStandard(b *testing.B) {
+	digest := sha256.Sum256([]byte("benchmark"))
+	var encoded [sha256.Size * 2]byte
+	for b.Loop() {
+		hex.Encode(encoded[:], digest[:])
+	}
+	benchmarkHexSink = uint16(encoded[0])
+}
+
+func BenchmarkHexPacked(b *testing.B) {
+	digest := sha256.Sum256([]byte("benchmark"))
+	var encoded [sha256.Size]uint16
+	for b.Loop() {
+		encodeDigest(&encoded, &digest)
+	}
+	benchmarkHexSink = encoded[0]
 }
 
 func request(t *testing.T, path string) *httptest.ResponseRecorder {
@@ -185,6 +230,17 @@ func referenceRisk(seed string) string {
 		value = hex.EncodeToString(digest[:])
 	}
 	return value
+}
+
+func calculateRiskStandardHex(seed string) [sha256.Size * 2]byte {
+	digest := sha256.Sum256([]byte(seed))
+	var encoded [sha256.Size * 2]byte
+	hex.Encode(encoded[:], digest[:])
+	for iteration := 1; iteration < riskIterations; iteration++ {
+		digest = sha256.Sum256(encoded[:])
+		hex.Encode(encoded[:], digest[:])
+	}
+	return encoded
 }
 
 func referenceStats(price float64) [4]float64 {

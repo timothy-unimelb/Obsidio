@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"io"
 	"log"
 	"math"
@@ -14,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 const (
@@ -46,6 +46,7 @@ type riskResult struct {
 }
 
 var markets = buildMarkets()
+var lowercaseHexPairs = buildLowercaseHexPairs()
 
 var (
 	riskWorkerCount = envInt("RISK_WORKERS", defaultRiskJobs, 1, 2)
@@ -239,14 +240,44 @@ func riskWorker() {
 // strings and byte slices without skipping any of the required work.
 func calculateRisk(seed string) [sha256.Size * 2]byte {
 	digest := sha256.Sum256([]byte(seed))
-	var encoded [sha256.Size * 2]byte
-	hex.Encode(encoded[:], digest[:])
+	var encodedWords [sha256.Size]uint16
+	encodeDigest(&encodedWords, &digest)
+	encoded := unsafe.Slice((*byte)(unsafe.Pointer(&encodedWords[0])), sha256.Size*2)
 
 	for iteration := 1; iteration < riskIterations; iteration++ {
-		digest = sha256.Sum256(encoded[:])
-		hex.Encode(encoded[:], digest[:])
+		digest = sha256.Sum256(encoded)
+		encodeDigest(&encodedWords, &digest)
 	}
-	return encoded
+
+	var result [sha256.Size * 2]byte
+	copy(result[:], encoded)
+	return result
+}
+
+// encodeDigest writes two lowercase hexadecimal bytes with one native-width
+// store. The table is laid out for the current byte order, while the backing
+// uint16 array guarantees aligned stores on every supported architecture.
+func encodeDigest(destination *[sha256.Size]uint16, digest *[sha256.Size]byte) {
+	for index, value := range digest {
+		destination[index] = lowercaseHexPairs[value]
+	}
+}
+
+func buildLowercaseHexPairs() [256]uint16 {
+	const digits = "0123456789abcdef"
+	var marker uint16 = 0x0102
+	littleEndian := *(*byte)(unsafe.Pointer(&marker)) == 0x02
+	var pairs [256]uint16
+	for value := range pairs {
+		first := uint16(digits[byte(value)>>4])
+		second := uint16(digits[byte(value)&0x0f])
+		if littleEndian {
+			pairs[value] = first | second<<8
+		} else {
+			pairs[value] = first<<8 | second
+		}
+	}
+	return pairs
 }
 
 func buildMarkets() map[string]*market {

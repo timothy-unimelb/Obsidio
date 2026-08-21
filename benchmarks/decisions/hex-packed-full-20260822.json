@@ -1,0 +1,24 @@
+{
+  "recorded_at": "2026-08-21T22:28:15Z",
+  "type": "comparison_decision",
+  "comparison_set": "hex-packed-full-20260822",
+  "candidate": "packed-lowercase-hex",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [2793090, 2588129],
+    "candidate_score": 2852984,
+    "candidate_vs_stronger_champion_percent": 2.1444,
+    "candidate_vs_champion_average_percent": 6.0349,
+    "error_rate": 0,
+    "all_latency_gates_passed": true,
+    "focused_kernel_gain_percent": 7.7912
+  },
+  "limitations": [
+    "same-host local Apple Silicon environment",
+    "champion bracket drifted -7.3381%",
+    "candidate source was dirty but exact files and image ID were recorded",
+    "not an interleaved six-run milestone"
+  ],
+  "report": "benchmarks/experiments/2026-08-22-packed-hex.md"
+}

@@ -5,6 +5,8 @@ Before changing or evaluating performance-sensitive code, read:
 1. `OBSIDIO-DETAIL-PAGE.md` for the endpoint and scoring contract.
 2. `benchmarks/PROTOCOL.md` for the authoritative testing procedure.
 3. `benchmarks/history.jsonl`, when present, for the accepted experiment trail.
+4. The latest report referenced by a history decision for its interpretation,
+   limitations, and raw-evidence paths.
 
 ## Performance work
 

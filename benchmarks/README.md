@@ -50,6 +50,17 @@ execution separately during a 30-second, 200-VU peak slice. Run the target with
 `RISK_TIMING=1` for that diagnostic only; normal scoring leaves timing headers
 disabled.
 
+Build-tagged Go profiling is also excluded from normal images. To create a
+diagnostic image, use `--build-arg GO_BUILD_TAGS=profile` and publish port 6060
+separately. The normal Docker build leaves the pprof listener out of the binary.
+
+After interpreting a comparison, create a reviewed JSON decision under
+`benchmarks/decisions/` and append it without rewriting prior history:
+
+```sh
+node benchmarks/record-decision.mjs benchmarks/decisions/<comparison-set>.json
+```
+
 ## Recorded local comparison set
 
 - Date: 2026-08-21 (Australia/Melbourne)
@@ -60,3 +71,15 @@ disabled.
 - Grading script SHA-256:
   `d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f`
 - Repetitions: 3 full runs per measured checkpoint; report the median
+
+## Latest accepted local comparison
+
+- Date: 2026-08-22 (Australia/Melbourne)
+- Sequence: permanent-worker champion → packed-hex candidate → champion
+- Exact scores: 2,793,090 → 2,852,984 → 2,588,129
+- Candidate improvement: +2.14% over the stronger champion side; +6.03% over
+  the bracket average
+- Errors: 0.00%; every published p95 gate passed
+- Verdict: current local champion, pending an interleaved six-run milestone
+- Detailed evidence:
+  [`experiments/2026-08-22-packed-hex.md`](experiments/2026-08-22-packed-hex.md)

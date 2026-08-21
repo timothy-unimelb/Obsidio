@@ -22,30 +22,36 @@ const roadmap = [
   },
   {
     number: "03",
+    question: "What surrounds every hash?",
+    title: "Pack the hex feedback",
+    copy: "Profiling found lowercase hex expansion using more CPU than SHA compression. A two-byte lookup now preserves the exact feedback string with half as many stores.",
+  },
+  {
+    number: "04",
     question: "Can each CPU cycle carry more useful work?",
     title: "Test small batches",
     copy: "Advance 2, 4, then 8 independent hash chains together. Keep a short fill deadline so the oldest request does not wait too long for companions.",
   },
   {
-    number: "04",
+    number: "05",
     question: "What repeats 49,999 times?",
     title: "Specialize the fixed input shape",
     copy: "After the first hash, every message is 64 ASCII bytes. The message changes, but its size and SHA-256 padding layout do not.",
   },
   {
-    number: "05",
+    number: "06",
     question: "What can the existing toolchain improve?",
     title: "Apply profile-guided tuning",
     copy: "Try Go PGO, then sweep GC, worker count, queue depth, and batch size one variable at a time under the 2 CPU / 2 GB limit.",
   },
   {
-    number: "06",
+    number: "07",
     question: "Is request handling visible in the profile?",
     title: "Trim the edges if necessary",
     copy: "Only then compare HTTP parsing, query handling, JSON assembly, symbol lookup, and buffer reuse. These affect many requests, but do little to the SHA loop.",
   },
   {
-    number: "07",
+    number: "08",
     question: "Does pure Go still limit the measured kernel?",
     title: "Evaluate a native kernel",
     copy: "Keep the Go server. Prototype only a narrow batched SHA function in C or Rust, and retain it only if the full mixed workload improves materially.",
@@ -165,7 +171,7 @@ export default function OptimizationsPage() {
               <div className="heavyBranch">
                 <small>HEAVY BRANCH</small>
                 <span className="coral">RISK</span><b>→</b><span>QUEUE</span><b>→</b><span>2 WORKERS</span>
-                <i>50,000 SHA-256 rounds</i>
+                <i>50,000 SHA-256 + lowercase hex rounds</i>
               </div>
             </div>
             <div className="pathAnnotations">

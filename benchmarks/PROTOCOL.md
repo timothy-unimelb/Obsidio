@@ -35,6 +35,8 @@ particular processor.
 | `benchmarks/protocol.json` | Machine-readable settings and decision rules |
 | `benchmarks/run-stage.sh` | Local build, capped run, and result recorder |
 | `benchmarks/history.jsonl` | Append-only experiment index |
+| `benchmarks/decisions/` | Reviewed machine-readable comparison verdicts |
+| `benchmarks/experiments/` | Human-readable hypotheses, profiles, and interpretations |
 | `benchmarks/results/` | Raw k6 summaries |
 
 Never edit an old raw summary or history entry. Correct a mistake with a new
@@ -90,6 +92,10 @@ go test -bench=. -benchmem ./...
 
 The endpoint tests must independently verify `/risk` rather than trusting the
 optimized implementation to verify itself. Reject any incorrect candidate.
+
+Profiling must remain diagnostic-only. The Go submission compiles pprof support
+only with `--build-arg GO_BUILD_TAGS=profile`; normal scoring builds must omit
+that tag and listener.
 
 ### Level 1 — 90-second screening
 
@@ -206,6 +212,13 @@ Every accepted result must retain:
 Record the hypothesis and interpretation in the commit, pull request, or
 performance write-up. Numbers without the change being tested are not a useful
 experiment.
+
+After reviewing a comparison, preserve the verdict without editing older run
+entries:
+
+```sh
+node benchmarks/record-decision.mjs benchmarks/decisions/<comparison-set>.json
+```
 
 ## 8. Operating checklist
 

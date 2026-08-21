@@ -12,7 +12,7 @@ if (!stage || !profile || !runId || !summaryPath || !imageName || exitCodeText =
 
 const command = (program, args, fallback = "unknown") => {
   try {
-    return execFileSync(program, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return execFileSync(program, args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trimEnd();
   } catch {
     return fallback;
   }

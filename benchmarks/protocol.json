@@ -106,7 +106,7 @@
     ]
   },
   "recorded_evidence": {
-    "latest_set": "local-2026-08-21",
+    "latest_set": "hex-packed-full-20260822",
     "sets": [
       {
         "id": "local-2026-08-21",
@@ -147,6 +147,33 @@
             "diagnostic_summary": "benchmarks/results/workers-timing-summary.json"
           }
         ]
+      },
+      {
+        "id": "hex-packed-full-20260822",
+        "recorded_at": "2026-08-22T08:28:15+10:00",
+        "status": "accepted-local-full-comparison",
+        "environment_id": "local-arm64-colima",
+        "execution_order": ["champion-a1", "candidate-b1", "champion-a2"],
+        "protocol_interpretation": "current-champion-pending-six-run-milestone",
+        "candidate": {
+          "name": "packed-lowercase-hex",
+          "work_score": 2852984,
+          "requests": 1141016,
+          "error_rate": 0,
+          "price_p95_ms": 23.56185,
+          "stats_p95_ms": 23.616,
+          "risk_p95_ms": 320.85585,
+          "raw_summary": "benchmarks/results/candidate-hex-packed-full-b1-summary.json"
+        },
+        "champion_scores": [2793090, 2588129],
+        "candidate_vs_stronger_champion_percent": 2.1444,
+        "candidate_vs_champion_average_percent": 6.0349,
+        "limitations": [
+          "same physical Apple Silicon host",
+          "champion bracket drifted -7.3381%",
+          "not an interleaved six-run milestone"
+        ],
+        "report": "benchmarks/experiments/2026-08-22-packed-hex.md"
       }
     ]
   }
