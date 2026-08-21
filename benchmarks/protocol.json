@@ -95,7 +95,7 @@
     "history_file": "benchmarks/history.jsonl",
     "require_unique_run_id": true,
     "overwrite_raw_results_by_default": false,
-    "verdicts": ["pending", "kept", "reverted", "invalid", "superseded"],
+    "verdicts": ["pending", "kept", "reverted", "unresolved", "invalid", "superseded"],
     "required_metrics": [
       "work_score",
       "http_reqs",

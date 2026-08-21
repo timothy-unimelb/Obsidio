@@ -75,3 +75,28 @@ champion bracket average. Champion drift was -1.21%. The candidate passed every
 latency gate with zero errors and is supported by the independent 2.50% kernel
 gain, so it advances under the protocol's bracketed-evidence path for small
 changes.
+
+## Exact full comparison
+
+Sequence: packed-hex champion -> compact-unroll candidate -> packed-hex
+champion, using the untouched 4m30s grader.
+
+| Run | Work score | Requests | Errors | Price p95 | Stats p95 | Risk p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Champion A1 | 2,892,463 | 1,157,669 | 0.00% | 23.64 ms | 23.73 ms | 348.30 ms |
+| Candidate B1 | 2,919,075 | 1,169,136 | 0.00% | 22.87 ms | 22.96 ms | 339.98 ms |
+| Champion A2 | 2,783,480 | 1,112,981 | 0.00% | 22.64 ms | 22.67 ms | 349.93 ms |
+
+The candidate beat the stronger champion side by 0.92% and the champion bracket
+average by 2.86%. It remained correct and within every latency gate. However,
+the champion controls drifted by -3.77%, which is larger than the conservative
+candidate advantage.
+
+## Verdict
+
+**Unresolved; do not promote to champion yet.** The microbenchmark, screen, and
+both direct control comparisons point in the favorable direction, so reverting
+and forgetting the candidate would discard useful evidence. But the exact-run
+advantage does not exceed observed environmental noise. Commit `5bb6824`
+preserves the candidate for an interleaved finalist comparison or separated
+x86-64 validation; commit `64e38e0` remains the accepted champion.

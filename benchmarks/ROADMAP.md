@@ -36,8 +36,10 @@ reaches a gate, or changes what should happen next.
    controls at 992,877 and 980,888: +1.51% versus the stronger side and +2.13%
    versus the bracket average, with zero errors. It is promoted using the
    protocol's bracketed-evidence path for small changes.
-5. **Active: run an exact full bracket.** Keep, reject, or mark
-   unresolved with a decision record and update this file.
+5. **Completed: exact full bracket.** Candidate scored 2,919,075 versus controls
+   at 2,892,463 and 2,783,480. It was +0.92% versus the stronger side and +2.86%
+   versus the bracket average, but control drift was -3.77%. Verdict: unresolved;
+   `64e38e0` remains champion and `5bb6824` preserves the candidate.
 
 ## Candidate queue after the active sequence
 
@@ -67,6 +69,8 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** re-profile, Level 0, and screening are complete. Compact hex
-unrolling is promoted to a champion -> candidate -> champion exact full
-comparison. No post-packed-hex candidate has been accepted yet.
+**Status:** the compact-unroll sequence is complete and unresolved because its
+exact gain did not exceed host noise. Next, keep this change isolated and test
+Go PGO against champion `64e38e0`; do not combine PGO with unrolling until each
+change has independent evidence. Revisit unrolling in an interleaved finalist
+comparison or separated x86 validation.
