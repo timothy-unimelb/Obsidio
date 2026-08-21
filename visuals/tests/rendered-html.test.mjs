@@ -74,7 +74,8 @@ test("exports the performance record", async () => {
   assert.match(html, /2,874,253/);
   assert.match(html, /\+101\.6%/);
   assert.match(html, /Permanent workers \+ queue/);
-  assert.match(html, /Measured · kept · median of 3 runs/);
+  assert.match(html, /Measured · current champion · 3 grouped runs/);
+  assert.match(html, /provisional under protocol v2/i);
   assert.match(html, /INSIDE A PEAK \/RISK REQUEST/);
   assert.match(html, /320\.70 ms/);
   assert.match(html, /BASELINE → CURRENT/);

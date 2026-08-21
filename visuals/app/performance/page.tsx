@@ -29,7 +29,7 @@ const checkpoints = [
   {
     number: "02",
     name: "Permanent workers + queue",
-    status: "Measured · kept · median of 3 runs",
+    status: "Measured · current champion · 3 grouped runs",
     detail: "Two permanent hash workers draw from a bounded FIFO. Price and stats bypass it; risk waits deliberately when both workers are occupied.",
     score: 2_874_253,
     requests: 1_149_663,
@@ -110,7 +110,7 @@ export default function PerformancePage() {
       <section className="section progressionSection">
         <div className="sectionHead compact">
           <div><span className="sectionNumber">THE PROGRESSION</span><h2>One checkpoint.<br />One complete siege.</h2></div>
-          <p>The first optimized entry combines work completed before this log existed, so it proves the total improvement but cannot attribute it to one change. Checkpoint 02 changes one scheduling layer and clears the measured noise band.</p>
+          <p>The first optimized entry combines work completed before this log existed, so it proves the total improvement but cannot attribute it to one change. Checkpoint 02 changes one scheduling layer and clears the observed local noise, so it is the current champion; the grouped run order predates protocol v2 and still needs interleaved milestone validation.</p>
         </div>
         <div className="checkpointList">
           {checkpoints.map((checkpoint) => (
@@ -126,7 +126,7 @@ export default function PerformancePage() {
       </section>
 
       <section className="metricsSection">
-        <div className="metricsIntro"><span className="sectionNumber inverse">BASELINE → CURRENT</span><h2>The complete<br />comparison.</h2><p>Each value is the median of three complete runs generated on 21 August 2026. Nine full score summaries remain in the repository.</p></div>
+        <div className="metricsIntro"><span className="sectionNumber inverse">BASELINE → CURRENT</span><h2>The complete<br />comparison.</h2><p>Each value is the median of three complete grouped runs generated on 21 August 2026. Nine full score summaries remain in the repository. Protocol v2 records this set as provisional until an interleaved milestone repeats it.</p></div>
         <div className="metricTable" role="table" aria-label="Baseline and current benchmark metrics">
           <div className="metricHeader" role="row"><span>METRIC</span><span>STARTER</span><span>CURRENT</span><span>CHANGE</span><span>BAR</span></div>
           {metrics.map((metric) => (
@@ -167,7 +167,7 @@ export default function PerformancePage() {
         <div className="fingerprintCard">
           <div><small>GRADING SCRIPT SHA-256</small><code>d7b259eb36cd…9f56998d20f</code></div>
           <div><small>COMPARISON SET</small><strong>2026-08-21 · local-arm64-01</strong></div>
-          <div><small>REPETITION STATUS</small><strong>3 of 3 runs per measured checkpoint</strong></div>
+          <div><small>REPETITION STATUS</small><strong>Legacy grouped set · provisional under protocol v2</strong></div>
         </div>
         <div className="evidenceLinks">
           {evidenceLinks.map(([label, href]) => <a href={href} target="_blank" rel="noreferrer" key={label}><span>{label}</span><b>↗</b></a>)}
