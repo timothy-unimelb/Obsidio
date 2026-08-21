@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-08-21T15:02:32+10:00",
+  "status": "local-grader-shaped",
+  "workload": {
+    "script": "k6/grading.js",
+    "sha256": "d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f",
+    "k6_version": "2.2.0",
+    "duration_seconds": 270,
+    "max_vus": 200,
+    "traffic_mix": { "price": 0.6, "stats": 0.3, "risk": 0.1 },
+    "thresholds_ms": { "price_p95": 200, "stats_p95": 500, "risk_p95": 1500 },
+    "error_rate_limit": 0.01
+  },
+  "target": {
+    "cpus": 2,
+    "memory_bytes": 2147483648,
+    "container_os": "linux",
+    "container_arch": "arm64",
+    "runtime": "Docker on Colima"
+  },
+  "load_generator": {
+    "os": "macOS 26.6.1",
+    "arch": "arm64",
+    "relationship_to_target": "same physical Apple Silicon host"
+  },
+  "limitations": [
+    "The organizer runs k6 separately from the target; this local comparison shares a physical host.",
+    "The published threshold values are placeholders until the organizer locks the final grading script.",
+    "Baseline and current checkpoint currently contain one full run each; small gains require repeated runs."
+  ]
+}

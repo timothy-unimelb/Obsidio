@@ -30,10 +30,11 @@ test("exports the solution page", async () => {
   assert.match(html, /WHY TWO PERMITS/);
   assert.match(html, /preemption target/);
   assert.match(html, /150,000/);
-  assert.match(html, /3,245,586/);
+  assert.match(html, /2,790,902/);
   assert.match(html, /0\.00%/);
   assert.match(html, /href="\/Obsidio\/?"/);
   assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
+  assert.match(html, /href="\/Obsidio\/performance\/?"/);
 });
 
 test("exports the optimization roadmap", async () => {
@@ -56,6 +57,24 @@ test("exports the optimization roadmap", async () => {
   assert.match(html, /BATCH IN/);
   assert.match(html, /Four checks/);
   assert.match(html, /href="\/Obsidio\/solution\/?"/);
+  assert.match(html, /href="\/Obsidio\/performance\/?"/);
+});
+
+test("exports the performance record", async () => {
+  const html = await readFile(new URL("performance/index.html", output), "utf8");
+
+  assert.match(html, /<title>Performance Record — Obsidio<\/title>/i);
+  assert.match(html, /Performance,/);
+  assert.match(html, /LOCAL GRADER-SHAPED RUNS/);
+  assert.match(html, /The protocol matches/);
+  assert.match(html, /1,425,795/);
+  assert.match(html, /2,790,902/);
+  assert.match(html, /\+95\.7%/);
+  assert.match(html, /Permanent workers \+ queue/);
+  assert.match(html, /Not implemented/);
+  assert.match(html, /BASELINE → CURRENT/);
+  assert.match(html, /GRADING SCRIPT SHA-256/);
+  assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
 });
 
 test("exports branded assets without hosting-specific files", async () => {

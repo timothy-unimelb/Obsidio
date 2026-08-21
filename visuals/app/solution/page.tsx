@@ -8,9 +8,9 @@ export const metadata: Metadata = {
 };
 
 const results = [
-  { metric: "/price p95", value: "41.90", unit: "ms", bar: "21%", tone: "mint", limit: "200 ms bar" },
-  { metric: "/stats p95", value: "41.86", unit: "ms", bar: "8%", tone: "amber", limit: "500 ms bar" },
-  { metric: "/risk p95", value: "62.24", unit: "ms", bar: "4%", tone: "coral", limit: "1,500 ms bar" },
+  { metric: "/price p95", value: "50.82", unit: "ms", bar: "25.4%", tone: "mint", limit: "200 ms bar" },
+  { metric: "/stats p95", value: "50.85", unit: "ms", bar: "10.2%", tone: "amber", limit: "500 ms bar" },
+  { metric: "/risk p95", value: "55.84", unit: "ms", bar: "3.7%", tone: "coral", limit: "1,500 ms bar" },
 ];
 
 export default function SolutionPage() {
@@ -189,8 +189,8 @@ export default function SolutionPage() {
       </section>
 
       <section className="resultsSection">
-        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Full 4m30s published k6 run · 200 VUs · local Apple M4 development result.</p></div>
-        <div className="heroScore"><small>WORK SCORE</small><strong>3,245,586</strong><span>12,020 weighted points / sec</span></div>
+        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Full 4m30s published k6 run · 200 VUs · 2 CPU / 2 GB local grader-shaped result.</p></div>
+        <div className="heroScore"><small>WORK SCORE</small><strong>2,790,902</strong><span>10,336.65 weighted points / sec</span></div>
         <div className="resultBars">
           {results.map((result) => (
             <div className="resultRow" key={result.metric}>
@@ -199,12 +199,12 @@ export default function SolutionPage() {
             </div>
           ))}
         </div>
-        <div className="proofStrip"><span><strong>1,298,614</strong> successful requests</span><span><strong>0.00%</strong> HTTP errors</span><span><strong>2.2 MB</strong> final image</span></div>
+        <div className="proofStrip"><span><strong>1,115,212</strong> successful requests</span><span><strong>0.00%</strong> HTTP errors</span><span><strong>2.2 MB</strong> final image</span></div>
       </section>
 
       <section className="solutionFooter">
         <div><span className="sectionNumber">THE PRINCIPLE</span><h2>Do all the work.<br /><em>Control when it runs.</em></h2></div>
-        <Link className="backLink" href="/"><b>←</b><span>Revisit the challenge</span></Link>
+        <Link className="backLink" href="/performance"><span>See the performance record</span><b>→</b></Link>
       </section>
     </main>
   );
