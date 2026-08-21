@@ -9,6 +9,8 @@
   --amber: #ffbd59;
   --coral: #ff765e;
   --line: rgba(24, 33, 29, 0.18);
+  --font-geist-sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 * { box-sizing: border-box; }
