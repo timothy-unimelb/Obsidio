@@ -29,6 +29,7 @@ test("renders the visual challenge page and social metadata", async () => {
   assert.match(html, /THE SCORE/);
   assert.match(html, /og:image/);
   assert.match(html, /og\.png/);
+  assert.match(html, /https:\/\/obsidio-engineering-under-siege\.timothymathews\.chatgpt\.site\/og\.png/);
   assert.doesNotMatch(html, /codex-preview|SkeletonPreview|react-loading-skeleton/);
 });
 

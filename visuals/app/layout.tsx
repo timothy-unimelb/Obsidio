@@ -6,7 +6,10 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ??
+      "https://obsidio-engineering-under-siege.timothymathews.chatgpt.site",
+  ),
   title: "Obsidio — Engineering Under Siege",
   description: "A visual guide to the Obsidio resilience challenge and our high-throughput Go solution.",
   icons: {
