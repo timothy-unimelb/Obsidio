@@ -122,9 +122,39 @@ func calibrateRisk() {
 		q = 5000
 	}
 	riskMaxQueued = int32(q)
-	log.Printf("risk calibration: unitCost=%s maxQueued=%d waitTimeout=%s",
-		unitCost, riskMaxQueued, riskWaitTimeout)
+
+	// Yield stride: target ~1ms hashing slices on THIS hardware. On a slow box
+	// (30ms chains) that's a small stride; on SHA-NI x86 (~4ms) a large one.
+	// RISK_YIELD_STRIDE overrides for A/B (0 disables yielding entirely).
+	stride := uint32(4096)
+	if s := os.Getenv("RISK_YIELD_STRIDE"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
+			stride = uint32(v)
+		}
+	} else {
+		perIter := float64(unitCost) / 50000.0
+		target := float64(time.Millisecond) / perIter
+		stride = 256
+		for stride < 8192 && float64(stride*2) <= target {
+			stride *= 2
+		}
+	}
+	if stride == 0 {
+		riskYieldMask = ^uint32(0) // i&mask never 0 within 50k → no yields
+	} else {
+		riskYieldMask = stride - 1
+	}
+	log.Printf("risk calibration: unitCost=%s maxQueued=%d waitTimeout=%s yieldStride=%d",
+		unitCost, riskMaxQueued, riskWaitTimeout, stride)
 }
+
+// riskYieldMask: yield the P every (mask+1) iterations. All nine recorded runs
+// show /price p95 == /stats p95 despite ~1500× different compute — fast-path
+// latency is pure scheduler wait behind hashing goroutines (~10ms preemption
+// quantum), so the fix is voluntary yields ~every 1ms of hashing, not handler
+// work. Power-of-2 stride, set from the calibrated per-iteration cost; a
+// Gosched with no waiter is tens of ns, so worst case is ~0.1% chain cost.
+var riskYieldMask = uint32(4096 - 1)
 
 // riskChain: h = seed; 50,000 × h = hex(sha256(h)). Zero heap allocations in
 // the loop; only the final string(buf) allocates.
@@ -132,9 +162,13 @@ func riskChain(seed string) string {
 	var buf [64]byte
 	sum := sha256.Sum256([]byte(seed))
 	hex.Encode(buf[:], sum[:])
-	for i := 1; i < 50000; i++ {
+	mask := riskYieldMask
+	for i := uint32(1); i < 50000; i++ {
 		sum = sha256.Sum256(buf[:])
 		hex.Encode(buf[:], sum[:])
+		if i&mask == 0 {
+			runtime.Gosched()
+		}
 	}
 	return string(buf[:])
 }
@@ -250,8 +284,12 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 		}
 		cancel()
 	}
+	// Slot held from here on. Release via defer so no panic path between
+	// acquire and release can leak it — two leaked slots would silence /risk
+	// (~40% of score) for the rest of the run. net/http recovers handler
+	// panics per-connection, so without the defer a leak would be silent.
+	defer func() { <-riskSem }()
 	h := riskChain(seed)
-	<-riskSem
 	// seed is arbitrary user input → JSON-escape it properly.
 	seedJSON, _ := json.Marshal(seed)
 	b := make([]byte, 0, 96+len(seedJSON))

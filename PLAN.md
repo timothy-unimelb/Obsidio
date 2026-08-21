@@ -65,13 +65,13 @@ SHA-NI actually selected (full feature gate) · contended chain cost (decides th
 Kernel change ⇒ differential test + Tier-0 + /smoke (full 50k digests) before any bench. Scheduling/gate change ⇒ devloop A/B (≥5% resolvable), Tier-2 recorded before claiming, /experiment always. One bench at a time; nothing CPU-heavy during a bench. Deltas <10% = noise; 10-30% = A/B protocol; >30% = one confirming re-run. Write-up cites medians+ranges only.
 
 ## Progress
-- [ ] W1: commit + HANDOFF refresh
-- [ ] W1: safety bundle (test-in-build, defer/recover, go.mod 1.26) + /smoke
-- [ ] W1: measurement upgrades + Tier-0 image fix
-- [ ] W1: GOGC=off + GOMEMLIMIT A/B + RSS watch
-- [ ] W1: Gosched yield A/B (N sweep)
-- [ ] W1: Step-0 ARM 2-lane microbench → kernel go/no-go
-- [ ] W1: cpu.stat throttle sample
+- [x] W1: commit + HANDOFF refresh (46894e4 pushed)
+- [x] W1: safety bundle (test-in-build, defer/recover, go.mod 1.26) + /smoke 35/35
+- [x] W1: measurement upgrades (chains/sec + peak-RSS in record.py) + Tier-0 image fix
+- [x] W1: GOGC=off + GOMEMLIMIT — devloop FLAT (−0.1%), kept for tail/STW hygiene
+- [x] W1: Gosched yield — /price p95 140→12ms devloop (~12×), score-flat, kept; auto-stride from calibration
+- [x] W1: Step-0 microbench → **GO: 1.65× interleave ratio measured on arm64** (digest verified vs hashlib)
+- [x] W1: cpu.stat — 37ms total throttled/run: CFS hypothesis dead, GOMAXPROCS=2 validated
 - [ ] W2A: x86 VM verification session (SHA-NI, ratios, grading run)
 - [ ] W2A: 2-lane SHA-NI kernel v1 + differential tests
 - [ ] W2B: adaptive-LIFO waiter stack + race hammer test

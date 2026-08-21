@@ -65,3 +65,52 @@ Entry format (see the /experiment skill):
   noise, not cost.
 - **Verdict:** kept — protective change, local-flat within noise. If we ever need
   certainty on its local cost, run the BENCHMARKING.md A/B interleave protocol.
+
+## 2026-08-22 Wave 1: GOGC=off + GOMEMLIMIT=1600MiB
+
+- **SHA:** 46894e4, dirty tree
+- **Hypothesis:** GC ran ~1.2 cycles/s under load (gctrace, ~6MB heap), a few ms
+  CPU each → disabling scheduled GC (with GOMEMLIMIT as the hard net) buys 1-4%.
+- **Change:** app/Dockerfile ENV GOGC=off GOMEMLIMIT=1600MiB.
+- **Result (devloop, ~3% noise):** work_score 310,723 → 310,320 (−0.1%, FLAT).
+  Errors 0.21% → 0.00%. GC cost was already ~invisible at this heap size.
+- **Verdict:** kept — score-neutral, mechanically removes STW pauses from tails,
+  memory-safe via limit. RSS watched via new peak-RSS field in bench records.
+
+## 2026-08-22 Wave 1: Gosched yield in the hash loop (stride from calibration)
+
+- **SHA:** 46894e4, dirty tree
+- **Hypothesis:** /price p95 == /stats p95 in all 9 recorded runs despite ~1500×
+  compute gap → fast-path latency is scheduler wait behind hashing goroutines
+  (~10ms preemption quantum), fixable by voluntary yields ~every 1ms of hashing.
+- **Change:** app/main.go riskChain yields every stride iterations (power-of-2,
+  derived at boot: ~1ms slices; RISK_YIELD_STRIDE env override; boot log prints it).
+- **Result (devloop):** /price p95 139.9ms → 12.0ms (~12×); work_score 310,320 →
+  309,606 (−0.2%, FLAT — score ≈ 25×chains held exactly, as the fleet predicted:
+  faster cheap responses do NOT add score, they only add bar margin). Risk p95
+  1.0s→1.2s and errors 0.28% (more risk arrivals/s → more shed pressure) —
+  absorbed by the Wave-2 LIFO rework.
+- **Verdict:** kept — 10× fast-path DQ margin for ~0 score cost.
+
+## 2026-08-22 Wave 1: Step-0 interleave go/no-go microbench (C intrinsics, arm64)
+
+- **SHA:** 46894e4 (bench.c in session scratchpad, not shipped)
+- **Hypothesis:** 2 independent SHA-256 chains interleaved instruction-by-
+  instruction on ONE core beat 2 sequential chains, by hiding crypto-unit
+  instruction latency (mechanism behind the Wave-2 x86 kernel).
+- **Change:** none to app. 170-line NEON-crypto microbench: 1-lane vs 2-lane
+  50k-iteration 2-block chains; digest self-test matches hashlib exactly.
+- **Result:** 1-lane 3.42ms/chain (292.6 chains/s/core); 2-lane 4.15ms/pair
+  (482.1 chains/s/core) → **interleave ratio 1.65× on Apple silicon**. Bonus
+  signal: C 3.4ms vs Go-in-container 11.9ms per chain → Go kernel carries
+  per-call overhead worth attacking in the same Wave-2 kernel.
+- **Verdict:** GO for the Wave-2 2-lane kernel. x86 magnitude TBD on real
+  silicon (literature: +60-98% Zen, +38% SPR, +4% ICL).
+
+## 2026-08-22 Wave 1: CFS-throttle hypothesis test
+
+- **Result:** cpu.stat over a full devloop: 88 throttle events, 37ms total
+  throttled time (~0.05% of one core-second) → CFS throttling is NOT the
+  fast-path latency cause at GOMAXPROCS=2; scheduler-quantum theory confirmed
+  by the yield result above. GOMAXPROCS=2 pin validated.
+- **Verdict:** hypothesis closed; supports the GOMAXPROCS=3 dead-end ruling.

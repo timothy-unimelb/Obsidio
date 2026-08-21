@@ -39,7 +39,7 @@ cheap tiers; the expensive ones exist to *confirm*, not to explore.
 **Tier 0** (no Go on the host — run it in the builder image):
 
 ```bash
-docker run --rm -v "$PWD/app":/src -w /src golang:1.22-bookworm go test -bench=RiskChain -benchtime=10x -count=3
+docker run --rm -v "$PWD/app":/src -w /src golang:1.26-bookworm go test -bench=RiskChain -benchtime=10x -count=3
 ```
 
 `app/main_test.go` also contains `TestRiskChainMatchesReference`, which checks

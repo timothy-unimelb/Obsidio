@@ -86,7 +86,24 @@ def main():
         "error_rate": get(metrics, "http_req_failed", "value"),
         "work_score": get(metrics, "work_score", "count"),
         "reqs_total": get(metrics, "http_reqs", "count"),
+        # score ≈ 25 × completed /risk chains (closed-loop mix), so score rate
+        # /25 is the chains/sec the whole system actually sustained — the one
+        # number optimisation moves. k6's summary export has no per-tier counts.
+        "score_rate": get(metrics, "work_score", "rate"),
     }
+    if row["score_rate"]:
+        row["est_chains_per_sec"] = round(row["score_rate"] / 25.0, 2)
+    # Peak RSS from the container's cgroup (best-effort; OOM/leak tripwire —
+    # the cap is 2 GiB).
+    try:
+        peak = subprocess.run(
+            ["docker", "exec", os.environ.get("BENCH_CONTAINER", "obsidio"),
+             "cat", "/sys/fs/cgroup/memory.peak"],
+            capture_output=True, text=True, timeout=10).stdout.strip()
+        if peak.isdigit():
+            row["rss_peak_bytes"] = int(peak)
+    except Exception:
+        pass
 
     core = ["p95_price", "p95_stats", "p95_risk", "error_rate", "work_score"]
     missing = [k for k in core if row[k] is None]
@@ -136,6 +153,10 @@ def main():
     print(f"  work_score  {fmt(row['work_score'], 'n')}"
           f"{delta(row['work_score'], pv('work_score'), lower_is_better=False)}")
     print(f"  requests    {fmt(row['reqs_total'], 'n')}")
+    if row.get("est_chains_per_sec"):
+        print(f"  chains/sec  {row['est_chains_per_sec']:10.1f}  (score_rate/25)")
+    if row.get("rss_peak_bytes"):
+        print(f"  peak RSS    {row['rss_peak_bytes'] / (1 << 20):8.0f}MiB  (cap 2048)")
     print(f"  bars passed  {row['bars_passed']}/4"
           + (f"   (prev {prev.get('bars_passed')}/4)" if prev and 'bars_passed' in prev else ""))
     if prev and row["work_score"] < (pv("work_score") or 0):
