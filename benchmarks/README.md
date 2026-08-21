@@ -1,29 +1,36 @@
-# Obsidio performance record
+# Obsidio performance tooling
 
-This directory keeps the raw evidence behind the visual performance log. Every
-checkpoint is tested with the published `k6/grading.js` workload against a
-freshly built target container capped at 2 CPUs and 2 GB of memory.
+Read [`PROTOCOL.md`](PROTOCOL.md) before evaluating a performance change. It is
+the authoritative testing and acceptance procedure. This directory keeps the
+scripts, machine-readable settings, append-only history, and raw evidence
+behind the visual performance log.
 
 ## Run a checkpoint
 
 ```sh
-./benchmarks/run-stage.sh <stage-name> <docker-build-context>
+RUN_ID=<unique-id> ./benchmarks/run-stage.sh <stage-name> <docker-build-context> [screen|full]
 ```
 
 Examples:
 
 ```sh
-./benchmarks/run-stage.sh baseline starters/go
-./benchmarks/run-stage.sh current submission/go
+RUN_ID=baseline-a1 ./benchmarks/run-stage.sh baseline starters/go full
+RUN_ID=queue-screen-b1 ./benchmarks/run-stage.sh candidate submission/go screen
 ```
 
-The script builds the image, starts it with the grading resource caps, confirms
-`/health`, runs the complete 4 minute 30 second published siege, and writes the
-k6 summary to `benchmarks/results/<stage-name>-summary.json`.
+The runner builds the image, starts it with the grading resource caps, confirms
+`/health`, runs the selected workload, stores the raw k6 summary, and appends a
+compact record to `history.jsonl`. Existing result paths are not overwritten by
+default.
+
+- `screen` uses the separate proportional 90-second screening script.
+- `full` uses the untouched published 4 minute 30 second grader.
+- `BENCH_CPU_MODE=portable` runs the target with `GODEBUG=cpu.all=off`.
+- `BENCH_COMPARISON_SET` and `BENCH_ENVIRONMENT_ID` label related evidence.
 
 ## Comparability rules
 
-- Do not alter `k6/grading.js` between checkpoint runs.
+- Never alter `k6/grading.js`; abbreviated work belongs in `screening.js`.
 - Record the grading-script SHA-256 and k6 version with each comparison set.
 - Build every checkpoint from committed source.
 - Use the same load-generator and target environment for every checkpoint in a
@@ -33,16 +40,17 @@ k6 summary to `benchmarks/results/<stage-name>-summary.json`.
 - Treat local results as grader-shaped evidence, not grading-hardware claims.
   The organizer keeps k6 and the target on separate machines; this local setup
   runs k6 on macOS and the target in a Linux arm64 VM on the same physical host.
-- Repeat important checkpoints three times and compare medians before accepting
-  a small improvement. The raw files contain three full runs for the starter,
-  bounded Go, and permanent-worker checkpoints.
+- Follow the bracketed screening, full comparison, and milestone repetition
+  sequences in `PROTOCOL.md`. The existing legacy comparison contains three
+  full runs for the starter, bounded Go, and permanent-worker checkpoints; it
+  predates the interleaved milestone sequence and is labelled accordingly.
 
 The optional `benchmarks/risk-timing.js` diagnostic records queue wait and hash
 execution separately during a 30-second, 200-VU peak slice. Run the target with
 `RISK_TIMING=1` for that diagnostic only; normal scoring leaves timing headers
 disabled.
 
-## Current comparison set
+## Recorded local comparison set
 
 - Date: 2026-08-21 (Australia/Melbourne)
 - Workload: published 4m30s ramp, 200 VUs, 60/30/10 endpoint mix

@@ -14,6 +14,7 @@ test("exports the challenge page for the GitHub Pages base path", async () => {
   assert.match(html, /THE SCORE/);
   assert.match(html, /href="\/Obsidio\/solution\/?"/);
   assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
+  assert.match(html, /href="\/Obsidio\/testing\/?"/);
   assert.match(html, /https:\/\/timothy-unimelb\.github\.io\/Obsidio\/og\.png/);
   assert.doesNotMatch(html, /chatgpt\.site|codex-preview|SkeletonPreview/);
 });
@@ -35,6 +36,7 @@ test("exports the solution page", async () => {
   assert.match(html, /href="\/Obsidio\/?"/);
   assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
   assert.match(html, /href="\/Obsidio\/performance\/?"/);
+  assert.match(html, /href="\/Obsidio\/testing\/?"/);
 });
 
 test("exports the optimization roadmap", async () => {
@@ -58,6 +60,7 @@ test("exports the optimization roadmap", async () => {
   assert.match(html, /Four checks/);
   assert.match(html, /href="\/Obsidio\/solution\/?"/);
   assert.match(html, /href="\/Obsidio\/performance\/?"/);
+  assert.match(html, /href="\/Obsidio\/testing\/?"/);
 });
 
 test("exports the performance record", async () => {
@@ -77,6 +80,26 @@ test("exports the performance record", async () => {
   assert.match(html, /BASELINE → CURRENT/);
   assert.match(html, /GRADING SCRIPT SHA-256/);
   assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
+  assert.match(html, /href="\/Obsidio\/testing\/?"/);
+});
+
+test("exports the testing protocol", async () => {
+  const html = await readFile(new URL("testing/index.html", output), "utf8");
+
+  assert.match(html, /<title>Testing Protocol — Obsidio<\/title>/i);
+  assert.match(html, /From change/);
+  assert.match(html, /AUTHORITATIVE SOURCE/);
+  assert.match(html, /benchmarks\/PROTOCOL\.md/);
+  assert.match(html, /REFERENCE ENVIRONMENT/);
+  assert.match(html, /cpu\.max 200000 100000/);
+  assert.match(html, /FOUR LEVELS/);
+  assert.match(html, /90 SECONDS/);
+  assert.match(html, /4M30S \/ RUN/);
+  assert.match(html, /ORDER CONTROLS DRIFT/);
+  assert.match(html, /A.*B.*B.*A.*A.*B/s);
+  assert.match(html, /DECISION RULES/);
+  assert.match(html, /CHAIN OF CUSTODY/);
+  assert.match(html, /href="\/Obsidio\/performance\/?"/);
 });
 
 test("exports branded assets without hosting-specific files", async () => {

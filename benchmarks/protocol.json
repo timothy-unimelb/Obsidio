@@ -1,32 +1,153 @@
 {
-  "recorded_at": "2026-08-21T15:02:32+10:00",
-  "status": "local-grader-shaped",
-  "repetitions_per_checkpoint": 3,
-  "reported_statistic": "median",
+  "schema_version": 2,
+  "updated_at": "2026-08-22T00:00:00+10:00",
+  "authority": "benchmarks/PROTOCOL.md",
+  "judge_constraints": {
+    "status": "hardware-not-finalized",
+    "os": "linux",
+    "arch": "x86_64",
+    "cpu_quota": 2,
+    "cpu_max_expected": "200000 100000",
+    "memory_bytes": 2147483648,
+    "host_cpu_count_may_be_visible": true,
+    "assume_optional_cpu_extensions": false,
+    "load_generator_relationship": "separate machine"
+  },
   "workload": {
-    "script": "k6/grading.js",
-    "sha256": "d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f",
-    "k6_version": "2.2.0",
-    "duration_seconds": 270,
+    "full_script": "k6/grading.js",
+    "full_script_sha256": "d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f",
+    "published_values_status": "placeholder-until-organizer-locks-grader",
     "max_vus": 200,
-    "traffic_mix": { "price": 0.6, "stats": 0.3, "risk": 0.1 },
-    "thresholds_ms": { "price_p95": 200, "stats_p95": 500, "risk_p95": 1500 },
+    "traffic_mix": {
+      "price": 0.6,
+      "stats": 0.3,
+      "risk": 0.1
+    },
+    "thresholds_ms": {
+      "price_p95": 200,
+      "stats_p95": 500,
+      "risk_p95": 1500
+    },
     "error_rate_limit": 0.01
   },
-  "target": {
-    "cpus": 2,
-    "memory_bytes": 2147483648,
-    "container_os": "linux",
-    "container_arch": "arm64",
-    "runtime": "Docker on Colima"
+  "profiles": {
+    "screen": {
+      "script": "benchmarks/screening.js",
+      "duration_seconds": 90,
+      "stages": [
+        { "duration_seconds": 20, "target_vus": 50 },
+        { "duration_seconds": 40, "target_vus": 100 },
+        { "duration_seconds": 20, "target_vus": 200 },
+        { "duration_seconds": 10, "target_vus": 0 }
+      ],
+      "default_sequence": ["champion", "candidate", "champion"],
+      "publishable": false
+    },
+    "full": {
+      "script": "k6/grading.js",
+      "duration_seconds": 270,
+      "default_sequence": ["champion", "candidate"],
+      "small_change_sequence": ["champion", "candidate", "champion"],
+      "publishable": true
+    },
+    "milestone": {
+      "script": "k6/grading.js",
+      "duration_seconds_per_run": 270,
+      "repetitions_per_implementation": 3,
+      "sequence": ["A", "B", "B", "A", "A", "B"],
+      "reported_statistic": "median-and-range"
+    }
   },
-  "load_generator": {
-    "os": "macOS 26.6.1",
-    "arch": "arm64",
-    "relationship_to_target": "same physical Apple Silicon host"
+  "promotion_rules": {
+    "screen_promote_percent_above": 2.0,
+    "paired_evidence_percent_range": [0.5, 2.0],
+    "unresolved_below_percent": 0.5,
+    "accept_only_above_observed_noise": true,
+    "prefer_simpler_when_intervals_overlap": true,
+    "reject_on_correctness_failure": true,
+    "reject_at_or_above_error_rate": 0.01
   },
-  "limitations": [
-    "The organizer runs k6 separately from the target; this local comparison shares a physical host.",
-    "The published threshold values are placeholders until the organizer locks the final grading script."
-  ]
+  "environments": {
+    "local": {
+      "status": "available-grader-shaped",
+      "target_os": "linux",
+      "target_arch": "arm64",
+      "runtime": "Docker on Colima",
+      "load_generator_os": "macOS",
+      "load_generator_arch": "arm64",
+      "relationship": "same physical Apple Silicon host",
+      "claim_limit": "local relative evidence only"
+    },
+    "separated_x86": {
+      "status": "planned-reference",
+      "target_host": "fixed-performance x86_64 Linux with more than 2 visible vCPUs",
+      "target_container_cpus": 2,
+      "target_container_memory_bytes": 2147483648,
+      "cpuset": null,
+      "load_host": "separate fixed-performance x86_64 Linux",
+      "network": "same-region private low-latency",
+      "aws_reference_target": "c7i.xlarge",
+      "aws_reference_load_generator": "c7i.large"
+    }
+  },
+  "recording": {
+    "raw_results_directory": "benchmarks/results",
+    "history_file": "benchmarks/history.jsonl",
+    "require_unique_run_id": true,
+    "overwrite_raw_results_by_default": false,
+    "verdicts": ["pending", "kept", "reverted", "invalid", "superseded"],
+    "required_metrics": [
+      "work_score",
+      "http_reqs",
+      "http_req_failed",
+      "price_p95",
+      "stats_p95",
+      "risk_p95"
+    ]
+  },
+  "recorded_evidence": {
+    "latest_set": "local-2026-08-21",
+    "sets": [
+      {
+        "id": "local-2026-08-21",
+        "recorded_at": "2026-08-21T15:02:32+10:00",
+        "status": "legacy-local-grader-shaped",
+        "environment_id": "local",
+        "repetitions_per_checkpoint": 3,
+        "reported_statistic": "median",
+        "execution_order": "grouped-not-interleaved",
+        "protocol_interpretation": "provisional-under-v2",
+        "checkpoints": [
+          {
+            "name": "starter",
+            "median_work_score": 1425795,
+            "raw_summaries": [
+              "benchmarks/results/baseline-summary.json",
+              "benchmarks/results/baseline-r2-summary.json",
+              "benchmarks/results/baseline-r3-summary.json"
+            ]
+          },
+          {
+            "name": "bounded-go",
+            "median_work_score": 2790902,
+            "raw_summaries": [
+              "benchmarks/results/current-summary.json",
+              "benchmarks/results/current-r2-summary.json",
+              "benchmarks/results/current-r3-summary.json"
+            ]
+          },
+          {
+            "name": "permanent-workers",
+            "median_work_score": 2874253,
+            "raw_summaries": [
+              "benchmarks/results/workers-r1-summary.json",
+              "benchmarks/results/workers-r2-summary.json",
+              "benchmarks/results/workers-r3-summary.json"
+            ],
+            "diagnostic_summary": "benchmarks/results/workers-timing-summary.json"
+          }
+        ]
+      }
+    ]
+  }
 }
