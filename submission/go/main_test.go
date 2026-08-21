@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -87,6 +88,58 @@ func TestRiskEndpointEscapesSeed(t *testing.T) {
 	}
 	if body.Seed != seed || body.RiskHash != referenceRisk(seed) {
 		t.Fatalf("unexpected body: %+v", body)
+	}
+}
+
+func TestRiskTimingIsOptional(t *testing.T) {
+	previous := emitRiskTiming
+	emitRiskTiming = true
+	defer func() { emitRiskTiming = previous }()
+
+	response := request(t, "/risk?seed=timed")
+	if response.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d", response.Code)
+	}
+	timing := response.Header().Get("Server-Timing")
+	if !strings.Contains(timing, "risk_queue;dur=") || !strings.Contains(timing, "risk_hash;dur=") {
+		t.Fatalf("unexpected Server-Timing header: %q", timing)
+	}
+}
+
+func TestConcurrentRiskRequests(t *testing.T) {
+	type completedRequest struct {
+		index  int
+		status int
+		body   string
+	}
+
+	const requestCount = 8
+	expected := make([]string, requestCount)
+	completed := make(chan completedRequest, requestCount)
+	for index := range requestCount {
+		seed := "concurrent-" + strconv.Itoa(index)
+		expected[index] = referenceRisk(seed)
+		go func() {
+			response := httptest.NewRecorder()
+			route(response, httptest.NewRequest(http.MethodGet, "/risk?seed="+seed, nil))
+			completed <- completedRequest{index: index, status: response.Code, body: response.Body.String()}
+		}()
+	}
+
+	for range requestCount {
+		result := <-completed
+		if result.status != http.StatusOK {
+			t.Fatalf("request %d returned status %d", result.index, result.status)
+		}
+		var body struct {
+			RiskHash string `json:"risk_hash"`
+		}
+		if err := json.Unmarshal([]byte(result.body), &body); err != nil {
+			t.Fatalf("request %d returned invalid JSON: %v", result.index, err)
+		}
+		if body.RiskHash != expected[result.index] {
+			t.Fatalf("request %d returned the wrong hash", result.index)
+		}
 	}
 }
 

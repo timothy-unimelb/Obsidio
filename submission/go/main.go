@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	riskIterations  = 50_000
-	defaultRiskJobs = 2
+	riskIterations   = 50_000
+	defaultRiskJobs  = 2
+	defaultRiskQueue = 32
 )
 
 type priceSeries [500]float64
@@ -32,12 +33,26 @@ type responseBuffer struct {
 	bytes []byte
 }
 
+type riskJob struct {
+	seed     string
+	queuedAt time.Time
+	result   chan<- riskResult
+}
+
+type riskResult struct {
+	hash      [sha256.Size * 2]byte
+	queueWait time.Duration
+	hashTime  time.Duration
+}
+
 var markets = buildMarkets()
 
-// riskSlots prevents a burst of expensive requests from creating more runnable
-// hashing goroutines than the two-CPU container can execute. Cheap handlers do
-// not enter this queue, so they remain immediately schedulable.
-var riskSlots = make(chan struct{}, envInt("RISK_WORKERS", defaultRiskJobs, 1, 2))
+var (
+	riskWorkerCount = envInt("RISK_WORKERS", defaultRiskJobs, 1, 2)
+	riskQueue       = make(chan riskJob, envInt("RISK_QUEUE", defaultRiskQueue, 1, 200))
+	riskWorkersOnce sync.Once
+	emitRiskTiming  = os.Getenv("RISK_TIMING") == "1"
+)
 
 var responseBuffers = sync.Pool{
 	New: func() any {
@@ -49,6 +64,7 @@ func main() {
 	// Docker CPU quotas are not guaranteed to change the processor count seen by
 	// every Go release. Pinning it avoids overscheduling on the grading host.
 	runtime.GOMAXPROCS(2)
+	startRiskWorkers()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -63,7 +79,7 @@ func main() {
 		MaxHeaderBytes:    8 << 10,
 	}
 
-	log.Printf("obsidio listening on :%s with %d risk workers", port, cap(riskSlots))
+	log.Printf("obsidio listening on :%s with %d risk workers and queue capacity %d", port, riskWorkerCount, cap(riskQueue))
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
@@ -149,24 +165,73 @@ func handleStats(w http.ResponseWriter, symbol string) {
 }
 
 func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
+	startRiskWorkers()
+	resultChannel := make(chan riskResult, 1)
+	job := riskJob{seed: seed, result: resultChannel}
+	if emitRiskTiming {
+		job.queuedAt = time.Now()
+	}
+
 	select {
-	case riskSlots <- struct{}{}:
-		defer func() { <-riskSlots }()
+	case riskQueue <- job:
 	case <-r.Context().Done():
 		return
 	}
 
-	hash := calculateRisk(seed)
+	var result riskResult
+	select {
+	case result = <-resultChannel:
+	case <-r.Context().Done():
+		return
+	}
+
+	if emitRiskTiming {
+		queueMilliseconds := float64(result.queueWait) / float64(time.Millisecond)
+		hashMilliseconds := float64(result.hashTime) / float64(time.Millisecond)
+		timing := "risk_queue;dur=" + strconv.FormatFloat(queueMilliseconds, 'f', 3, 64) +
+			", risk_hash;dur=" + strconv.FormatFloat(hashMilliseconds, 'f', 3, 64)
+		w.Header().Set("Server-Timing", timing)
+	}
+
 	pooled := getResponseBuffer()
 	buffer := pooled.bytes
 	buffer = append(buffer, `{"seed":`...)
 	buffer = strconv.AppendQuote(buffer, seed)
 	buffer = append(buffer, `,"risk_hash":"`...)
-	buffer = append(buffer, hash[:]...)
+	buffer = append(buffer, result.hash[:]...)
 	buffer = append(buffer, '"', '}')
 	writeJSONBytes(w, http.StatusOK, buffer)
 	pooled.bytes = buffer
 	putResponseBuffer(pooled)
+}
+
+// startRiskWorkers creates the only goroutines allowed to execute the expensive
+// hash loop. HTTP handlers enqueue jobs and wait for their own buffered result
+// channel, while price and stats requests bypass this queue completely.
+func startRiskWorkers() {
+	riskWorkersOnce.Do(func() {
+		for range riskWorkerCount {
+			go riskWorker()
+		}
+	})
+}
+
+func riskWorker() {
+	for job := range riskQueue {
+		if !emitRiskTiming {
+			job.result <- riskResult{hash: calculateRisk(job.seed)}
+			continue
+		}
+
+		hashStarted := time.Now()
+		hash := calculateRisk(job.seed)
+		finished := time.Now()
+		job.result <- riskResult{
+			hash:      hash,
+			queueWait: hashStarted.Sub(job.queuedAt),
+			hashTime:  finished.Sub(hashStarted),
+		}
+	}
 }
 
 // calculateRisk performs the specified SHA-256 -> lowercase hex feedback loop.

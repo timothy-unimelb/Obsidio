@@ -11,7 +11,7 @@ const checkpoints = [
   {
     number: "00",
     name: "Go starter",
-    status: "Measured · run 1 of 3",
+    status: "Measured · median of 3 runs",
     detail: "Untouched, correct starter: general JSON encoding, allocation-heavy risk loop, no explicit concurrency control.",
     score: 1_425_795,
     requests: 570_589,
@@ -19,14 +19,22 @@ const checkpoints = [
   },
   {
     number: "01",
-    name: "Current bounded Go",
-    status: "Measured · run 1 of 3",
+    name: "Bounded Go",
+    status: "Measured · median of 3 runs",
     detail: "Combined checkpoint: two risk permits, GOMAXPROCS=2, fixed risk buffer, lean response serialization, and a scratch image.",
     score: 2_790_902,
     requests: 1_115_212,
+    tone: "paper",
+  },
+  {
+    number: "02",
+    name: "Permanent workers + queue",
+    status: "Measured · kept · median of 3 runs",
+    detail: "Two permanent hash workers draw from a bounded FIFO. Price and stats bypass it; risk waits deliberately when both workers are occupied.",
+    score: 2_874_253,
+    requests: 1_149_663,
     tone: "acid",
   },
-  { number: "02", name: "Permanent workers + queue", status: "Not implemented", detail: "Measure the scheduling change independently before adding batching.", score: null, requests: null, tone: "pending" },
   { number: "03", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
   { number: "04", name: "Fixed-shape SHA path", status: "Not implemented", detail: "Specialize rounds 2–50,000 and verify every digest against reference vectors.", score: null, requests: null, tone: "pending" },
   { number: "05", name: "PGO + runtime tuning", status: "Not implemented", detail: "Record PGO and each runtime control separately so their effects remain attributable.", score: null, requests: null, tone: "pending" },
@@ -34,25 +42,25 @@ const checkpoints = [
 ];
 
 const metrics = [
-  { label: "Work score", baseline: "1,425,795", current: "2,790,902", delta: "+95.7%", bar: "higher is better" },
-  { label: "Weighted work / sec", baseline: "5,280.72", current: "10,336.65", delta: "+95.7%", bar: "higher is better" },
-  { label: "Completed requests", baseline: "570,589", current: "1,115,212", delta: "+95.4%", bar: "higher is better" },
-  { label: "Requests / sec", baseline: "2,113.29", current: "4,130.41", delta: "+95.4%", bar: "higher is better" },
-  { label: "/price p95", baseline: "85.59 ms", current: "50.82 ms", delta: "−40.6%", bar: "< 200 ms" },
-  { label: "/stats p95", baseline: "86.62 ms", current: "50.85 ms", delta: "−41.3%", bar: "< 500 ms" },
-  { label: "/risk p95", baseline: "542.33 ms", current: "55.84 ms", delta: "−89.7%", bar: "< 1,500 ms" },
+  { label: "Work score", baseline: "1,425,795", current: "2,874,253", delta: "+101.6%", bar: "higher is better" },
+  { label: "Weighted work / sec", baseline: "5,280.72", current: "10,645.59", delta: "+101.6%", bar: "higher is better" },
+  { label: "Completed requests", baseline: "570,589", current: "1,149,663", delta: "+101.5%", bar: "higher is better" },
+  { label: "Requests / sec", baseline: "2,113.29", current: "4,258.09", delta: "+101.5%", bar: "higher is better" },
+  { label: "/price p95", baseline: "85.59 ms", current: "24.34 ms", delta: "−71.6%", bar: "< 200 ms" },
+  { label: "/stats p95", baseline: "86.62 ms", current: "24.39 ms", delta: "−71.8%", bar: "< 500 ms" },
+  { label: "/risk p95", baseline: "542.33 ms", current: "298.54 ms", delta: "−45.0%", bar: "< 1,500 ms" },
   { label: "HTTP errors", baseline: "0.00%", current: "0.00%", delta: "no change", bar: "< 1%" },
 ];
 
 const latency = [
-  { endpoint: "/price", limit: "200 ms", baseline: "85.59", current: "50.82", baselineWidth: "42.8%", currentWidth: "25.4%", tone: "mint" },
-  { endpoint: "/stats", limit: "500 ms", baseline: "86.62", current: "50.85", baselineWidth: "17.3%", currentWidth: "10.2%", tone: "amber" },
-  { endpoint: "/risk", limit: "1,500 ms", baseline: "542.33", current: "55.84", baselineWidth: "36.2%", currentWidth: "3.7%", tone: "coral" },
+  { endpoint: "/price", limit: "200 ms", baseline: "85.59", current: "24.34", baselineWidth: "42.8%", currentWidth: "12.2%", tone: "mint" },
+  { endpoint: "/stats", limit: "500 ms", baseline: "86.62", current: "24.39", baselineWidth: "17.3%", currentWidth: "4.9%", tone: "amber" },
+  { endpoint: "/risk", limit: "1,500 ms", baseline: "542.33", current: "298.54", baselineWidth: "36.2%", currentWidth: "19.9%", tone: "coral" },
 ];
 
 const evidenceLinks = [
-  ["Baseline raw k6 summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/baseline-summary.json"],
-  ["Current raw k6 summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/current-summary.json"],
+  ["All raw k6 summaries", "https://github.com/timothy-unimelb/Obsidio/tree/draft/benchmarks/results"],
+  ["Peak queue timing summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/workers-timing-summary.json"],
   ["Recorded protocol", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/protocol.json"],
   ["Repeatable runner", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/run-stage.sh"],
 ];
@@ -68,13 +76,13 @@ export default function PerformancePage() {
           <div>
             <h1>Performance,<br /><em>run by run.</em></h1>
             <p className="lede lightText">A checkpoint enters this record only after a complete published siege. Measured stages show raw results; unimplemented ideas stay visibly empty.</p>
-            <div className="recordStatus"><span>LOCAL GRADER-SHAPED RUNS</span><b>2 measured</b><i>5 awaiting implementation</i></div>
+            <div className="recordStatus"><span>LOCAL GRADER-SHAPED RUNS</span><b>3 measured</b><i>4 awaiting implementation</i></div>
           </div>
-          <div className="scoreComparison" aria-label="Work score increased from 1,425,795 for the starter to 2,790,902 for the current submission">
-            <div className="scoreCompareHead"><span>WORK SCORE</span><small>same script · same caps · one full run each</small></div>
+          <div className="scoreComparison" aria-label="Median work score increased from 1,425,795 for the starter to 2,874,253 for the current submission">
+            <div className="scoreCompareHead"><span>WORK SCORE</span><small>same script · same caps · median of three</small></div>
             <div className="scoreBar baselineScore"><span>STARTER</span><i /><strong>1,425,795</strong></div>
-            <div className="scoreBar currentScore"><span>CURRENT</span><i /><strong>2,790,902</strong></div>
-            <div className="scoreDelta"><strong>+95.7%</strong><span>weighted work</span><small>provisional until repeated</small></div>
+            <div className="scoreBar currentScore"><span>CURRENT</span><i /><strong>2,874,253</strong></div>
+            <div className="scoreDelta"><strong>+101.6%</strong><span>weighted work</span><small>three complete runs per checkpoint</small></div>
           </div>
         </div>
       </section>
@@ -102,7 +110,7 @@ export default function PerformancePage() {
       <section className="section progressionSection">
         <div className="sectionHead compact">
           <div><span className="sectionNumber">THE PROGRESSION</span><h2>One checkpoint.<br />One complete siege.</h2></div>
-          <p>The first optimized entry combines work completed before this log existed, so it proves the total improvement but cannot attribute it to one change. From checkpoint 02 onward, each row changes one layer.</p>
+          <p>The first optimized entry combines work completed before this log existed, so it proves the total improvement but cannot attribute it to one change. Checkpoint 02 changes one scheduling layer and clears the measured noise band.</p>
         </div>
         <div className="checkpointList">
           {checkpoints.map((checkpoint) => (
@@ -118,7 +126,7 @@ export default function PerformancePage() {
       </section>
 
       <section className="metricsSection">
-        <div className="metricsIntro"><span className="sectionNumber inverse">BASELINE → CURRENT</span><h2>The complete<br />comparison.</h2><p>All values come from the two raw k6 summary files generated on 21 August 2026.</p></div>
+        <div className="metricsIntro"><span className="sectionNumber inverse">BASELINE → CURRENT</span><h2>The complete<br />comparison.</h2><p>Each value is the median of three complete runs generated on 21 August 2026. Nine full score summaries remain in the repository.</p></div>
         <div className="metricTable" role="table" aria-label="Baseline and current benchmark metrics">
           <div className="metricHeader" role="row"><span>METRIC</span><span>STARTER</span><span>CURRENT</span><span>CHANGE</span><span>BAR</span></div>
           {metrics.map((metric) => (
@@ -144,6 +152,14 @@ export default function PerformancePage() {
             </article>
           ))}
         </div>
+        <div className="riskTimingCard" aria-label="At peak load, median risk time was 4 milliseconds hashing and 321 milliseconds waiting in the queue">
+          <div><span className="sectionNumber">INSIDE A PEAK /RISK REQUEST</span><h3>The queue is the policy.</h3><p>The work did not become slower. It waits so price and stats can finish first.</p></div>
+          <div className="riskTimingVisual">
+            <div className="riskTimingBar"><i className="hashSlice" /><i className="queueSlice" /></div>
+            <div className="riskTimingValues"><span><b>4.00 ms</b>median hashing</span><span><b>320.70 ms</b>median queue wait</span></div>
+            <small>30-second diagnostic at 200 VUs · timing headers disabled during scoring runs</small>
+          </div>
+        </div>
       </section>
 
       <section className="evidenceSection">
@@ -151,7 +167,7 @@ export default function PerformancePage() {
         <div className="fingerprintCard">
           <div><small>GRADING SCRIPT SHA-256</small><code>d7b259eb36cd…9f56998d20f</code></div>
           <div><small>COMPARISON SET</small><strong>2026-08-21 · local-arm64-01</strong></div>
-          <div><small>REPETITION STATUS</small><strong>1 of 3 runs per measured checkpoint</strong></div>
+          <div><small>REPETITION STATUS</small><strong>3 of 3 runs per measured checkpoint</strong></div>
         </div>
         <div className="evidenceLinks">
           {evidenceLinks.map(([label, href]) => <a href={href} target="_blank" rel="noreferrer" key={label}><span>{label}</span><b>↗</b></a>)}

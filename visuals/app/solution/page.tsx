@@ -4,13 +4,13 @@ import { SiteHeader } from "../components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "Our Solution — Obsidio",
-  description: "A visual walkthrough of the bounded-concurrency, allocation-free Go solution built for Obsidio.",
+  description: "A visual walkthrough of the queued, allocation-free Go solution built for Obsidio.",
 };
 
 const results = [
-  { metric: "/price p95", value: "50.82", unit: "ms", bar: "25.4%", tone: "mint", limit: "200 ms bar" },
-  { metric: "/stats p95", value: "50.85", unit: "ms", bar: "10.2%", tone: "amber", limit: "500 ms bar" },
-  { metric: "/risk p95", value: "55.84", unit: "ms", bar: "3.7%", tone: "coral", limit: "1,500 ms bar" },
+  { metric: "/price p95", value: "24.34", unit: "ms", bar: "12.2%", tone: "mint", limit: "200 ms bar" },
+  { metric: "/stats p95", value: "24.39", unit: "ms", bar: "4.9%", tone: "amber", limit: "500 ms bar" },
+  { metric: "/risk p95", value: "298.54", unit: "ms", bar: "19.9%", tone: "coral", limit: "1,500 ms bar" },
 ];
 
 export default function SolutionPage() {
@@ -23,7 +23,7 @@ export default function SolutionPage() {
         <div className="solutionHeroGrid">
           <div>
             <h1>Protect the cheap path.<br /><em>Bound the expensive one.</em></h1>
-            <p className="lede lightText">A compact Go server turns uncontrolled CPU contention into two deliberate lanes of heavy work—while cheap traffic walks straight past.</p>
+            <p className="lede lightText">A compact Go server sends heavy work through a bounded FIFO and two permanent hash workers—while cheap traffic walks straight past.</p>
           </div>
           <div className="coreVisual" aria-label="Two CPU cores process bounded risk work">
             <div className="coreRing outer"><span>GOMAXPROCS</span><b>2</b></div>
@@ -37,12 +37,12 @@ export default function SolutionPage() {
       <section className="section controlsSection">
         <div className="sectionHead">
           <div><span className="sectionNumber">THE TWO CONTROLS</span><h2>Same number.<br />Different jobs.</h2></div>
-          <p><code>riskSlots=2</code> and <code>GOMAXPROCS=2</code> are separate limits. One controls admission to heavy work; the other controls execution across the whole Go process.</p>
+          <p><code>riskWorkers=2</code> and <code>GOMAXPROCS=2</code> are separate limits. One owns heavy work; the other limits execution across the whole Go process.</p>
         </div>
 
-        <div className="controlDiagram" aria-label="The semaphore and Go scheduler are two separate controls">
+        <div className="controlDiagram" aria-label="The risk worker queue and Go scheduler are two separate controls">
           <article className="controlLayer admissionLayer">
-            <header><span>01 · OUR CODE</span><code>riskSlots = 2</code></header>
+            <header><span>01 · OUR CODE</span><code>workers = 2 · FIFO = 32</code></header>
             <div className="admissionBoard">
               <div className="routeLabel mint"><b>/price</b><small>BYPASS</small></div>
               <div className="routeLine"><i /><span>→</span></div>
@@ -52,11 +52,11 @@ export default function SolutionPage() {
               <div className="routeLine"><i /><span>→</span></div>
               <div className="admissionResult directResult">RUNNABLE</div>
 
-              <div className="routeLabel coral"><b>/risk</b><small>MUST ENTER</small></div>
+              <div className="routeLabel coral"><b>/risk</b><small>ENQUEUE FIFO</small></div>
               <div className="permitGate"><span>01</span><span>02</span></div>
-              <div className="admissionResult riskResult"><b>2 RUNNABLE</b><small>REST PARKED</small></div>
+              <div className="admissionResult riskResult"><b>2 HASHERS</b><small>REST QUEUED</small></div>
             </div>
-            <p>Only risk requests pass through this gate. Once both permits are occupied, later risk handlers sleep instead of joining the CPU competition.</p>
+            <p>Only risk requests enter this FIFO. Two permanent workers remove jobs in order; later handlers wait on their result instead of creating another runnable hash loop.</p>
           </article>
 
           <div className="controlHandoff" aria-hidden="true"><span>THEN</span><b>→</b></div>
@@ -66,7 +66,7 @@ export default function SolutionPage() {
             <div className="runtimeBoard">
               <div className="runnableTray">
                 <small>RUNNABLE GOROUTINES</small>
-                <div><span className="mint">PRICE</span><span className="amber">STATS</span><span className="coral">RISK 01</span><span className="coral">RISK 02</span></div>
+                <div><span className="mint">PRICE</span><span className="amber">STATS</span><span className="coral">WORKER 01</span><span className="coral">WORKER 02</span></div>
               </div>
               <div className="schedulerStep"><span>GO SCHEDULER PICKS ANY TWO</span><b>↓</b></div>
               <div className="processorPair">
@@ -79,8 +79,8 @@ export default function SolutionPage() {
         </div>
 
         <div className="priorityTruth">
-          <strong>NO SECRET PRIORITY</strong>
-          <p>Go does not know that <code>/price</code> matters most. Cheap requests stay responsive because they bypass the risk gate and compete with at most two active hash loops—not hundreds.</p>
+          <strong>EXPLICIT ADMISSION POLICY</strong>
+          <p>Go still does not assign endpoint priority. Our code supplies the useful policy: risk jobs wait FIFO, while price and stats bypass the queue and compete with at most two hash workers.</p>
         </div>
       </section>
 
@@ -118,24 +118,24 @@ export default function SolutionPage() {
             <div className="switchEvent"><span>01</span><p><b>Natural hand-off</b>A handler finishes, blocks on I/O, or waits on synchronization.</p></div>
             <div className="switchEvent"><span>02</span><p><b>Runtime preemption</b>Go can pause CPU-bound work so another runnable goroutine is not starved.</p></div>
             <div className="timingPair">
-              <div><strong>3.68<small>ms</small></strong><span>local risk kernel</span></div>
+              <div><strong>4.00<small>ms</small></strong><span>median hash at peak</span></div>
               <div><strong>~10<small>ms</small></strong><span>preemption target</span></div>
             </div>
-            <p className="timingCaveat">Usually our risk calculation finishes before forced preemption is needed. The ~10 ms target is a backstop, not a metronome.</p>
+            <p className="timingCaveat">The median hash finishes before forced preemption is usually needed. The ~10 ms target is a backstop, not a metronome.</p>
           </div>
         </div>
       </section>
 
       <section className="section permitSection">
         <div className="sectionHead compact">
-          <div><span className="sectionNumber">WHY TWO PERMITS?</span><h2>Match the box.<br />Protect the score.</h2></div>
+          <div><span className="sectionNumber">WHY TWO WORKERS?</span><h2>Match the box.<br />Protect the score.</h2></div>
           <p>Two is the strongest measured default, not a universal mathematical proof. It matches two CPUs and preserves headroom for the fast path on our full siege.</p>
         </div>
 
         <div className="permitChoices">
-          <article><span className="choiceNumber">1</span><small>RISK PERMIT</small><h3>Leaves throughput behind</h3><p>Maximum fast-path protection, but only one core can advance the most valuable request type at a time.</p></article>
-          <article className="chosen"><div className="choiceFlag">OUR CHOICE</div><span className="choiceNumber">2</span><small>RISK PERMITS</small><h3>Useful parallelism</h3><p>Both CPUs can hash while Go still gives short turns to price and stats. Local p95 remained far below every bar.</p></article>
-          <article><span className="choiceNumber">3+</span><small>RISK PERMITS</small><h3>More competition, not more CPUs</h3><p>Pure CPU work has no I/O to hide. Extra runnable hash loops add contention without adding execution capacity.</p></article>
+          <article><span className="choiceNumber">1</span><small>RISK WORKER</small><h3>Leaves throughput behind</h3><p>Maximum fast-path protection, but only one core can advance the most valuable request type at a time.</p></article>
+          <article className="chosen"><div className="choiceFlag">OUR CHOICE</div><span className="choiceNumber">2</span><small>RISK WORKERS</small><h3>Useful parallelism</h3><p>Both CPUs can hash while the bounded queue absorbs bursts. Price and stats still bypass it.</p></article>
+          <article><span className="choiceNumber">3+</span><small>RISK WORKERS</small><h3>More competition, not more CPUs</h3><p>Pure CPU work has no I/O to hide. Extra runnable hash loops add contention without adding execution capacity.</p></article>
         </div>
 
         <div className="scoreMotive">
@@ -170,7 +170,7 @@ export default function SolutionPage() {
             </div>
             <div className="bufferLabel"><span>64 BYTES</span><em>reused 49,999 times</em></div>
             <div className="compareMetric after"><strong>0</strong><span>loop allocations</span></div>
-            <div className="speedBadge"><span>5.00 ms</span><b>→</b><strong>3.68 ms</strong></div>
+            <div className="speedBadge"><span>5.38 ms</span><b>→</b><strong>3.86 ms</strong></div>
           </div>
         </div>
       </section>
@@ -182,15 +182,15 @@ export default function SolutionPage() {
         </div>
         <div className="decisionGrid">
           <article><span className="decisionIcon">2</span><h3>Two schedulers</h3><p><code>GOMAXPROCS=2</code> prevents the host core count from creating runnable work the quota cannot execute.</p></article>
-          <article><span className="decisionIcon">Ⅱ</span><h3>Two risk permits</h3><p>The semaphore turns excess heavy requests into sleeping waiters, not competing hash loops.</p></article>
+          <article><span className="decisionIcon">Ⅱ</span><h3>Two risk workers</h3><p>A bounded FIFO turns bursts of heavy requests into ordered waiters, not competing hash loops.</p></article>
           <article><span className="decisionIcon">↯</span><h3>Direct fast path</h3><p>Price and stats handlers never touch the risk queue. The lightweight work remains immediately schedulable.</p></article>
           <article><span className="decisionIcon">□</span><h3>Tiny artifact</h3><p>A static binary in a <code>scratch</code> image: no runtime, package manager, shell, or incidental memory cost.</p></article>
         </div>
       </section>
 
       <section className="resultsSection">
-        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Full 4m30s published k6 run · 200 VUs · 2 CPU / 2 GB local grader-shaped result.</p></div>
-        <div className="heroScore"><small>WORK SCORE</small><strong>2,790,902</strong><span>10,336.65 weighted points / sec</span></div>
+        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Median of three full 4m30s published k6 runs · 200 VUs · 2 CPU / 2 GB local grader-shaped result.</p></div>
+        <div className="heroScore"><small>WORK SCORE</small><strong>2,874,253</strong><span>10,645.59 weighted points / sec</span></div>
         <div className="resultBars">
           {results.map((result) => (
             <div className="resultRow" key={result.metric}>
@@ -199,7 +199,7 @@ export default function SolutionPage() {
             </div>
           ))}
         </div>
-        <div className="proofStrip"><span><strong>1,115,212</strong> successful requests</span><span><strong>0.00%</strong> HTTP errors</span><span><strong>2.2 MB</strong> final image</span></div>
+        <div className="proofStrip"><span><strong>1,149,663</strong> successful requests</span><span><strong>0.00%</strong> HTTP errors</span><span><strong>2.2 MB</strong> final image</span></div>
       </section>
 
       <section className="solutionFooter">

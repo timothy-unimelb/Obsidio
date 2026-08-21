@@ -1,6 +1,8 @@
 {
   "recorded_at": "2026-08-21T15:02:32+10:00",
   "status": "local-grader-shaped",
+  "repetitions_per_checkpoint": 3,
+  "reported_statistic": "median",
   "workload": {
     "script": "k6/grading.js",
     "sha256": "d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f",
@@ -25,7 +27,6 @@
   },
   "limitations": [
     "The organizer runs k6 separately from the target; this local comparison shares a physical host.",
-    "The published threshold values are placeholders until the organizer locks the final grading script.",
-    "Baseline and current checkpoint currently contain one full run each; small gains require repeated runs."
+    "The published threshold values are placeholders until the organizer locks the final grading script."
   ]
 }

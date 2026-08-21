@@ -34,8 +34,13 @@ k6 summary to `benchmarks/results/<stage-name>-summary.json`.
   The organizer keeps k6 and the target on separate machines; this local setup
   runs k6 on macOS and the target in a Linux arm64 VM on the same physical host.
 - Repeat important checkpoints three times and compare medians before accepting
-  a small improvement. The raw files currently contain the first full run for
-  the baseline and current submission.
+  a small improvement. The raw files contain three full runs for the starter,
+  bounded Go, and permanent-worker checkpoints.
+
+The optional `benchmarks/risk-timing.js` diagnostic records queue wait and hash
+execution separately during a 30-second, 200-VU peak slice. Run the target with
+`RISK_TIMING=1` for that diagnostic only; normal scoring leaves timing headers
+disabled.
 
 ## Current comparison set
 
@@ -46,3 +51,4 @@ k6 summary to `benchmarks/results/<stage-name>-summary.json`.
 - Target: Docker on Colima, Linux arm64
 - Grading script SHA-256:
   `d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f`
+- Repetitions: 3 full runs per measured checkpoint; report the median
