@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function SiteHeader({ active }: { active: "challenge" | "solution" }) {
+export function SiteHeader({ active }: { active: "challenge" | "solution" | "optimizations" }) {
   return (
     <header className="topbar">
       <Link className="brand" href="/" aria-label="Obsidio challenge home">
@@ -12,7 +12,10 @@ export function SiteHeader({ active }: { active: "challenge" | "solution" }) {
           The challenge
         </Link>
         <Link className={`navLink ${active === "solution" ? "active" : ""}`} href="/solution">
-          Our solution <span aria-hidden="true">↗</span>
+          Our solution
+        </Link>
+        <Link className={`navLink ${active === "optimizations" ? "active" : ""}`} href="/optimizations">
+          Next gains <span aria-hidden="true">↗</span>
         </Link>
       </nav>
     </header>

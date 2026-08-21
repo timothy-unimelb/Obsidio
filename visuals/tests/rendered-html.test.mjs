@@ -13,6 +13,7 @@ test("exports the challenge page for the GitHub Pages base path", async () => {
   assert.match(html, /THE SIEGE/);
   assert.match(html, /THE SCORE/);
   assert.match(html, /href="\/Obsidio\/solution\/?"/);
+  assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
   assert.match(html, /https:\/\/timothy-unimelb\.github\.io\/Obsidio\/og\.png/);
   assert.doesNotMatch(html, /chatgpt\.site|codex-preview|SkeletonPreview/);
 });
@@ -32,6 +33,22 @@ test("exports the solution page", async () => {
   assert.match(html, /3,245,586/);
   assert.match(html, /0\.00%/);
   assert.match(html, /href="\/Obsidio\/?"/);
+  assert.match(html, /href="\/Obsidio\/optimizations\/?"/);
+});
+
+test("exports the optimization roadmap", async () => {
+  const html = await readFile(new URL("optimizations/index.html", output), "utf8");
+
+  assert.match(html, /<title>Optimization Roadmap — Obsidio<\/title>/i);
+  assert.match(html, /Optimize in layers/);
+  assert.match(html, /RECOMMENDED ORDER/);
+  assert.match(html, /Permanent risk workers/);
+  assert.match(html, /Multi-request batching/);
+  assert.match(html, /Fixed-block SHA path/);
+  assert.match(html, /Go PGO/);
+  assert.match(html, /Native C \/ Rust kernel/);
+  assert.match(html, /KEEP \/ REJECT GATE/);
+  assert.match(html, /href="\/Obsidio\/solution\/?"/);
 });
 
 test("exports branded assets without hosting-specific files", async () => {

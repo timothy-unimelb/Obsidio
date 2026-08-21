@@ -1,9 +1,10 @@
 # Obsidio visual story
 
-Two responsive, visual-first pages explaining the challenge and the submitted Go solution:
+Three responsive, visual-first pages explaining the challenge, the submitted Go solution, and the next optimization experiments:
 
 - `/Obsidio/` — the traffic siege, scoring model, endpoint mix, ramp, and latency target
 - `/Obsidio/solution/` — the architecture, bounded concurrency, allocation fix, and measured result
+- `/Obsidio/optimizations/` — the evidence-led optimization order, tradeoffs, and native-kernel decision
 
 ## Run locally
 
