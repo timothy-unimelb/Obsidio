@@ -39,15 +39,22 @@ test("exports the solution page", async () => {
 test("exports the optimization roadmap", async () => {
   const html = await readFile(new URL("optimizations/index.html", output), "utf8");
 
-  assert.match(html, /<title>Optimization Roadmap — Obsidio<\/title>/i);
-  assert.match(html, /Optimize in layers/);
-  assert.match(html, /RECOMMENDED ORDER/);
+  assert.match(html, /<title>Optimization Guide — Obsidio<\/title>/i);
+  assert.match(html, /A map of what/);
+  assert.match(html, /CURRENT SYSTEM/);
+  assert.match(html, /Measure at three/);
+  assert.match(html, /ONE REQUEST/);
+  assert.match(html, /FOUR REQUESTS/);
+  assert.match(html, /ROUNDS 2–50,000/);
+  assert.match(html, /A PRACTICAL SEQUENCE/);
+  assert.match(html, /OPTIMIZATION REFERENCE/);
   assert.match(html, /Permanent risk workers/);
-  assert.match(html, /Multi-request batching/);
-  assert.match(html, /Fixed-block SHA path/);
-  assert.match(html, /Go PGO/);
-  assert.match(html, /Native C \/ Rust kernel/);
-  assert.match(html, /KEEP \/ REJECT GATE/);
+  assert.match(html, /Batch independent requests/);
+  assert.match(html, /Specialize the 64-byte rounds/);
+  assert.match(html, /Go profile-guided optimization/);
+  assert.match(html, /A C or Rust hash kernel/);
+  assert.match(html, /BATCH IN/);
+  assert.match(html, /Four checks/);
   assert.match(html, /href="\/Obsidio\/solution\/?"/);
 });
 

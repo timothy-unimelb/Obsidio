@@ -4,7 +4,7 @@ Three responsive, visual-first pages explaining the challenge, the submitted Go 
 
 - `/Obsidio/` — the traffic siege, scoring model, endpoint mix, ramp, and latency target
 - `/Obsidio/solution/` — the architecture, bounded concurrency, allocation fix, and measured result
-- `/Obsidio/optimizations/` — the evidence-led optimization order, tradeoffs, and native-kernel decision
+- `/Obsidio/optimizations/` — a visual guide to the request path, batching, fixed-shape SHA rounds, tradeoffs, and native-kernel decision
 
 ## Run locally
 
