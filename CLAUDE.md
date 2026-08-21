@@ -8,6 +8,13 @@ capped at **2 CPUs / 2 GB RAM**. Every team does identical work per endpoint; th
 game is serving that work more efficiently and keeping the cheap path fast while the
 expensive path burns CPU. The grade is measured, not argued.
 
+**Official sources:** the live directions page is
+https://cissa-unimelb.notion.site/Obsidio-Directions-Resources-3c199473577c80968edcc87d91e386c7
+(verified 2026-08-21 to match `OBSIDIO-DETAIL-PAGE.md`, the fuller version bundled with
+the skeleton — no rule drift; thresholds still placeholders). Skeleton repo:
+https://github.com/solpercival/Obsidio. Re-check the Notion page before submission for
+the locked threshold numbers.
+
 **Submission checklist:**
 - [ ] A working backend as a `Dockerfile` (grader builds and runs it, port 8080)
 - [ ] `docker-compose.yml` ONLY if attempting the persistence bonus
@@ -54,6 +61,41 @@ not just bar-clearance):
 **Optional bonus:** `POST /price {"symbol","price"}` with storage that survives a
 container restart, via docker-compose sharing the SAME 2 CPU / 2 GB budget. Only worth it
 if all latency bars still pass afterward.
+
+**Bonus clarifications (per organizer, 2026-08-21):**
+- Bonus POSTs are **0% of the graded load mix** — evaluated separately from the
+  throughput siege with a small fixed set of writes, not a proportion of traffic.
+- Scoring is **pass/fail durability**, not volume: grader writes a fixed set of values,
+  restarts the container, reads them back. All survive + all latency thresholds still
+  pass → bonus. Number of writes handled doesn't factor in.
+- Restart is a **hard kill (`docker kill`)**, not a graceful compose restart. Data must
+  be durably written (fsync'd) at the moment the POST is accepted — a shutdown-time
+  flush does NOT count. Design as if power is lost right after the 200 is sent.
+
+**Grading hardware (per Competitions Director, Discord 2026-08-21 — not finalized):**
+- Assume ONLY: 2.0 CPUs (cgroup-enforced), 2 GB RAM, x86-64 Linux. Do NOT assume a
+  CPU model, cache size, or instruction-set extension (AVX-512, SHA-NI, AES-NI) —
+  any may change; code that hard-depends on them may not carry over. Runtime feature
+  detection (e.g. Go's crypto/sha256) is fine; hard-coded ISA paths are not.
+- It will be a cloud VM with recent hardware or a powerful home-lab workstation —
+  not ancient silicon — but treat that as a floor, not a target.
+- `nproc`/`lscpu` inside the container report HOST CPUs, not the cap. Read the real
+  budget from the cgroup: `cat /sys/fs/cgroup/cpu.max` (`200000 100000` = 2.0 CPUs)
+  and `cat /sys/fs/cgroup/memory.max`. Size pools/threads against the 2-CPU cap.
+- Organizer's stated priorities: right-sized concurrency, unblocked fast path,
+  bounded queues, no memory leaks — these transfer to any machine.
+
+**Container-privilege rules (per Competitions Director, Discord 2026-08-21):**
+- NO `privileged: true` in docker-compose.yml (called a security hole).
+- NO added capabilities (`cap_add`) — could exceed the standard Docker resource
+  environment.
+- NO CPU core binding/pinning (`cpuset`) in the submission — grading runs on
+  different machines, so core-specific optimisation is disallowed and pointless.
+- Local-only impact: our `/bench` harness uses `--cpuset-cpus=0,1` on the
+  `docker run` line purely for same-machine measurement isolation. That is our
+  local harness, not the submitted Dockerfile/compose, so it stays — but never
+  let cpuset/cap_add/privileged leak into `app/Dockerfile` or any submitted
+  docker-compose.yml.
 
 ## Commands
 
@@ -118,7 +160,9 @@ zero-allocation hash loop, and serializes without encoding/json reflection.
 - **Run `/smoke` after any change to endpoint logic** — a correctness bug in /risk
   scores zero no matter how fast it is.
 - **Log every optimisation attempt via `/experiment`** — EXPERIMENTS.md is the evidence
-  base for the judged write-up.
+  base for the judged write-up. Keep it current: it doubles as the record of the
+  improvement journey, so failures and reverts get entries too, and stale verdicts
+  (e.g. a "kept" that later gets reverted) must be corrected when reality changes.
 - **Start each session with `/status`. End each session with `/handoff`.**
 
 ## Planning workflow

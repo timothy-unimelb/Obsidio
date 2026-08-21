@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -25,8 +26,10 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -45,6 +48,7 @@ var (
 	series     = map[string][]float64{}
 	healthBody = []byte(`{"status":"ok"}`)
 	notFound   = []byte(`{"error":"unknown symbol"}`)
+	overloaded = []byte(`{"error":"overloaded, try again"}`)
 )
 
 func buildPriceResp(sym string, p float64) []byte {
@@ -69,10 +73,58 @@ func init() {
 	}
 }
 
-// riskSem bounds concurrent hash chains to the CPU budget. Waiters are parked
-// goroutines (cheap); with the closed-loop grader (max 200 VUs, 10% risk) the
-// worst-case queue clears well inside the 1500 ms bar, so nothing is shed.
-var riskSem = make(chan struct{}, cpuCap)
+// /risk gate: at most cpuCap chains burn CPU at once; a bounded number more
+// may wait, each with a deadline; everything past that is shed with an
+// immediate 503 (a request that would miss the 1500 ms bar scores zero anyway,
+// but burns ~a full chain of CPU — shedding it is strictly cheaper).
+//
+// The queue depth and wait deadline are NOT hardcoded: grading-hardware speed
+// is unknown, so they are derived at boot from a real timed measurement of
+// this container's chain cost (calibrateRisk). Idea adapted from Joel's
+// branch (joel/draft@894f469).
+var (
+	riskSem         = make(chan struct{}, cpuCap)
+	riskWaiting     int32
+	riskMaxQueued   int32
+	riskWaitTimeout time.Duration
+)
+
+const (
+	riskLatencyBudget = 1500 * time.Millisecond // the /risk p95 grading bar
+	riskSafetyMargin  = 300 * time.Millisecond  // headroom for jitter + response overhead
+)
+
+// calibrateRisk times real 50k chains on this container (median of 3, so one
+// boot-time scheduling hiccup can't skew it) and derives the gate limits.
+// waitTimeout: a waiter must still fit one full chain plus margin inside the
+// latency bar. maxQueued: how many can be in line and still clear in time
+// (Little's Law), oversized 3× because the boot measurement is a best case
+// (idle machine) and shedding too eagerly wastes score.
+func calibrateRisk() {
+	samples := make([]time.Duration, 3)
+	for i := range samples {
+		start := time.Now()
+		riskChain("obsidio-calibration")
+		samples[i] = time.Since(start)
+	}
+	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
+	unitCost := samples[1]
+
+	riskWaitTimeout = riskLatencyBudget - unitCost - riskSafetyMargin
+	if riskWaitTimeout < 100*time.Millisecond {
+		riskWaitTimeout = 100 * time.Millisecond
+	}
+	q := int64(riskWaitTimeout/unitCost) * cpuCap * 3
+	if q < cpuCap {
+		q = cpuCap
+	}
+	if q > 5000 { // sanity ceiling against a freak fast measurement
+		q = 5000
+	}
+	riskMaxQueued = int32(q)
+	log.Printf("risk calibration: unitCost=%s maxQueued=%d waitTimeout=%s",
+		unitCost, riskMaxQueued, riskWaitTimeout)
+}
 
 // riskChain: h = seed; 50,000 × h = hex(sha256(h)). Zero heap allocations in
 // the loop; only the final string(buf) allocates.
@@ -173,7 +225,31 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 	if seed == "" {
 		seed = "none"
 	}
-	riskSem <- struct{}{}
+	if atomic.AddInt32(&riskWaiting, 1) > riskMaxQueued {
+		atomic.AddInt32(&riskWaiting, -1)
+		writeJSON(w, 503, overloaded)
+		return
+	}
+	// Wait for a slot, but give up at the calibrated deadline or when the
+	// client disconnects (r.Context() cancels) — a waiter that can no longer
+	// finish inside the latency bar scores zero either way, and computing its
+	// chain anyway would burn CPU that a live request could use.
+	select {
+	case riskSem <- struct{}{}:
+		atomic.AddInt32(&riskWaiting, -1)
+	default:
+		waitCtx, cancel := context.WithTimeout(r.Context(), riskWaitTimeout)
+		select {
+		case riskSem <- struct{}{}:
+			atomic.AddInt32(&riskWaiting, -1)
+		case <-waitCtx.Done():
+			cancel()
+			atomic.AddInt32(&riskWaiting, -1)
+			writeJSON(w, 503, overloaded)
+			return
+		}
+		cancel()
+	}
 	h := riskChain(seed)
 	<-riskSem
 	// seed is arbitrary user input → JSON-escape it properly.
@@ -207,6 +283,7 @@ func handlePricePost(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	runtime.GOMAXPROCS(cpuCap)
+	calibrateRisk() // ~3 timed chains; runs before the listener, so /health only reports ready after
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

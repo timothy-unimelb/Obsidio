@@ -1,5 +1,7 @@
 # Obsidio engineered backend: Go. Multi-stage, pinned images, reproducible.
-FROM golang:1.22-bookworm AS build
+# Go >=1.25 required: stdlib crypto/sha256 gains a SHA-NI path on amd64 (~2x /risk
+# on Zen/Ice Lake+ hardware); 1.22-1.24 top out at AVX2.
+FROM golang:1.26-bookworm AS build
 WORKDIR /app
 COPY go.mod main.go ./
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o server .

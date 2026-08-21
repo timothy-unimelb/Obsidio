@@ -11,7 +11,11 @@ Goal: a fresh session (or a /clear) can resume with zero archaeology.
    to match what actually got done — no aspirational ticks. If the plan is finished,
    move it to `archived-plans/` with a dated name.
 
-2. **Write/overwrite HANDOFF.md** (repo root, keep it under ~30 lines):
+2. **Sync EXPERIMENTS.md.** Every optimisation attempt from this session (including
+   failures/reverts) must have an entry; backfill anything missed and fix any verdict
+   that reality has since changed (e.g. a "kept" that got reverted).
+
+3. **Write/overwrite HANDOFF.md** (repo root, keep it under ~30 lines):
    - **Best result so far:** best work_score and which bars pass, pulled from
      `bench/history.jsonl` (say "no bench runs yet" if empty).
    - **What changed this session:** 2-5 bullets, referencing experiment entries where
@@ -22,5 +26,5 @@ Goal: a fresh session (or a /clear) can resume with zero archaeology.
      (e.g. "bench the worker-pool change at SHA abc123 — hypothesis logged in
      EXPERIMENTS.md").
 
-3. **Remind the user** of anything that must not be forgotten overnight (e.g. "the
+4. **Remind the user** of anything that must not be forgotten overnight (e.g. "the
    container is still running: docker stop obsidio", "tree is dirty and unpushed").
