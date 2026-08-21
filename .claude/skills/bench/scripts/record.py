@@ -141,6 +141,15 @@ def main():
     if prev and row["work_score"] < (pv("work_score") or 0):
         print("\n  *** REGRESSION: work_score fell vs the previous run. ***")
 
+    # Keep the human-readable comparison table in sync (best-effort: a render
+    # failure must never lose the history line we just appended).
+    try:
+        import render_results
+        sys.argv = ["render_results.py", "--history", args.history]
+        render_results.main()
+    except Exception as e:
+        print(f"WARNING: could not render RESULTS.md: {e}", file=sys.stderr)
+
 
 if __name__ == "__main__":
     main()

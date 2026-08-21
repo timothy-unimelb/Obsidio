@@ -39,6 +39,11 @@ starting. No bench delta = no performance claim.
    The line contains: ts, git_sha, dirty, note, p95_price, p95_stats, p95_risk,
    error_rate, work_score, reqs_total, bars_passed. Tier p95s come from the
    `http_req_duration{tier:...}` submetrics; work_score from the Counter.
+   It also regenerates `RESULTS.md` (repo root) — the run-comparison table with
+   commit links and deltas. Standalone regen:
+   `python3 .claude/skills/bench/scripts/render_results.py`.
+   Because the note becomes the "Approach" column there, make it describe the
+   change being measured, not the circumstances of the run.
 
 5. **Report** the table record.py printed: this run vs the bars, and the delta vs the
    previous history line (work_score and each p95). Call out any regression explicitly —
