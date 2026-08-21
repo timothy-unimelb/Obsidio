@@ -22,7 +22,12 @@ test("exports the solution page", async () => {
 
   assert.match(html, /<title>Our Solution — Obsidio<\/title>/i);
   assert.match(html, /Protect the cheap path/);
-  assert.match(html, /THE ARCHITECTURE/);
+  assert.match(html, /THE TWO CONTROLS/);
+  assert.match(html, /riskSlots = 2/);
+  assert.match(html, /GOMAXPROCS = 2/);
+  assert.match(html, /NO SECRET PRIORITY/);
+  assert.match(html, /WHY TWO PERMITS/);
+  assert.match(html, /preemption target/);
   assert.match(html, /150,000/);
   assert.match(html, /3,245,586/);
   assert.match(html, /0\.00%/);

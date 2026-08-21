@@ -34,27 +34,117 @@ export default function SolutionPage() {
         </div>
       </section>
 
-      <section className="section architectureSection">
+      <section className="section controlsSection">
         <div className="sectionHead">
-          <div><span className="sectionNumber">THE ARCHITECTURE</span><h2>Route first.<br />Queue only the cost.</h2></div>
-          <p>The HTTP front door stays concurrent. Only risk work crosses the semaphore, so queue depth never becomes active CPU contention.</p>
+          <div><span className="sectionNumber">THE TWO CONTROLS</span><h2>Same number.<br />Different jobs.</h2></div>
+          <p><code>riskSlots=2</code> and <code>GOMAXPROCS=2</code> are separate limits. One controls admission to heavy work; the other controls execution across the whole Go process.</p>
         </div>
 
-        <div className="architectureMap" aria-label="Request architecture diagram">
-          <div className="incomingNode"><span>IN</span><b>HTTP</b><small>:8080</small></div>
-          <div className="mapConnector connectorIn"><i /><i /><i /></div>
-          <div className="routerNode"><small>ROUTE BY</small><b>PATH</b></div>
-          <div className="branchLines" aria-hidden="true"><i /><i /><i /></div>
-          <div className="pathNodes">
-            <div className="pathNode mint"><span>/price</span><b>direct</b><small>pre-serialized response</small><i>→</i></div>
-            <div className="pathNode amber"><span>/stats</span><b>direct</b><small>500 values · two passes</small><i>→</i></div>
-            <div className="pathNode coral riskPath"><span>/risk</span><b>2-slot gate</b><small>wait without consuming CPU</small><i>→</i></div>
+        <div className="controlDiagram" aria-label="The semaphore and Go scheduler are two separate controls">
+          <article className="controlLayer admissionLayer">
+            <header><span>01 · OUR CODE</span><code>riskSlots = 2</code></header>
+            <div className="admissionBoard">
+              <div className="routeLabel mint"><b>/price</b><small>BYPASS</small></div>
+              <div className="routeLine"><i /><span>→</span></div>
+              <div className="admissionResult directResult">RUNNABLE</div>
+
+              <div className="routeLabel amber"><b>/stats</b><small>BYPASS</small></div>
+              <div className="routeLine"><i /><span>→</span></div>
+              <div className="admissionResult directResult">RUNNABLE</div>
+
+              <div className="routeLabel coral"><b>/risk</b><small>MUST ENTER</small></div>
+              <div className="permitGate"><span>01</span><span>02</span></div>
+              <div className="admissionResult riskResult"><b>2 RUNNABLE</b><small>REST PARKED</small></div>
+            </div>
+            <p>Only risk requests pass through this gate. Once both permits are occupied, later risk handlers sleep instead of joining the CPU competition.</p>
+          </article>
+
+          <div className="controlHandoff" aria-hidden="true"><span>THEN</span><b>→</b></div>
+
+          <article className="controlLayer runtimeLayer">
+            <header><span>02 · GO RUNTIME</span><code>GOMAXPROCS = 2</code></header>
+            <div className="runtimeBoard">
+              <div className="runnableTray">
+                <small>RUNNABLE GOROUTINES</small>
+                <div><span className="mint">PRICE</span><span className="amber">STATS</span><span className="coral">RISK 01</span><span className="coral">RISK 02</span></div>
+              </div>
+              <div className="schedulerStep"><span>GO SCHEDULER PICKS ANY TWO</span><b>↓</b></div>
+              <div className="processorPair">
+                <div><small>EXECUTING</small><b>CPU SLOT 1</b></div>
+                <div><small>EXECUTING</small><b>CPU SLOT 2</b></div>
+              </div>
+            </div>
+            <p>This limit applies to every endpoint. The two executing goroutines can be risk + risk, risk + price, price + stats—or any other ready pair.</p>
+          </article>
+        </div>
+
+        <div className="priorityTruth">
+          <strong>NO SECRET PRIORITY</strong>
+          <p>Go does not know that <code>/price</code> matters most. Cheap requests stay responsive because they bypass the risk gate and compete with at most two active hash loops—not hundreds.</p>
+        </div>
+      </section>
+
+      <section className="schedulerSection">
+        <div className="schedulerIntro">
+          <span className="sectionNumber inverse">A SCHEDULING MOMENT</span>
+          <h2>Price arrives.<br />Who moves?</h2>
+          <p>A request becomes runnable immediately. If both CPU slots are occupied, it waits for the next scheduling opportunity rather than entering the risk queue.</p>
+        </div>
+
+        <div className="scheduleExplainer">
+          <div className="timelineCard" aria-label="Illustrative timeline of a price request being scheduled between risk requests">
+            <div className="timelineScale"><span>NOW</span><span>NEXT OPPORTUNITY</span><span>CONTINUE</span></div>
+            <div className="cpuTimeline">
+              <b>CPU 01</b>
+              <div className="timelineTrack">
+                <span className="segment coral long">RISK A</span>
+                <span className="segment mint quick">PRICE</span>
+                <span className="segment coral rest">RISK C</span>
+              </div>
+            </div>
+            <div className="cpuTimeline">
+              <b>CPU 02</b>
+              <div className="timelineTrack secondTrack">
+                <span className="segment coral longer">RISK B</span>
+                <span className="segment amber quick">STATS</span>
+                <span className="segment coral remainder">RISK D</span>
+              </div>
+            </div>
+            <div className="arrivalMarker"><i /><span>PRICE BECOMES RUNNABLE</span></div>
+            <p>Illustrative sequence—not an exact trace or a priority guarantee.</p>
           </div>
-          <div className="semaphore" aria-label="Two risk permits">
-            <span className="permit used">01</span><span className="permit used">02</span><span className="permit blocked">WAIT</span>
+
+          <div className="switchCard">
+            <div className="switchEvent"><span>01</span><p><b>Natural hand-off</b>A handler finishes, blocks on I/O, or waits on synchronization.</p></div>
+            <div className="switchEvent"><span>02</span><p><b>Runtime preemption</b>Go can pause CPU-bound work so another runnable goroutine is not starved.</p></div>
+            <div className="timingPair">
+              <div><strong>3.68<small>ms</small></strong><span>local risk kernel</span></div>
+              <div><strong>~10<small>ms</small></strong><span>preemption target</span></div>
+            </div>
+            <p className="timingCaveat">Usually our risk calculation finishes before forced preemption is needed. The ~10 ms target is a backstop, not a metronome.</p>
           </div>
-          <div className="cpuPool"><div><small>CPU</small><b>1</b></div><div><small>CPU</small><b>2</b></div></div>
-          <div className="mapCaption"><span>Cheap work bypasses the queue</span><span>Heavy work has exactly two active permits</span></div>
+        </div>
+      </section>
+
+      <section className="section permitSection">
+        <div className="sectionHead compact">
+          <div><span className="sectionNumber">WHY TWO PERMITS?</span><h2>Match the box.<br />Protect the score.</h2></div>
+          <p>Two is the strongest measured default, not a universal mathematical proof. It matches two CPUs and preserves headroom for the fast path on our full siege.</p>
+        </div>
+
+        <div className="permitChoices">
+          <article><span className="choiceNumber">1</span><small>RISK PERMIT</small><h3>Leaves throughput behind</h3><p>Maximum fast-path protection, but only one core can advance the most valuable request type at a time.</p></article>
+          <article className="chosen"><div className="choiceFlag">OUR CHOICE</div><span className="choiceNumber">2</span><small>RISK PERMITS</small><h3>Useful parallelism</h3><p>Both CPUs can hash while Go still gives short turns to price and stats. Local p95 remained far below every bar.</p></article>
+          <article><span className="choiceNumber">3+</span><small>RISK PERMITS</small><h3>More competition, not more CPUs</h3><p>Pure CPU work has no I/O to hide. Extra runnable hash loops add contention without adding execution capacity.</p></article>
+        </div>
+
+        <div className="scoreMotive">
+          <div><span className="sectionNumber">EXPECTED POINTS PER RANDOM REQUEST</span><p>Traffic share × endpoint weight</p></div>
+          <div className="motiveBars">
+            <div><code>/price</code><i className="mint" style={{ width: "60%" }} /><strong>0.60</strong></div>
+            <div><code>/stats</code><i className="amber" style={{ width: "90%" }} /><strong>0.90</strong></div>
+            <div><code>/risk</code><i className="coral" style={{ width: "100%" }} /><strong>1.00</strong></div>
+          </div>
         </div>
       </section>
 
