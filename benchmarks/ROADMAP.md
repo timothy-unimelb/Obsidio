@@ -19,6 +19,9 @@ reaches a gate, or changes what should happen next.
 - **Outstanding finalist evidence:** interleaved six-run milestone, separated
   x86-64 validation, optional-instruction portability run, and rerun after the
   organizers lock the grader.
+- **Separated environment:** reproducible AWS CloudFormation and lifecycle
+  scripts live under `benchmarks/aws/`. Provisioning awaits authenticated AWS
+  CLI access; no AWS result has been recorded yet.
 
 ## Active sequence
 
@@ -73,4 +76,5 @@ Priority is evidence-dependent, not a promise to implement every item:
 exact gain did not exceed host noise. Next, keep this change isolated and test
 Go PGO against champion `64e38e0`; do not combine PGO with unrolling until each
 change has independent evidence. Revisit unrolling in an interleaved finalist
-comparison or separated x86 validation.
+comparison or separated x86 validation. Before either, finish and validate the
+remote AWS runner after the two-host CloudFormation stack is provisioned.
