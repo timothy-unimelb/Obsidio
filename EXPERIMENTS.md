@@ -401,3 +401,13 @@ Entry format (see the /experiment skill):
   /risk waits, so cheap-latency savings don't convert into volume.
 - **Verdict:** keep auto stride (8192): best score, no new knob. Logged as
   considered-and-measured for the write-up.
+
+## 2026-08-22 Single-lane fused iteration (x86 full A/B — kept, marginal)
+
+- **SHA:** candidate 09a1879 vs champion 999a87f, set single-fused-x86-01.
+- **Result:** 4,003,863 / **4,060,125** / 4,022,632 — +0.9% vs stronger
+  side (drift 0.47%, noise floor 0.8%): marginal, consistent with the
+  mechanism — hashHex1 only touches lone-waiter (ramp) chains; the peak
+  path is byte-identical. Tier-0: 92.3 → 76.9ns per single iteration.
+- **Verdict:** KEPT (zero structural downside). **Final champion 09a1879:
+  4,060,125 — day total 1.95M → 4.06M (+108%).**
