@@ -477,3 +477,16 @@ Entry format (see the /experiment skill):
 - **Verdict:** FROZEN. Submission headline: **4,166,000 ± 400 work_score**
   on c7i-class hardware, 2.13× the morning baseline, 4/4 bars with 18×
   /risk p95 margin and 0.16pp error-gate margin (conservatively counted).
+
+## 2026-08-22 Slow-grader simulation (RISK_KERNEL=off + GODEBUG=cpu.sha=off)
+
+- **Purpose:** the one untested regime — a non-SHA-NI grader where chains
+  cost ~17ms (measured boot: unitCost 16.6ms, no pairing) and demand
+  outstrips capacity at peak. Full grading.js on the testbed.
+- **Result:** work_score 812,074; risk p95 408.7ms (bar 1500 — 3.7×
+  margin); price/stats p95 10.5ms; errors 0.72%; all bars pass. Failure
+  composition stayed shed-dominated (no 60s-timeout p95 poisoning).
+- **Verdict:** the governor + staleness + budget architecture holds on
+  2.5×-slower silicon with zero retuning — the constants derived themselves
+  (calibration 16.6ms → stride 2048, patience 1.18s). Bar-safety story
+  complete: fast box 4.17M, slow box 812k, both 4/4 bars.
