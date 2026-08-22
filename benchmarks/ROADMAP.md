@@ -6,13 +6,17 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** `5c3d681` — SHA-NI kernel with hex encoding and the chain loop
-  in assembly, called in 256-round chunks with a yield between them — carried
-  forward in `4d1d2ea` with durable `POST /price` (fsynced WAL on `/data`) and
-  an opt-in overload gate (`RISK_SHED=1`, off by default).
-- **Latest accepted evidence:** `shani-yield-x86-full-20260822`: 3,598,675 vs
-  2,338,684 / 2,339,747 (+53.8%, +0.05% drift, 0 errors, price p95 10.4 ms).
-  `gap-x86-full-20260822` confirms the additions are inert (−0.26%, 0 errors).
+- **Champion:** `d52d74b` — the yielding SHA-NI kernel build plus the
+  budgeted shedding governor (88bp, on by default; `RISK_SHED=0` restores the
+  zero-error build), single-lane fused kernel, `GOGC=off`/512MiB limit,
+  durable `POST /price`.
+- **Latest accepted evidence:** `governor-x86-full-20260822`: 4,854,704 vs
+  4,143,222 / 4,141,819 (+17.2%, −0.03% drift, errors 0.847%, risk p95 80 ms).
+  Passes all bars at 800 VUs (0.80% errors). See
+  `experiments/2026-08-22-governor.md`.
+- **Known tail:** waiters past patience with the budget exhausted are held
+  until the client gives up (risk max 42.7 s at published load). p95 is
+  unaffected; fix by serving them late after ~2× patience — next bracket.
 - **Mechanism:** once the kernel made risk cheap, the closed-loop request rate
   was bound by cheap requests waiting ~17 ms behind an unpreemptible asm loop.
   Yielding freed the fast path; score ∝ request rate.
@@ -60,7 +64,7 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** champion `5c3d681`/`4d1d2ea` at 3.60M on separated x86; gaps
-bridged (persistence on, shedding opt-in); visuals and the results artifact
-updated; AWS destroyed. Next: profile the HTTP path under load before
-choosing between allocation trims and a custom HTTP server.
+**Status:** governor build `d52d74b` accepted on separated x86 (+17.2%,
+0.85% errors by design). AWS destroyed. Next: (1) cap the post-patience hold
+and serve late, re-bracket; (2) update submission README/RESILIENCE and the
+results artifact for the governor; (3) the HTTP-path CPU profile.
