@@ -1,0 +1,30 @@
+{
+  "recorded_at": "2026-08-22T04:55:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "budget88-x86-01",
+  "candidate": "shed-budget-88bp + preemptive stale charging (advait app, ee2d73a)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4110569, 4087386],
+    "candidate_score": 4168373,
+    "candidate_vs_stronger_champion_percent": 1.41,
+    "champion_drift_percent": 0.57,
+    "error_rate_percent_candidate_k6_view": 0.83,
+    "internal_budget_bp": 88,
+    "gate_margin_pp": 0.17,
+    "all_latency_gates_passed": true
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "champion=09a1879-content at 60bp; candidate identical code with Dockerfile ENV RISK_SHED_BUDGET_BP=88 + stale-skip preemptive error charging",
+    "internal counter is a strict overestimate of k6's failure view (88bp cap -> k6 saw 0.83%): margin to the 1% gate is 0.17pp PLUS the conservative skew",
+    "devloop sweep 60/75/88bp: 1,178,569 / 1,186,923 / 1,203,222 (+2.1% at 88bp)"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Shed-budget sweep + 88bp bracket' entry"
+}

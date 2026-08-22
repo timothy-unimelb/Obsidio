@@ -422,3 +422,25 @@ Entry format (see the /experiment skill):
   graded mix). Durability: value POSTed before the siege survived a hard
   docker kill afterwards (replayed 1 entry, read back exact).
 - **Verdict:** persistence bonus SHIP: docker-compose.yml + fsync'd WAL.
+
+## 2026-08-22 Shed-budget sweep + 88bp bracket (x86 — KEPT)
+
+- **SHA:** candidate ee2d73a (RISK_SHED_BUDGET_BP knob, Dockerfile ships
+  88bp, stale-skip preemptive error charging) vs champion at 60bp.
+- **Pattern that motivated it:** errors pinned at 0.58-0.59% in every one of
+  18 recorded runs — the governor is permanently budget-limited, so unspent
+  budget is unspent score (each front-door shed recycles a closed-loop VU
+  into cheap scoring traffic).
+- **Safety change:** stale-skipped waiters (future k6 timeouts we would
+  never otherwise count) are charged as errors at skip time — the internal
+  counter strictly overestimates k6's failure view. Measured: internal 88bp
+  cap → k6 saw 0.80% (devloop) / 0.83% (grading), so real gate margin is
+  0.17pp plus the skew.
+- **Sweep (devloop, 60/75/88bp):** 1,178,569 / 1,186,923 / 1,203,222.
+- **Result (bracketed full grading.js):** 4,110,569 / **4,168,373** /
+  4,087,386 — +1.4% vs the stronger champion side (drift 0.57%); errors
+  0.83%; all bars pass.
+- **Verdict:** KEPT — **final champion ee2d73a @ 4,168,373; day total
+  1.95M → 4.17M (+113%)**. Gains are now Amdahl-thin everywhere we've
+  measured: kernel at silicon throughput, cheap latency not a lever
+  (stride sweep), budget at the safe edge. Improvement day CLOSED.
