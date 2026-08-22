@@ -121,8 +121,12 @@ Skills: `/run-capped` (build+run under caps), `/smoke` (correctness gate),
 Why Go: the /risk hash chain gates the whole closed loop, and Go's sha256 kernel is
 ~5× cheaper per request than Node/Python's; goroutines + a semaphore give precise
 control over how much CPU the heavy path may occupy. The engineered app pins
-GOMAXPROCS=2, bounds /risk to 2 concurrent chains (waiters park cheaply), runs a
-zero-allocation hash loop, and serializes without encoding/json reflection.
+GOMAXPROCS=2 and runs exactly 2 risk-hash workers, one per CPU core (waiters park
+cheaply on a LIFO stack). Each worker batches up to 4 parked chains per call through a
+4-lane SHA-NI kernel (falling back to 2-lane pairing, or escalating to a 16-lane batch
+under deep queue pressure) — that's per-call throughput, not extra concurrent workers:
+hashing concurrency stays pinned to 2 cores regardless of batch width. Zero-allocation
+hash loop; serializes without encoding/json reflection.
 `starters/go` remains untouched as the naive baseline for comparison.
 
 ## Critical gotchas
