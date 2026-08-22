@@ -11,6 +11,11 @@ complete scored API while keeping the cheap path independent of the heavy one:
 - Each worker drains up to four queued jobs (`RISK_LANES`) and hashes them as
   interleaved independent chains, so the core can overlap one chain's SHA
   latency with another's work. Every chain still performs all 50,000 rounds.
+- On x86-64 processors with SHA extensions, two lanes' hashes are computed by
+  one assembly routine (`risk_amd64.s`): block 1 follows Go's own SHA-NI
+  schedule with the lanes interleaved, and the constant padding block uses a
+  precomputed W+K table. It is selected by CPUID at startup; `RISK_SHANI=0`
+  or any other processor uses Go's standard library unchanged.
 - `/price` and `/stats` never touch that queue, so they stay schedulable no
   matter how deep the risk backlog is.
 - The risk kernel performs all 50,000 SHA-256 → lowercase-hex rounds in a fixed
@@ -55,20 +60,21 @@ at `--cpus=2 --memory=2g` and the untouched published `k6/grading.js`
 
 | Metric | Result | Bar |
 | --- | ---: | ---: |
-| `work_score` | 2,062,911 | — |
-| completed requests | 826,875 / 826,875 | — |
+| `work_score` | 2,545,521 | — |
+| completed requests | 1,018,708 / 1,018,708 | — |
 | error rate | 0.00% | <1% |
-| `/price` p95 | 22.25 ms | <200 ms |
-| `/stats` p95 | 22.22 ms | <500 ms |
-| `/risk` p95 | 422.60 ms | <1,500 ms |
+| `/price` p95 | 39.98 ms | <200 ms |
+| `/stats` p95 | 40.06 ms | <500 ms |
+| `/risk` p95 | 169.21 ms | <1,500 ms |
 
 The grading CPU model is unspecified, so this is reference evidence, not a
 prediction of the judge's absolute score. Every number above is reproducible
 from the raw summaries, append-only history, and decision records under
 `benchmarks/`; see `benchmarks/PROTOCOL.md` for how comparisons are run.
 
-`RISK_WORKERS` (1–2) and `RISK_LANES` (1–4) can be varied on the real grading
-hardware. The submitted defaults are `2` and `4`.
+`RISK_WORKERS` (1–2), `RISK_LANES` (1–4), and `RISK_SHANI` (`0` to disable the
+assembly kernel) can be varied on the real grading hardware. The submitted
+defaults are `2`, `4`, and enabled.
 
 See [RESILIENCE.md](RESILIENCE.md) for the bottleneck analysis, design
 rationale, measured progression, and the trade-offs and rejected experiments.
