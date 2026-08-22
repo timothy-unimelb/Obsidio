@@ -101,6 +101,21 @@ func BenchmarkKernelPair(b *testing.B) {
 	}
 }
 
+// TestRiskChainPairMatchesSingle: full 50k-iteration paired chains must equal
+// the single-lane chains digest-for-digest (this is the shipped combination).
+func TestRiskChainPairMatchesSingle(t *testing.T) {
+	if riskSumPair == nil {
+		t.Skip("pair path inactive on this machine")
+	}
+	ha, hb := riskChainPair("0.4823905", "none")
+	if want := riskChain("0.4823905"); ha != want {
+		t.Fatalf("lane A full chain: %s != %s", ha, want)
+	}
+	if want := riskChain("none"); hb != want {
+		t.Fatalf("lane B full chain: %s != %s", hb, want)
+	}
+}
+
 func riskChainN(seed string, n int) string {
 	var buf [64]byte
 	sum := sha256.Sum256([]byte(seed))

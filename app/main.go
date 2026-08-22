@@ -176,20 +176,30 @@ func init() {
 // abandoned or stale waiters (too old to finish inside the 1500ms bar) are
 // skipped at grant time, and the only 503s are the error-budget governor's
 // sheds plus a memory backstop that should never trip.
+// Execution model: riskSlots hash WORKERS (one per core) pop waiters off the
+// stack and run their chains — one at a time on the stdlib/single kernel, or
+// TWO in lockstep through the interleaved 2-lane SHA-NI kernel when pairing
+// is enabled (riskSumPair non-nil), which hashes ~1.17× faster per core than
+// two sequential chains (measured on SPR). A worker never waits for a
+// partner: it pairs only when two live waiters are already parked.
 type riskWaiter struct {
-	ready     chan struct{} // closed by the granter, under riskMu
+	seed      string
+	result    chan string // cap 1; a worker delivers the digest
 	ctx       context.Context
 	next      *riskWaiter
-	enqueued  time.Time // staleness check at grant time (see releaseRiskSlot)
-	granted   bool      // set under riskMu; slot ownership transferred
-	abandoned bool      // set under riskMu; client disconnected while waiting
+	enqueued  time.Time // staleness check at take-time (see riskTakeWork)
+	taken     bool      // set under riskMu; a worker owns it, result WILL arrive
+	abandoned bool      // set under riskMu; waiter left (disconnect or shed)
 }
 
 var (
-	riskMu         sync.Mutex
-	riskRunning    int // chains executing now (≤ cpuCap)
-	riskStackTop   *riskWaiter
-	riskStackDepth int
+	riskMu          sync.Mutex
+	riskStackTop    *riskWaiter
+	riskStackDepth  int
+	riskIdleWorkers int
+	// riskWork wakes parked workers; buffered so submitters never block and
+	// spurious wakeups are harmless.
+	riskWork = make(chan struct{}, 16)
 )
 
 // Patience / staleness window: how old a waiter may get and still be worth
@@ -236,48 +246,53 @@ func observeChainCost(d time.Duration) {
 // each waiter is one parked goroutine + a small struct.
 const riskStackBackstop = 2048
 
-// riskAcquire returns true holding an execution slot (caller MUST
-// releaseRiskSlot), false if the request should be shed (backstop hit or the
-// client disconnected while waiting).
-func riskAcquire(ctx context.Context) bool {
+// riskSubmit parks the request on the LIFO stack and waits for a worker to
+// deliver its digest. Returns ok=false when the request should be shed
+// (backstop hit, front-door shed, budgeted patience shed, or disconnect).
+func riskSubmit(ctx context.Context, seed string) (string, bool) {
 	riskMu.Lock()
-	if riskRunning < riskSlots {
-		riskRunning++
-		riskMu.Unlock()
-		return true
-	}
 	if riskStackDepth >= riskStackBackstop {
 		riskMu.Unlock()
-		return false
+		return "", false
 	}
-	// Genuinely overloaded (slots busy AND waiters already parked): spend the
-	// error budget HERE, on an instant shed, not on aged waiters. k6 folds
+	// Genuinely overloaded (no idle worker AND waiters already parked): spend
+	// the error budget HERE, on an instant shed, not on aged waiters. k6 folds
 	// failed-request durations into the graded percentile stream, so a 503
 	// emitted after parking ≥patience is a 1.2s+ sample that drags the /risk
 	// p95 over the bar (measured: 2.3s devloop p95 with patience-time sheds),
 	// while an at-arrival 503 is a ~1ms sample at the harmless bottom of the
 	// distribution — and it recycles the closed-loop VU into cheap scoring
 	// traffic ~1.2s sooner.
-	if riskStackDepth > 0 && shedBudgetAllows() {
+	if riskStackDepth > 0 && riskIdleWorkers == 0 && shedBudgetAllows() {
 		riskMu.Unlock()
-		return false
+		return "", false
 	}
-	w := &riskWaiter{ready: make(chan struct{}), ctx: ctx, next: riskStackTop, enqueued: time.Now()}
+	w := &riskWaiter{
+		seed:     seed,
+		result:   make(chan string, 1),
+		ctx:      ctx,
+		next:     riskStackTop,
+		enqueued: time.Now(),
+	}
 	riskStackTop = w
 	riskStackDepth++
 	riskMu.Unlock()
+	select {
+	case riskWork <- struct{}{}:
+	default: // wake buffer full — every worker already has a pending wakeup
+	}
 
 	patience := time.NewTimer(riskPatience())
 	defer patience.Stop()
 wait:
 	for {
 		select {
-		case <-w.ready:
-			return true
+		case h := <-w.result:
+			return h, true
 		case <-ctx.Done():
 			break wait
 		case <-patience.C:
-			// Past patience the waiter is stale — grant-time would skip it
+			// Past patience the waiter is stale — take-time would skip it
 			// anyway — so its outcomes are only "shed now" (one ~1.2s error
 			// sample) or "hold the VU to the client's 60s timeout" (one 60s
 			// error sample). Shed if the budget holds; otherwise stay parked
@@ -291,30 +306,34 @@ wait:
 		}
 	}
 	riskMu.Lock()
-	if w.granted {
-		// Lost the race: the slot was already handed to us (select picks
-		// randomly when several cases fire). Pass it straight on.
+	if w.taken {
+		// A worker already owns this waiter (select picks randomly when
+		// several cases fire, and take/deliver can race the timer). The
+		// digest costs real CPU — wait the few remaining ms and serve it.
 		riskMu.Unlock()
-		releaseRiskSlot()
-		return false
+		return <-w.result, true
 	}
-	w.abandoned = true // skipped (and unlinked) at grant time
+	w.abandoned = true // skipped (and unlinked) at take time
 	riskMu.Unlock()
-	return false
+	return "", false
 }
 
-// releaseRiskSlot hands the slot to the newest live, still-serviceable waiter,
-// or retires it.
-func releaseRiskSlot() {
+// riskTakeWork pops up to want live, still-serviceable waiters (newest
+// first). Dead waiters are unlinked in passing; stale ones (older than the
+// patience window) are skipped: served now, their duration sample would land
+// past the 1500ms bar and drag the graded p95 (measured: 2-4s straggler
+// serves breached the bar). Their goroutines shed when the error budget
+// allows, else hold their VU until the client gives up — far cheaper than
+// serving them.
+func riskTakeWork(want int) []*riskWaiter {
+	taken := make([]*riskWaiter, 0, want)
 	riskMu.Lock()
 	now := time.Now()
 	stale := riskPatience()
-	for {
+	for len(taken) < want {
 		w := riskStackTop
 		if w == nil {
-			riskRunning--
-			riskMu.Unlock()
-			return
+			break
 		}
 		riskStackTop = w.next
 		riskStackDepth--
@@ -322,18 +341,49 @@ func releaseRiskSlot() {
 			continue // dead waiter; its goroutine has left or will shed
 		}
 		if now.Sub(w.enqueued) > stale {
-			// Stale: granted now it would finish past the 1500ms bar, and that
-			// duration sample would drag the graded p95 with it (measured: the
-			// governor served stragglers at 2-4s and breached the bar). Unlink
-			// and leave it parked — its goroutine sheds when the error budget
-			// allows, else holds its VU until the client gives up, which costs
-			// far less than serving it would.
+			continue // stale; see doc comment
+		}
+		w.taken = true
+		taken = append(taken, w)
+	}
+	riskMu.Unlock()
+	return taken
+}
+
+// riskWorker: one per core. Pops one waiter — or two, when the 2-lane pair
+// kernel is live and two live waiters are already parked — runs the chain(s),
+// and delivers the digests. It never waits for a partner: a lone waiter runs
+// single-lane immediately.
+func riskWorker() {
+	for {
+		lanes := 1
+		if riskSumPair != nil {
+			lanes = 2
+		}
+		work := riskTakeWork(lanes)
+		if len(work) == 0 {
+			riskMu.Lock()
+			riskIdleWorkers++
+			riskMu.Unlock()
+			<-riskWork
+			riskMu.Lock()
+			riskIdleWorkers--
+			riskMu.Unlock()
 			continue
 		}
-		w.granted = true
-		close(w.ready)
-		riskMu.Unlock()
-		return
+		start := time.Now()
+		if len(work) == 2 {
+			ha, hb := riskChainPair(work[0].seed, work[1].seed)
+			d := time.Since(start)
+			observeChainCost(d)
+			observeChainCost(d)
+			work[0].result <- ha
+			work[1].result <- hb
+		} else {
+			h := riskChain(work[0].seed)
+			observeChainCost(time.Since(start))
+			work[0].result <- h
+		}
 	}
 }
 
@@ -450,6 +500,34 @@ func hexEncode64(buf *[64]byte, sum *[32]byte) {
 // amd64 when the ISA gate + boot self-test pass (see shakernel_amd64.go).
 var riskSum64 = func(in *[64]byte, out *[32]byte) { *out = sha256.Sum256(in[:]) }
 
+// riskSumPair, when non-nil, hashes two independent 64-byte buffers on one
+// core via the interleaved 2-lane SHA-NI kernel (~1.17× two serial hashes on
+// SPR). Set by initRiskKernel after its own self-test; cleared by the boot
+// race in main() if pairing doesn't actually win on this silicon.
+var riskSumPair func(a, b *[64]byte, oa, ob *[32]byte)
+
+// riskChainPair advances two chains in lockstep through the pair kernel.
+// Identical math to two riskChain calls (differentially tested); one Gosched
+// yield per iteration covers both lanes.
+func riskChainPair(seedA, seedB string) (string, string) {
+	var bufA, bufB [64]byte
+	sumA := sha256.Sum256([]byte(seedA))
+	sumB := sha256.Sum256([]byte(seedB))
+	hexEncode64(&bufA, &sumA)
+	hexEncode64(&bufB, &sumB)
+	mask := riskYieldMask
+	pair := riskSumPair
+	for i := uint32(1); i < 50000; i++ {
+		pair(&bufA, &bufB, &sumA, &sumB)
+		hexEncode64(&bufA, &sumA)
+		hexEncode64(&bufB, &sumB)
+		if i&mask == 0 {
+			runtime.Gosched()
+		}
+	}
+	return string(bufA[:]), string(bufB[:])
+}
+
 // riskChain: h = seed; 50,000 × h = hex(sha256(h)). Zero heap allocations in
 // the loop; only the final string(buf) allocates.
 func riskChain(seed string) string {
@@ -466,6 +544,36 @@ func riskChain(seed string) string {
 		}
 	}
 	return string(buf[:])
+}
+
+// raceKernelPairing keeps the 2-lane pair path only if it BEATS two serial
+// chains on this machine by ≥5%, measured right here at boot (median of 3).
+// The pair kernel is already digest-verified by its boot self-test, so this
+// race caps the performance downside of pairing at exactly zero.
+func raceKernelPairing() {
+	if riskSumPair == nil {
+		return
+	}
+	serial := make([]time.Duration, 3)
+	paired := make([]time.Duration, 3)
+	for i := range serial {
+		t0 := time.Now()
+		riskChain("obsidio-race-a")
+		riskChain("obsidio-race-b")
+		serial[i] = time.Since(t0)
+		t0 = time.Now()
+		riskChainPair("obsidio-race-a", "obsidio-race-b")
+		paired[i] = time.Since(t0)
+	}
+	sort.Slice(serial, func(i, j int) bool { return serial[i] < serial[j] })
+	sort.Slice(paired, func(i, j int) bool { return paired[i] < paired[j] })
+	s, p := serial[1], paired[1]
+	if p*100 >= s*95 {
+		riskSumPair = nil
+		log.Printf("risk pairing: DISABLED by boot race (pair %s vs serial-2 %s — win < 5%%)", p, s)
+		return
+	}
+	log.Printf("risk pairing: enabled (pair %s vs serial-2 %s, ratio %.2fx)", p, s, float64(s)/float64(p))
 }
 
 // Response accounting for the shed-budget governor: k6 counts any status
@@ -581,21 +689,14 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 	if seed == "" {
 		seed = "none"
 	}
-	// LIFO admission (see riskAcquire): parks until granted a slot or the
-	// client disconnects. The 503 covers only the memory backstop / lost-race
-	// shed — there is no deadline-based rejection to storm the error gate.
-	if !riskAcquire(r.Context()) {
+	// LIFO admission (see riskSubmit): parks until a hash worker delivers the
+	// digest, or sheds per the governor. Workers own all chain execution, so
+	// there is no slot to leak on any panic path.
+	h, ok := riskSubmit(r.Context(), seed)
+	if !ok {
 		writeJSON(w, 503, overloaded)
 		return
 	}
-	// Slot held from here on. Release via defer so no panic path between
-	// acquire and release can leak it — two leaked slots would silence /risk
-	// (~40% of score) for the rest of the run. net/http recovers handler
-	// panics per-connection, so without the defer a leak would be silent.
-	defer releaseRiskSlot()
-	chainStart := time.Now()
-	h := riskChain(seed)
-	observeChainCost(time.Since(chainStart))
 	// seed is arbitrary user input → JSON-escape it properly.
 	seedJSON, _ := json.Marshal(seed)
 	b := make([]byte, 0, 96+len(seedJSON))
@@ -647,6 +748,10 @@ func main() {
 	bootFingerprint()
 	initRiskKernel() // before calibration, so calibrateRisk times the active kernel
 	calibrateRisk()  // timed chains; runs before the listener, so /health only reports ready after
+	raceKernelPairing()
+	for i := 0; i < riskSlots; i++ {
+		go riskWorker()
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

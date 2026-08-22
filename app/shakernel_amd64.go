@@ -141,6 +141,9 @@ func initRiskKernel() {
 			}
 		}
 	}
+	if kernelPairOK {
+		riskSumPair = kernelSum64Pair // final say: raceKernelPairing in main()
+	}
 	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair available=%v)", path, kernelPairOK)
 }
 
