@@ -123,6 +123,7 @@
 
   footer { margin-top:2rem; padding-top:1.2rem; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; display:grid; gap:.4rem; }
   footer .mono { font-family:"IBM Plex Mono",monospace; font-size:.74rem; }
+  footer b { color:var(--ink); font-weight:600; }
 
   /* SVG element styling */
   .lbl { font-family:"IBM Plex Mono",monospace; font-size:9px; fill:var(--viz-muted); letter-spacing:.04em; }
@@ -509,34 +510,37 @@
     </article>
 
     <!-- 08 GATE (countdown timers) -->
-    <article class="card" data-accent="insurance">
-      <header><span class="num">08</span><span class="kick">Resilience</span><h3>Triage the rush</h3></header>
+    <article class="card" data-accent="big">
+      <header><span class="num">08</span><span class="kick">The door</span><h3>A quick no beats a long wait</h3></header>
       <div class="viz">
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
-            <text class="lbl" x="10" y="14">FIFO: serve the oldest — its timer's gone</text>
+            <text class="lbl" x="10" y="14">FIFO: oldest first, already late</text>
             <rect class="ticket" x="24" y="26" width="118" height="13" rx="3"/><rect class="timer g drain" x="26" y="28" width="114" height="9" rx="2" style="animation-delay:-.3s"/>
             <rect class="ticket" x="24" y="44" width="118" height="13" rx="3"/><rect class="timer w drain" x="26" y="46" width="114" height="9" rx="2" style="animation-delay:-1.3s"/>
             <rect class="ticket" x="24" y="62" width="118" height="13" rx="3"/><rect class="timer b drain" x="26" y="64" width="114" height="9" rx="2" style="animation-delay:-2.4s"/>
             <rect class="ticket" x="24" y="80" width="118" height="13" rx="3"/><rect class="timer b" x="26" y="82" width="7" height="9" rx="2"/>
-            <g class="servept"><text class="txt-b" x="148" y="90" style="font-size:9px">◄ serving ✗</text></g>
+            <g class="servept"><text class="txt-b" x="148" y="90" style="font-size:9px">◄ serve ✗</text></g>
           </svg></div>
           <figcaption class="balabel"><span class="badge b">Before</span> the doomed go first</figcaption>
         </figure>
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
-            <text class="lbl" x="10" y="14">LIFO: serve the newest + shed the rest</text>
+            <text class="lbl" x="10" y="14">LIFO: newest first, shed excess</text>
             <rect class="ticket" x="24" y="26" width="118" height="13" rx="3"/><rect class="timer g" x="26" y="28" width="110" height="9" rx="2"/>
-            <g class="servept"><text class="txt-g" x="148" y="36" style="font-size:9px">◄ serving ✓</text></g>
+            <g class="servept"><text class="txt-g" x="148" y="36" style="font-size:9px">◄ serve ✓</text></g>
             <rect class="ticket" x="24" y="44" width="118" height="13" rx="3"/><rect class="timer w drain" x="26" y="46" width="114" height="9" rx="2"/>
             <rect class="ticket" x="24" y="62" width="118" height="13" rx="3"/><rect class="timer w drain" x="26" y="64" width="114" height="9" rx="2" style="animation-delay:-1.5s"/>
+            <rect class="ticket" x="24" y="80" width="118" height="13" rx="3"/><rect class="timer b" x="26" y="82" width="7" height="9" rx="2"/>
+            <text class="lbl" x="38" y="89.5" style="font-size:6.5px">late queue · served next</text>
             <g class="shedchip"><rect class="chip b" x="150" y="84" width="30" height="14" rx="3"/><text class="txt-b" x="155" y="94" style="font-size:8px">503</text></g>
+            <text class="lbl" x="10" y="110" style="font-size:7.5px">error budget: ≤ 0.88% of responses</text>
           </svg></div>
           <figcaption class="balabel"><span class="badge g">After</span> serve who can finish</figcaption>
         </figure>
       </div>
-      <p class="say">In a rush you can't clear, the oldest request will blow its deadline even if you serve it now. Serve the newest that can still make it, and wave off the overflow at the door before it costs you.</p>
-      <p class="impact"><span class="k">Result</span><span><b>Insurance.</b> A no-op today; under a rush that DQs a naive build at 5% errors, this holds it at 0.6%.</span></p>
+      <p class="say">In a rush you can't clear, the oldest order will blow its deadline even if you serve it now — and a customer parked at the stove orders nothing. So serve the newest who can still make it, and turn the overflow away at the door in a millisecond, spending a small error budget to do it. A customer waved off comes straight back and orders drinks; one left waiting earns you nothing. Anyone held past twice their patience goes to a late queue that's served next — late, not lost.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+17% — separated x86.</b> 4.14M → 4.85M at 0.85% errors (gate: 1%); risk p95 215 → 80 ms. The late queue cut the worst wait from 60 s to 2.4 s. At 4× the published peak it still passes every bar at 0.8% errors.</span></p>
     </article>
 
     <!-- 09 WAL -->
@@ -594,6 +598,7 @@
 
   <footer>
     <div>Every percentage is a real measured delta from the project's benchmark trail — bracketed champion → candidate → champion runs on a separated x86-64 reference (a <span class="mono">c7i.xlarge</span> target with a separate load host), unless marked otherwise. Each card's gain is versus its own control, not a running total.</div>
+    <div>Where it stands: the current build scores <b>4.85M</b> on the reference pair at 0.85% errors, with a price median of 3.4 ms and a risk p95 of 80 ms while the braise runs flat out.</div>
     <div class="mono">the challenge: keep /price fast while /risk runs 50,000 SHA-256 rounds · qualify: p95 200 / 500 / 1500 ms, errors &lt; 1%</div>
   </footer>
 </div>
