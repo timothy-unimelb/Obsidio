@@ -1,0 +1,19 @@
+# Obsidio submission, persistence bonus deployment. One service, no database:
+# POST /price updates are journalled to an fsynced write-ahead log on the named
+# volume below and replayed at startup, so they survive `docker kill` and a
+# container replacement. The whole 2 CPU / 2 GB budget goes to the one service.
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - obsidio-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 2048M
+
+volumes:
+  obsidio-data:

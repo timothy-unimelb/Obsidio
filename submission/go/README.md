@@ -37,8 +37,14 @@ docker run --rm --cpus=2 --memory=2g -v obsidio-data:/data -p 8080:8080 obsidio-
 curl http://127.0.0.1:8080/health
 ```
 
-`./killtest.sh` scripts the persistence check: two `POST /price` updates,
+For the persistence bonus, `docker-compose.yml` runs the same single service
+with a named volume; there is no second service, so the whole budget stays with
+the app. `./killtest.sh` scripts the check: two `POST /price` updates,
 `docker kill`, restart, both values read back.
+
+The image build runs `go vet` and the test suite before compiling: a kernel
+that is wrong on the grading CPU fails the build instead of shipping a binary
+that returns plausible but incorrect digests.
 
 ## Tests and microbenchmarks
 
