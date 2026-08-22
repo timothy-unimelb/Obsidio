@@ -149,6 +149,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W3: shed-budget sweep + 88bp bracket — **KEPT +1.4%: FINAL champion ee2d73a @ 4,168,373 (+113% on the day)**; k6-visible errors 0.83% vs the 1% gate, internal counter strictly conservative (preemptive stale charging). Improvement work CLOSED — kernel at silicon floor, stride falsified, budget at safe edge
 - [x] W3: persistence go/no-go — **user GO (session 5)**: fsync'd WAL + compose volume built; hard-kill durability verified locally (2 POSTs → docker kill → replayed); graded path bit-identical (smoke 35/35, WAL inactive without env). Bars-under-compose check on testbed still owed
 - [x] W4: freeze + final verification — submission build **7added4**: 3× cold-boot grading runs 4,166,303/4,166,378/4,165,599 (spread 0.019%), 4/4 bars; fresh-clone build + smoke verified (arm64 fallback path proven); compose-bars + hard-kill durability verified on x86
+- [x] Sprint-2 (see archived-plans/2026-08-22-sprint2-gains.md): kernel-v3 loop NEGATIVE (kill-switched); raw HTTP/1.1 KEPT +2.5%; AVX-512 16-lane insurance KEPT (4.3× on no-SHA-NI sim); x16-on-SHA-NI FLAT (reverted to opt-in). New freeze **5c42e72**: 4,299,037/4,289,957/4,305,181 (spread 0.355%), 4/4 bars
 - [ ] W4: write-up drafted from EXPERIMENTS.md
 - [ ] W4: video script + A/B headline numbers
 - [ ] W4: locked-script diff (when published) + final push + checklist
