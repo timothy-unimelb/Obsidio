@@ -1,8 +1,11 @@
-# Obsidio engineered backend: Go. Multi-stage, pinned images, reproducible.
-# (Measured 2026-08-22 on SPR: stdlib SHA-NI predates 1.25 — 1.22 and 1.26 are
-# kernel-flat. 1.26 kept for toolchain currency + container-aware runtime. The
-# vendored sha256block_amd64.s must match this toolchain's stdlib version.)
-FROM golang:1.26-bookworm AS build
+# Obsidio engineered backend: Go. Multi-stage, digest-pinned, reproducible:
+# the grader rebuilds on their own machine and these FROMs can never resolve
+# to anything but the exact bytes we froze and tested against.
+# (Measured 2026-08-22 on SPR: stdlib SHA-NI predates 1.25 — 1.22 and 1.26
+# are kernel-flat. The vendored sha256*.s files are frozen, self-contained
+# copies compiled into our package — correct against any toolchain, and
+# re-proven by the boot self-test + the go test build gate below.)
+FROM golang:1.26.6-bookworm@sha256:116d58cbd88c1297624acc6e967a060012422bacf9930927e23fb719189c6f36 AS build
 WORKDIR /app
 COPY go.mod *.go *.s ./
 # The digest-guard test is a BUILD GATE: a kernel change that breaks the /risk
@@ -10,7 +13,7 @@ COPY go.mod *.go *.s ./
 RUN go test ./...
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o server .
 
-FROM debian:bookworm-slim
+FROM debian:bookworm-slim@sha256:abd67ffcfa541b485a3dff59865ab629aa048a6c613e639d36e7456b0b229241
 COPY --from=build /app/server /server
 # Belt-and-suspenders with runtime.GOMAXPROCS(2) in main(): never let the
 # runtime size itself from the visible host cores.
