@@ -114,3 +114,32 @@ Entry format (see the /experiment skill):
   fast-path latency cause at GOMAXPROCS=2; scheduler-quantum theory confirmed
   by the yield result above. GOMAXPROCS=2 pin validated.
 - **Verdict:** hypothesis closed; supports the GOMAXPROCS=3 dead-end ruling.
+
+## 2026-08-22 Wave 2B: risk-gate redesign trilogy (devloop A/Bs, ~3% noise)
+
+- **SHA:** f1379c4 + working tree
+- **Hypothesis (fleet):** FIFO+deadline sheds storm on slow hardware; adaptive
+  LIFO fixes it at zero throughput cost.
+- **Three measured variants (vs Wave-1 keeper devloop 309,606 / 0.29% err):**
+  1. Pure LIFO, no deadline: 240,228 (−22%). Starved stack-bottom waiters hold
+     closed-loop VUs hostage up to k6's 60s request timeout → active VU
+     population shrinks → hash slots go hungry. Fleet's zero-cost claim WRONG
+     for closed-loop scoring.
+  2. LIFO + calibrated deadline (1.18s): 740,401 (+139%!!) but 8.38% errors =
+     DISQUALIFIED. Mechanism discovery: shedding a stale risk waiter recycles
+     its VU into ~5 fast cheap iterations (~50ms each round-trip) — cheap
+     VOLUME scores. **Corrects the "score ≈ 25×chains" law: it only holds at
+     zero shed.** The error gate, not chain throughput, is what caps score on
+     overloaded-but-fast systems.
+  3. LIFO + error-budget-governed patience (shed only while total error rate
+     ≤0.6%, else park): 324,772 (+4.9%, above noise), 0.45% errors — but risk
+     p95 3,403ms (devloop scale): parked stragglers served late blow the bar.
+- **Verdict:** pending — variant 3 is the right shape but needs a staleness
+  rule at grant time (see PLAN.md session-2 handoff). NOT shippable as-is.
+
+## 2026-08-22 Gotcha: boot calibration jitter under Docker Desktop VM
+
+- unitCost median-of-3 across four boots of near-identical builds: 11.9, 12.7,
+  15.8, 12.8 ms — ±15% boot-to-boot on this Mac. Derived knobs (patience,
+  yield stride) inherit the jitter. Contended/EWMA calibration (planned) or
+  more samples would stabilise; on real x86 hardware expect less VM noise.

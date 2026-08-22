@@ -64,6 +64,60 @@ SHA-NI actually selected (full feature gate) · contended chain cost (decides th
 ## Verification protocol (every wave)
 Kernel change ⇒ differential test + Tier-0 + /smoke (full 50k digests) before any bench. Scheduling/gate change ⇒ devloop A/B (≥5% resolvable), Tier-2 recorded before claiming, /experiment always. One bench at a time; nothing CPU-heavy during a bench. Deltas <10% = noise; 10-30% = A/B protocol; >30% = one confirming re-run. Write-up cites medians+ranges only.
 
+## SESSION-2 HANDOFF (2026-08-22 ~01:15, written for a fresh context after /clear)
+
+**⚠️ TREE STATE: the working tree (committed as WIP on `advait`) is NOT SHIPPABLE.**
+The last fully-green submittable build is commit **f1379c4** (Wave 1 keeper:
+1,154,625 recorded, 4/4 bars, /price p95 12ms). The tree since then contains the
+LIFO+governor gate: smoke-passing, race-clean, +4.9% devloop score at 0.45%
+errors, **but devloop risk p95 = 3.4s (bar breach)**. Fix forward or revert the
+gate before any submission.
+
+**What Wave 2B discovered (full data in EXPERIMENTS.md trilogy entry):**
+- Score law CORRECTION: "score ≈ 25×chains" holds only at zero shed. Shedding a
+  stale risk waiter recycles its VU into cheap traffic that also scores —
+  unthrottled shedding hit 740k devloop (+139%) but at 8.4% errors (DQ). The
+  error gate, not chain throughput, caps score under overload.
+- Pure LIFO parking (no deadline) idles hash slots via 60s VU hostages: −22%.
+- The governor (shed while error-rate ≤0.6%, park beyond) is the right shape:
+  +4.9% at 0.45% errors. Remaining defect: parked stragglers eventually get
+  SERVED at 2-4s, and those samples blow the risk p95 bar.
+- Parking economics: a parked VU removes ~1.3 risk-arrivals/s at an error cost
+  of only 1/60 err/s (its eventual k6 timeout); shedding the same demand costs
+  ~78× more errors. Park to reduce demand, shed for freshness, is the right mix.
+
+**The designed-but-unbuilt fix (next session, ~1-2h): staleness rule at grant
+time.** In releaseRiskSlot, skip (leave parked) any waiter whose age already
+exceeds ~(1500ms − unitCost − margin) — serving it would emit a bar-breaking
+duration sample; its eventual 60s timeout is cheaper (1/60 err/s) than the p95
+damage. Add `enqueued time.Time` to riskWaiter. Then re-run the devloop trilogy
+comparison + a full grading run; expect ≥324k devloop, risk p95 back under bar,
+errors <0.6%. If it fails: `git checkout f1379c4 -- app/main.go` restores Wave 1.
+
+**Other gotchas found:**
+- Boot calibration jitter: unitCost median-of-3 swung 11.9→15.8ms across boots
+  on this Mac (Docker VM noise). Contended/EWMA calibration will stabilise.
+- Grading-run RSS climbs to GOMEMLIMIT by design with GOGC=off; limit now
+  512MiB (was 1600 — peak-RSS tripwire caught 1489MiB). Verify on next Tier-2.
+- k6 http_req_duration INCLUDES failed requests (a 123µs 503 and a 60s timeout
+  both land in the tier's percentile stream) — reason about p95 accordingly.
+- The devloop reads p95 ~2× the grading script and error-rate higher (peak-only
+  sampling); bars in devloop are advisory, confirm on grading.js.
+
+**State of Wave-2 items:** Step-0 GO (1.65× on arm64, digest-verified);
+x86 VM session NOT STARTED (user provides box/credentials — Joel's Windows PC
+and/or cloud VM); 2-lane kernel NOT STARTED (references: Go stdlib avo
+generator `sha256block_amd64.go` fork, Linux finup2x register map, constant
+block-2 W+K table); overdrive exhibit NOT RUN (build k6/overdrive.js = devloop
+at 400 VUs when gate is fixed); contended-calibration/EWMA NOT STARTED.
+
+**Recommended next-session order:** (1) staleness rule → trilogy re-run →
+grading run → commit green; (2) overdrive exhibit FIFO-vs-governor;
+(3) x86 session the moment a box exists (verifies the entire 2× Go 1.26 bet +
+kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
+(6) freeze Sat ~22:00 → write-up + video (evidence base already strong:
+12 recorded runs, trilogy narrative, Step-0 microbench, throttle receipts).
+
 ## Progress
 - [x] W1: commit + HANDOFF refresh (46894e4 pushed)
 - [x] W1: safety bundle (test-in-build, defer/recover, go.mod 1.26) + /smoke 35/35
@@ -74,9 +128,9 @@ Kernel change ⇒ differential test + Tier-0 + /smoke (full 50k digests) before 
 - [x] W1: cpu.stat — 37ms total throttled/run: CFS hypothesis dead, GOMAXPROCS=2 validated
 - [ ] W2A: x86 VM verification session (SHA-NI, ratios, grading run)
 - [ ] W2A: 2-lane SHA-NI kernel v1 + differential tests
-- [ ] W2B: adaptive-LIFO waiter stack + race hammer test
-- [ ] W2B: 400-VU overdrive FIFO-vs-LIFO exhibit
-- [ ] W2B: contended calibration + EWMA
+- [~] W2B: adaptive-LIFO gate — trilogy measured, governor built (race-clean, +4.9%), **staleness rule at grant time still needed (p95 breach)** — see SESSION-2 HANDOFF
+- [ ] W2B: 400-VU overdrive FIFO-vs-governor exhibit (after staleness rule)
+- [ ] W2B: contended calibration + EWMA (also fixes boot-jitter gotcha)
 - [ ] W3: pairing dispatcher + boot kernel racing
 - [ ] W3: x86 bench matrix, recorded
 - [ ] W3: hardening bundle (cgroup, fingerprint, HTTP polish, pprof graph)

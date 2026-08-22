@@ -73,33 +73,117 @@ func init() {
 	}
 }
 
-// /risk gate: at most cpuCap chains burn CPU at once; a bounded number more
-// may wait, each with a deadline; everything past that is shed with an
-// immediate 503 (a request that would miss the 1500 ms bar scores zero anyway,
-// but burns ~a full chain of CPU — shedding it is strictly cheaper).
-//
-// The queue depth and wait deadline are NOT hardcoded: grading-hardware speed
-// is unknown, so they are derived at boot from a real timed measurement of
-// this container's chain cost (calibrateRisk). Idea adapted from Joel's
-// branch (joel/draft@894f469).
+// /risk admission: at most cpuCap chains execute at once; everyone else parks
+// on a LIFO stack (adaptive LIFO, after Facebook's "Fail at Scale"). Under
+// overload, FIFO serves the oldest waiter — the one most likely already
+// abandoned or doomed to miss the bar — while fresh requests rot behind it,
+// and a deadline-based shed turns sustained overload into a 503 storm (closed
+// loop: a rejected VU retries within ~50ms, so the storm feeds itself and
+// blows the 1% error gate). LIFO serves the FRESHEST waiter: p95 stays low,
+// completed stragglers still score (only aggregate p95 is graded), abandoned
+// waiters are skipped at grant time via their request context, and the only
+// 503 left is a memory backstop that should never trip.
+type riskWaiter struct {
+	ready     chan struct{} // closed by the granter, under riskMu
+	ctx       context.Context
+	next      *riskWaiter
+	granted   bool // set under riskMu; slot ownership transferred
+	abandoned bool // set under riskMu; client disconnected while waiting
+}
+
 var (
-	riskSem         = make(chan struct{}, cpuCap)
-	riskWaiting     int32
-	riskMaxQueued   int32
-	riskWaitTimeout time.Duration
+	riskMu         sync.Mutex
+	riskRunning    int  // chains executing now (≤ cpuCap)
+	riskStackTop   *riskWaiter
+	riskStackDepth int
+	// Calibrated waiter patience (see calibrateRisk). Without a deadline,
+	// starved stack-bottom waiters hold their closed-loop VUs hostage for
+	// k6's full 60s request timeout, shrinking the active VU population and
+	// idling hash slots — measured −22% work_score. With it, stale waiters
+	// are shed and their VUs recycle into fresh traffic within ~50ms.
+	riskWaitTimeout time.Duration = time.Second
 )
 
-const (
-	riskLatencyBudget = 1500 * time.Millisecond // the /risk p95 grading bar
-	riskSafetyMargin  = 300 * time.Millisecond  // headroom for jitter + response overhead
-)
+// Memory backstop only (~10× the 200-VU grading peak), never a latency valve:
+// each waiter is one parked goroutine + a small struct.
+const riskStackBackstop = 2048
+
+// riskAcquire returns true holding an execution slot (caller MUST
+// releaseRiskSlot), false if the request should be shed (backstop hit or the
+// client disconnected while waiting).
+func riskAcquire(ctx context.Context) bool {
+	riskMu.Lock()
+	if riskRunning < cpuCap {
+		riskRunning++
+		riskMu.Unlock()
+		return true
+	}
+	if riskStackDepth >= riskStackBackstop {
+		riskMu.Unlock()
+		return false
+	}
+	w := &riskWaiter{ready: make(chan struct{}), ctx: ctx, next: riskStackTop}
+	riskStackTop = w
+	riskStackDepth++
+	riskMu.Unlock()
+
+	patience := time.NewTimer(riskWaitTimeout)
+	defer patience.Stop()
+wait:
+	for {
+		select {
+		case <-w.ready:
+			return true
+		case <-ctx.Done():
+			break wait
+		case <-patience.C:
+			// Shed only while the error budget holds; otherwise stay parked
+			// (a parked VU reduces offered load without spending an error).
+			if shedBudgetAllows() {
+				break wait
+			}
+			patience.Reset(100 * time.Millisecond)
+		}
+	}
+	riskMu.Lock()
+	if w.granted {
+		// Lost the race: the slot was already handed to us (select picks
+		// randomly when several cases fire). Pass it straight on.
+		riskMu.Unlock()
+		releaseRiskSlot()
+		return false
+	}
+	w.abandoned = true // skipped (and unlinked) at grant time
+	riskMu.Unlock()
+	return false
+}
+
+// releaseRiskSlot hands the slot to the newest live waiter, or retires it.
+func releaseRiskSlot() {
+	riskMu.Lock()
+	for {
+		w := riskStackTop
+		if w == nil {
+			riskRunning--
+			riskMu.Unlock()
+			return
+		}
+		riskStackTop = w.next
+		riskStackDepth--
+		if w.abandoned || w.ctx.Err() != nil {
+			continue // dead waiter; its goroutine has left or will shed
+		}
+		w.granted = true
+		close(w.ready)
+		riskMu.Unlock()
+		return
+	}
+}
 
 // calibrateRisk times real 50k chains on this container (median of 3, so one
-// boot-time scheduling hiccup can't skew it) and derives the gate limits.
-// waitTimeout: a waiter must still fit one full chain plus margin inside the
-// latency bar. maxQueued: how many can be in line and still clear in time
-// (Little's Law), oversized 3× because the boot measurement is a best case
-// (idle machine) and shedding too eagerly wastes score.
+// boot-time scheduling hiccup can't skew it). The measured unit cost sizes the
+// yield stride; admission needs no derived limits since the LIFO gate has no
+// deadline (see riskAcquire).
 func calibrateRisk() {
 	samples := make([]time.Duration, 3)
 	for i := range samples {
@@ -110,18 +194,15 @@ func calibrateRisk() {
 	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
 	unitCost := samples[1]
 
+	// Waiter patience: a waiter granted at the deadline must still fit one
+	// full chain plus response overhead inside the 1500ms bar. Floor of 100ms
+	// so a freak slow calibration can't make the gate shed everything.
+	const riskLatencyBudget = 1500 * time.Millisecond
+	const riskSafetyMargin = 300 * time.Millisecond
 	riskWaitTimeout = riskLatencyBudget - unitCost - riskSafetyMargin
 	if riskWaitTimeout < 100*time.Millisecond {
 		riskWaitTimeout = 100 * time.Millisecond
 	}
-	q := int64(riskWaitTimeout/unitCost) * cpuCap * 3
-	if q < cpuCap {
-		q = cpuCap
-	}
-	if q > 5000 { // sanity ceiling against a freak fast measurement
-		q = 5000
-	}
-	riskMaxQueued = int32(q)
 
 	// Yield stride: target ~1ms hashing slices on THIS hardware. On a slow box
 	// (30ms chains) that's a small stride; on SHA-NI x86 (~4ms) a large one.
@@ -144,8 +225,8 @@ func calibrateRisk() {
 	} else {
 		riskYieldMask = stride - 1
 	}
-	log.Printf("risk calibration: unitCost=%s maxQueued=%d waitTimeout=%s yieldStride=%d",
-		unitCost, riskMaxQueued, riskWaitTimeout, stride)
+	log.Printf("risk calibration: unitCost=%s patience=%s yieldStride=%d (LIFO gate, backstop %d)",
+		unitCost, riskWaitTimeout, stride, riskStackBackstop)
 }
 
 // riskYieldMask: yield the P every (mask+1) iterations. All nine recorded runs
@@ -173,12 +254,39 @@ func riskChain(seed string) string {
 	return string(buf[:])
 }
 
+// Response accounting for the shed-budget governor: k6 counts any status
+// >= 400 toward the 1% http_req_failed gate, so every response lands in one
+// of these two counters (one atomic add per request, ~ns).
+var respOK, respErr int64
+
 func writeJSON(w http.ResponseWriter, code int, body []byte) {
 	h := w.Header()
 	h.Set("Content-Type", "application/json")
 	h.Set("Content-Length", strconv.Itoa(len(body)))
 	w.WriteHeader(code)
 	w.Write(body)
+	if code < 400 {
+		atomic.AddInt64(&respOK, 1)
+	} else {
+		atomic.AddInt64(&respErr, 1)
+	}
+}
+
+// shedBudgetAllows: may we emit one more error response and still stay well
+// under the 1% gate? Target 0.6% — margin for accounting skew vs k6's view
+// (in-flight requests, connection-level failures we never see). Empirically
+// (devloop A/B trilogy, 2026-08-22): unthrottled shedding scored +139% but at
+// 8.4% errors (DQ); zero shedding parks VUs for k6's 60s timeout and idles the
+// hash slots (−22%). The budget buys the upside the gate allows and parks
+// waiters beyond it — parked VUs shrink offered load without erroring.
+func shedBudgetAllows() bool {
+	ok := atomic.LoadInt64(&respOK)
+	er := atomic.LoadInt64(&respErr)
+	total := ok + er
+	if total < 500 { // early ramp: park rather than shed on tiny denominators
+		return false
+	}
+	return (er+1)*1000 <= total*6
 }
 
 // symbolParam pulls ?symbol=X without url.ParseQuery's allocations for the
@@ -259,36 +367,18 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 	if seed == "" {
 		seed = "none"
 	}
-	if atomic.AddInt32(&riskWaiting, 1) > riskMaxQueued {
-		atomic.AddInt32(&riskWaiting, -1)
+	// LIFO admission (see riskAcquire): parks until granted a slot or the
+	// client disconnects. The 503 covers only the memory backstop / lost-race
+	// shed — there is no deadline-based rejection to storm the error gate.
+	if !riskAcquire(r.Context()) {
 		writeJSON(w, 503, overloaded)
 		return
-	}
-	// Wait for a slot, but give up at the calibrated deadline or when the
-	// client disconnects (r.Context() cancels) — a waiter that can no longer
-	// finish inside the latency bar scores zero either way, and computing its
-	// chain anyway would burn CPU that a live request could use.
-	select {
-	case riskSem <- struct{}{}:
-		atomic.AddInt32(&riskWaiting, -1)
-	default:
-		waitCtx, cancel := context.WithTimeout(r.Context(), riskWaitTimeout)
-		select {
-		case riskSem <- struct{}{}:
-			atomic.AddInt32(&riskWaiting, -1)
-		case <-waitCtx.Done():
-			cancel()
-			atomic.AddInt32(&riskWaiting, -1)
-			writeJSON(w, 503, overloaded)
-			return
-		}
-		cancel()
 	}
 	// Slot held from here on. Release via defer so no panic path between
 	// acquire and release can leak it — two leaked slots would silence /risk
 	// (~40% of score) for the rest of the run. net/http recovers handler
 	// panics per-connection, so without the defer a leak would be silent.
-	defer func() { <-riskSem }()
+	defer releaseRiskSlot()
 	h := riskChain(seed)
 	// seed is arbitrary user input → JSON-escape it properly.
 	seedJSON, _ := json.Marshal(seed)
