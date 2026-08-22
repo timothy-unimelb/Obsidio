@@ -33,5 +33,10 @@ ENV GOMEMLIMIT=512MiB
 # the gate (sweep-validated; k6-visible rate lands ~5bp under it because the
 # internal counter conservatively overestimates). EXPERIMENTS.md 2026-08-22.
 ENV RISK_ERR_GATE_BP=100
+# Yield every 256 hash rounds (~60µs slices on SHA-NI) instead of the ~1ms
+# auto-calibrated stride: cheap handlers stop waiting milliseconds for a core,
+# and under the shedding governor that latency converts to closed-loop score
+# (bracket: stride256-x86-01; mechanism first shown in Tim's yield bracket).
+ENV RISK_YIELD_STRIDE=256
 EXPOSE 8080
 CMD ["/server"]
