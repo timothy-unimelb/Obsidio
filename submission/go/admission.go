@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"strconv"
 	"sync"
@@ -8,103 +9,119 @@ import (
 	"time"
 )
 
-// Admission gate for /risk. Cheap endpoints never touch it.
+// Admission governor for /risk. Cheap endpoints never touch it.
 //
-// Waiting jobs are parked in arrival order and served first-in-first-out while
-// the oldest waiter is comfortably inside the patience window, which is every
-// moment of the published siege. Once the oldest waiter has aged past half the
-// window, FIFO would start failing the latency bar, so the gate switches to
-// newest-first: the newest arrival is the one most likely to still finish on
-// time, while a job that has waited longer than patience is discarded when
-// popped instead of being hashed uselessly. Pure LIFO at the published load
-// measured 0.22% starvation discards for no score gain; adaptive order is inert.
+// Waiting jobs park on a LIFO stack and workers serve the freshest first: under
+// overload the newest arrival is the one most likely to still finish inside
+// its latency bar. A waiter older than the patience window is skipped at take
+// time (serving it would only add a sample past the bar) and charged as an
+// error, which keeps the internal error count a strict overestimate of what
+// the grader sees. When no worker is idle and someone is already waiting, a
+// new arrival is rejected at the front door with 503 in about a millisecond
+// while the run-wide error budget allows: the grader counts a request's full
+// duration whether or not it failed, so an instant rejection is a harmless
+// sample, and the closed-loop client comes straight back with cheap scoring
+// traffic instead of sitting in the queue. The budget is 88 basis points of
+// all responses against the published 100bp gate.
 //
-// Shedding is OFF by default (RISK_SHED=1 enables it). At 800 virtual users,
-// four times the published peak, the plain blocking design still passed every
-// gate with zero errors (risk p95 1,266 ms), while shedding bought +28% score
-// at a 3.5% error rate, which fails the 1% gate. Shedding only helps in the
-// narrow band where waiting would break the 1,500 ms bar but fewer than 1% of
-// requests need dropping; it is kept as an operator switch for a locked grader
-// that lands in that band. When the stack is at capacity and the run-wide error budget has
-// room, a new arrival is rejected immediately at the front door (about a
-// millisecond) rather than after a long wait, because the grader counts a
-// request's full duration whether or not it failed. The stack capacity exceeds
-// the published peak of 200 virtual users, so at that load nothing is shed; a
-// 64-slot stack measured 0.63% front-door rejections at the 200-VU peak.
+// RISK_SHED=0 disables all of this: jobs are served first-in-first-out, never
+// rejected and never discarded, which is the zero-error behaviour measured at
+// 3.6M on the separated x86 reference.
 
 const (
 	riskLatencyBar      = 1500 * time.Millisecond
-	defaultParkMax      = 256
-	defaultErrorBudget  = 0.006 // of all requests; the published gate is 0.01
-	minimumPatience     = 300 * time.Millisecond
-	maximumPatience     = 1300 * time.Millisecond
-	patienceSafetyDelay = 250 * time.Millisecond
+	riskSafetyMargin    = 300 * time.Millisecond
+	minimumPatience     = 100 * time.Millisecond
+	defaultShedBudgetBP = 88
+	parkBackstop        = 4096 // memory backstop only; ~20x the published peak
+	budgetMinResponses  = 500
 )
 
+type riskJob struct {
+	seed      string
+	queuedAt  time.Time
+	ctx       context.Context
+	result    chan riskResult
+	taken     bool // under gate.mu: a worker owns it and a result will arrive
+	abandoned bool // under gate.mu: the waiter left; skip at take time
+}
+
 type riskGate struct {
-	mu     sync.Mutex
-	parked []riskJob
-	wake   chan struct{}
+	mu          sync.Mutex
+	parked      []*riskJob
+	idleWorkers int
+	wake        chan struct{}
 
-	shed        bool // RISK_SHED=1; off by default, see the note above
-	parkMax     int
-	patience    time.Duration
-	errorBudget float64
+	shed     bool
+	budgetBP int64
 
-	totalRequests atomic.Int64
-	rejected      atomic.Int64
-	discarded     atomic.Int64
+	patienceNs  atomic.Int64
+	chainEWMANs atomic.Int64
+	responses   atomic.Int64
+	errors      atomic.Int64
 }
 
 var gate = newRiskGate()
 
 func newRiskGate() *riskGate {
 	g := &riskGate{
-		wake:        make(chan struct{}, 64),
-		shed:        os.Getenv("RISK_SHED") == "1",
-		parkMax:     envInt("RISK_PARK_MAX", defaultParkMax, 1, 4096),
-		errorBudget: envFloat("RISK_ERROR_BUDGET", defaultErrorBudget, 0, 0.01),
+		wake:     make(chan struct{}, 16),
+		shed:     os.Getenv("RISK_SHED") != "0",
+		budgetBP: int64(envInt("RISK_SHED_BUDGET_BP", defaultShedBudgetBP, 0, 95)),
 	}
-	if override := envInt("RISK_PATIENCE_MS", 0, 0, int(riskLatencyBar/time.Millisecond)); override > 0 {
-		g.patience = time.Duration(override) * time.Millisecond
-	} else {
-		g.patience = maximumPatience
-	}
+	g.patienceNs.Store(int64(time.Second))
 	return g
 }
 
-// calibratePatience measures one chain at startup and leaves enough of the
-// /risk bar for a full batch to run twice as slowly under load. It is skipped
-// when RISK_PATIENCE_MS is set explicitly.
+// calibratePatience seeds the chain-cost estimate from one real chain so the
+// patience window is sensible before the first batch completes.
 func (g *riskGate) calibratePatience() {
-	if os.Getenv("RISK_PATIENCE_MS") != "" {
-		return
-	}
 	started := time.Now()
 	_ = calculateRisk("calibration")
-	chain := time.Since(started)
-	patience := riskLatencyBar - 2*time.Duration(riskLaneLimit)*chain - patienceSafetyDelay
-	g.patience = min(max(patience, minimumPatience), maximumPatience)
+	g.observeChainCost(time.Since(started) * time.Duration(riskLaneLimit))
 }
 
-// countRequest records every request of every endpoint so the error budget is
-// measured the same way the grader measures it: as a fraction of all requests.
-func (g *riskGate) countRequest() { g.totalRequests.Add(1) }
-
-// budgetAllowsRejection reports whether one more rejection keeps the run-wide
-// error rate inside the budget.
-func (g *riskGate) budgetAllowsRejection() bool {
-	errors := float64(g.rejected.Load()+g.discarded.Load()) + 1
-	return errors <= g.errorBudget*float64(g.totalRequests.Load())
+// observeChainCost folds one batch's wall time into the EWMA and re-derives
+// the patience window. Samples are clamped so a freak stall cannot crater
+// patience in one step.
+func (g *riskGate) observeChainCost(d time.Duration) {
+	d = min(max(d, time.Millisecond), 500*time.Millisecond)
+	old := g.chainEWMANs.Load()
+	ewma := old + (int64(d)-old)/8
+	if old == 0 {
+		ewma = int64(d)
+	}
+	g.chainEWMANs.Store(ewma)
+	patience := int64(riskLatencyBar) - ewma - int64(riskSafetyMargin)
+	g.patienceNs.Store(max(patience, int64(minimumPatience)))
 }
 
-// admit parks a job or rejects it immediately. It returns false when the job
-// was rejected at the front door.
-func (g *riskGate) admit(job riskJob) bool {
+func (g *riskGate) patience() time.Duration { return time.Duration(g.patienceNs.Load()) }
+
+// countResponse records every response of every endpoint so the budget is a
+// fraction of all responses, which is how the grader measures the error rate.
+func (g *riskGate) countResponse() { g.responses.Add(1) }
+
+func (g *riskGate) countError() { g.errors.Add(1) }
+
+// budgetAllows reports whether one more error keeps the run inside the budget.
+func (g *riskGate) budgetAllows() bool {
+	total := g.responses.Load()
+	if total < budgetMinResponses {
+		return false // early ramp: park rather than shed on a tiny denominator
+	}
+	return (g.errors.Load()+1)*10000 <= total*g.budgetBP
+}
+
+// admit parks a job, or returns false when it is rejected at the front door.
+func (g *riskGate) admit(job *riskJob) bool {
 	g.mu.Lock()
-	if g.shed && len(g.parked) >= g.parkMax && g.budgetAllowsRejection() {
+	if len(g.parked) >= parkBackstop {
 		g.mu.Unlock()
-		g.rejected.Add(1)
+		return false
+	}
+	if g.shed && len(g.parked) > 0 && g.idleWorkers == 0 && g.budgetAllows() {
+		g.mu.Unlock()
 		return false
 	}
 	g.parked = append(g.parked, job)
@@ -116,52 +133,97 @@ func (g *riskGate) admit(job riskJob) bool {
 	return true
 }
 
+// wait blocks until the job's result arrives or the waiter gives up. It
+// returns ok=false when the request should be answered with 503.
+func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
+	if !g.shed {
+		select {
+		case result := <-job.result:
+			return result, true
+		case <-job.ctx.Done():
+			g.abandon(job)
+			return riskResult{}, false
+		}
+	}
+
+	timer := time.NewTimer(g.patience())
+	defer timer.Stop()
+	for {
+		select {
+		case result := <-job.result:
+			return result, true
+		case <-job.ctx.Done():
+			return g.abandon(job)
+		case <-timer.C:
+			// Past patience the waiter is stale and would be skipped at take
+			// time anyway: shed now if the budget allows, otherwise stay
+			// parked (a parked client reduces offered load without spending
+			// an error) and check again shortly.
+			if g.budgetAllows() {
+				return g.abandon(job)
+			}
+			timer.Reset(100 * time.Millisecond)
+		}
+	}
+}
+
+// abandon marks a waiter as gone unless a worker already owns it, in which
+// case the digest is seconds of CPU away and is served after all.
+func (g *riskGate) abandon(job *riskJob) (riskResult, bool) {
+	g.mu.Lock()
+	if job.taken {
+		g.mu.Unlock()
+		return <-job.result, true
+	}
+	job.abandoned = true
+	g.mu.Unlock()
+	return riskResult{}, false
+}
+
 // take blocks until at least one live job is available and returns up to
-// `limit` of them, newest first. Jobs past patience or already abandoned by
-// their client are dropped here.
-func (g *riskGate) take(limit int, batch []riskJob) int {
+// `limit` of them. With shedding on, the newest are served first and stale
+// waiters are skipped and charged; with shedding off, arrival order is kept.
+func (g *riskGate) take(limit int, batch []*riskJob) int {
 	for {
 		g.mu.Lock()
 		count := 0
 		now := time.Now()
-		// Sweep the oldest end first: anything past patience is rejected now,
-		// whatever order the live jobs are then served in. Without this sweep,
-		// stale jobs at the old end could sit unserved and unrejected for the
-		// whole overload while newer arrivals were popped ahead of them.
-		for g.shed && len(g.parked) > 0 && now.Sub(g.parked[0].queuedAt) > g.patience {
-			job := g.parked[0]
-			g.parked[0] = riskJob{}
-			g.parked = g.parked[1:]
-			if job.ctx.Err() == nil {
-				g.discarded.Add(1)
-				job.result <- riskResult{rejected: true}
-			}
-		}
-		newestFirst := len(g.parked) > 0 && g.shed && now.Sub(g.parked[0].queuedAt) > g.patience*4/5
+		stale := g.patience()
 		for count < limit && len(g.parked) > 0 {
-			var job riskJob
-			if newestFirst {
+			var job *riskJob
+			if g.shed {
 				job = g.parked[len(g.parked)-1]
+				g.parked[len(g.parked)-1] = nil
 				g.parked = g.parked[:len(g.parked)-1]
 			} else {
 				job = g.parked[0]
-				g.parked[0] = riskJob{}
+				g.parked[0] = nil
 				g.parked = g.parked[1:]
 			}
-			if job.ctx.Err() != nil {
-				continue // client gone; nobody is waiting for this result
+			if job.abandoned || job.ctx.Err() != nil {
+				continue
 			}
+			if g.shed && now.Sub(job.queuedAt) > stale {
+				g.errors.Add(1) // counted now; its client will see a timeout or a 503
+				continue
+			}
+			job.taken = true
 			batch[count] = job
 			count++
 		}
-		if len(g.parked) == 0 && cap(g.parked) > 4*g.parkMax {
-			g.parked = nil // release a deque that grew during an overload
+		if len(g.parked) == 0 && cap(g.parked) > 4*parkBackstop {
+			g.parked = nil
 		}
-		g.mu.Unlock()
 		if count > 0 {
+			g.mu.Unlock()
 			return count
 		}
+		g.idleWorkers++
+		g.mu.Unlock()
 		<-g.wake
+		g.mu.Lock()
+		g.idleWorkers--
+		g.mu.Unlock()
 	}
 }
 

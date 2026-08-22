@@ -21,11 +21,11 @@ func TestMultiLaneRiskMatchesReference(t *testing.T) {
 
 func TestRiskBatchSizesMatchReference(t *testing.T) {
 	for size := 1; size <= maxRiskLanes; size++ {
-		batch := make([]riskJob, size)
+		batch := make([]*riskJob, size)
 		channels := make([]chan riskResult, size)
 		for index := range batch {
 			channels[index] = make(chan riskResult, 1)
-			batch[index] = riskJob{seed: "batch-" + strconv.Itoa(size) + "-" + strconv.Itoa(index), result: channels[index]}
+			batch[index] = &riskJob{seed: "batch-" + strconv.Itoa(size) + "-" + strconv.Itoa(index), result: channels[index]}
 		}
 		runRiskBatch(batch)
 		for index := range batch {

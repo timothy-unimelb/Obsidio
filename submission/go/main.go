@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/sha256"
 	"io"
 	"log"
@@ -46,13 +45,6 @@ func (m *market) setPrice(price float64) {
 
 type responseBuffer struct {
 	bytes []byte
-}
-
-type riskJob struct {
-	seed     string
-	queuedAt time.Time
-	ctx      context.Context
-	result   chan<- riskResult
 }
 
 type riskResult struct {
@@ -101,15 +93,15 @@ func main() {
 		MaxHeaderBytes:    8 << 10,
 	}
 
-	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, park capacity %d, patience %s",
-		port, riskWorkerCount, riskLaneLimit, gate.parkMax, gate.patience)
+	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, shedding %v at %dbp, patience %s",
+		port, riskWorkerCount, riskLaneLimit, gate.shed, gate.budgetBP, gate.patience())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
 
 func route(w http.ResponseWriter, r *http.Request) {
-	gate.countRequest()
+	gate.countResponse()
 	if r.Method != http.MethodGet {
 		if r.Method == http.MethodPost && r.URL.Path == "/price" {
 			handlePriceUpdate(w, r)
@@ -194,21 +186,19 @@ func handleStats(w http.ResponseWriter, symbol string) {
 
 func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 	startRiskWorkers()
-	resultChannel := make(chan riskResult, 1)
-	job := riskJob{seed: seed, queuedAt: time.Now(), ctx: r.Context(), result: resultChannel}
+	job := &riskJob{seed: seed, queuedAt: time.Now(), ctx: r.Context(), result: make(chan riskResult, 1)}
 
 	if !gate.admit(job) {
+		gate.countError()
 		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}
-
-	var result riskResult
-	select {
-	case result = <-resultChannel:
-	case <-r.Context().Done():
-		return
-	}
-	if result.rejected {
+	result, ok := gate.wait(job)
+	if !ok {
+		if r.Context().Err() != nil {
+			return
+		}
+		gate.countError()
 		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}
@@ -244,18 +234,21 @@ func startRiskWorkers() {
 	})
 }
 
-// riskWorker takes up to riskLaneLimit live jobs from the gate, newest first,
-// and hashes them as interleaved lanes on this worker's core. With nothing else
-// parked a job still runs alone immediately.
+// riskWorker takes up to riskLaneLimit live jobs from the gate and hashes
+// them as interleaved lanes on this worker's core. It never waits for a
+// partner: a lone job runs single-lane immediately. Each batch's wall time
+// feeds the patience estimate.
 func riskWorker() {
-	var batch [maxRiskLanes]riskJob
+	var batch [maxRiskLanes]*riskJob
 	for {
 		count := gate.take(riskLaneLimit, batch[:])
+		started := time.Now()
 		runRiskBatch(batch[:count])
+		gate.observeChainCost(time.Since(started))
 	}
 }
 
-func runRiskBatch(batch []riskJob) {
+func runRiskBatch(batch []*riskJob) {
 	var hashes [maxRiskLanes][sha256.Size * 2]byte
 	var hashStarted time.Time
 	if emitRiskTiming {
@@ -301,9 +294,19 @@ func calculateRisk(seed string) [sha256.Size * 2]byte {
 	encodeDigest(&encodedWords, &digest)
 	encoded := unsafe.Slice((*byte)(unsafe.Pointer(&encodedWords[0])), sha256.Size*2)
 
-	for iteration := 1; iteration < riskIterations; iteration++ {
-		digest = sha256.Sum256(encoded)
-		encodeDigest(&encodedWords, &digest)
+	if useSHANIPair {
+		buf := (*[sha256.Size * 2]byte)(unsafe.Pointer(&encodedWords[0]))
+		for remaining := riskIterations - 1; remaining > 0; {
+			rounds := yieldChunk(remaining)
+			riskChain1x(buf, rounds)
+			remaining -= rounds
+			yieldAfterChunk(remaining)
+		}
+	} else {
+		for iteration := 1; iteration < riskIterations; iteration++ {
+			digest = sha256.Sum256(encoded)
+			encodeDigest(&encodedWords, &digest)
+		}
 	}
 
 	var result [sha256.Size * 2]byte

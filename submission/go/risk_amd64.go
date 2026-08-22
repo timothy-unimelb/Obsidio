@@ -13,6 +13,9 @@ var useSHANIPair = cpuidSHA() && os.Getenv("RISK_SHANI") != "0"
 // independent chains interleaved on one core.
 //
 //go:noescape
+func riskChain1x(buf0 *[64]byte, rounds int)
+
+//go:noescape
 func riskChain2x(buf0, buf1 *[64]byte, rounds int)
 
 //go:noescape

@@ -10,124 +10,135 @@ import (
 	"time"
 )
 
-func newTestGate(parkMax int, patience time.Duration, budget float64) *riskGate {
-	return &riskGate{wake: make(chan struct{}, 64), shed: true, parkMax: parkMax, patience: patience, errorBudget: budget}
+func newTestGate(shed bool, budgetBP int64, patience time.Duration) *riskGate {
+	g := &riskGate{wake: make(chan struct{}, 16), shed: shed, budgetBP: budgetBP}
+	g.patienceNs.Store(int64(patience))
+	return g
 }
 
-func testJob(seed string) (riskJob, chan riskResult) {
-	result := make(chan riskResult, 1)
-	return riskJob{seed: seed, queuedAt: time.Now(), ctx: context.Background(), result: result}, result
+func testJob(seed string) *riskJob {
+	return &riskJob{seed: seed, queuedAt: time.Now(), ctx: context.Background(), result: make(chan riskResult, 1)}
 }
 
-func TestGateServesFIFOWhileWaitsAreShort(t *testing.T) {
-	g := newTestGate(16, time.Second, 0)
+func fillBudget(g *riskGate, responses int) {
+	for range responses {
+		g.countResponse()
+	}
+}
+
+func TestGateServesNewestFirstWhenShedding(t *testing.T) {
+	g := newTestGate(true, 88, time.Second)
 	for _, seed := range []string{"first", "second", "third"} {
-		job, _ := testJob(seed)
-		if !g.admit(job) {
-			t.Fatalf("job %q rejected with an empty stack", seed)
+		if !g.admit(testJob(seed)) {
+			t.Fatalf("job %q rejected while a worker could be idle", seed)
 		}
 	}
-	var batch [maxRiskLanes]riskJob
-	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "first" || batch[1].seed != "second" {
-		t.Fatalf("expected arrival order, got %d jobs: %q %q", count, batch[0].seed, batch[1].seed)
+	var batch [maxRiskLanes]*riskJob
+	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "third" || batch[1].seed != "second" {
+		t.Fatalf("expected newest-first, got %d: %q %q", count, batch[0].seed, batch[1].seed)
 	}
-	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "third" {
+	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "first" {
 		t.Fatalf("expected the remaining job, got %d: %q", count, batch[0].seed)
 	}
 }
 
-func TestGateSwitchesToNewestFirstUnderOverload(t *testing.T) {
-	g := newTestGate(16, time.Second, 0)
-	old, _ := testJob("old")
-	old.queuedAt = time.Now().Add(-900 * time.Millisecond) // past 80% of patience
-	g.admit(old)
-	for _, seed := range []string{"second", "third"} {
-		job, _ := testJob(seed)
-		g.admit(job)
-	}
-	var batch [maxRiskLanes]riskJob
-	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "third" || batch[1].seed != "second" {
-		t.Fatalf("expected newest-first under overload, got %d jobs: %q %q", count, batch[0].seed, batch[1].seed)
-	}
-}
-
-func TestGateDiscardsJobsPastPatience(t *testing.T) {
-	g := newTestGate(16, 20*time.Millisecond, 0)
-	stale, staleResult := testJob("stale")
+func TestGateServesFIFOWhenSheddingDisabled(t *testing.T) {
+	g := newTestGate(false, 88, time.Millisecond)
+	fillBudget(g, 1000)
+	stale := testJob("stale")
 	stale.queuedAt = time.Now().Add(-time.Second)
-	fresh, _ := testJob("fresh")
 	g.admit(stale)
-	g.admit(fresh)
-	var batch [maxRiskLanes]riskJob
-	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "fresh" {
-		t.Fatalf("expected only the fresh job, got %d: %q", count, batch[0].seed)
+	g.admit(testJob("second"))
+	g.admit(testJob("third")) // never rejected: no idle-worker rule without shedding
+	var batch [maxRiskLanes]*riskJob
+	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "stale" || batch[1].seed != "second" {
+		t.Fatalf("expected arrival order with no discards, got %d: %q %q", count, batch[0].seed, batch[1].seed)
 	}
-	select {
-	case result := <-staleResult:
-		if !result.rejected {
-			t.Fatal("stale job should have been rejected")
-		}
-	default:
-		t.Fatal("stale job received no rejection")
-	}
-	if g.discarded.Load() != 1 {
-		t.Fatalf("discarded counter = %d", g.discarded.Load())
+	if g.errors.Load() != 0 {
+		t.Fatalf("shedding disabled must not charge errors, got %d", g.errors.Load())
 	}
 }
 
-func TestGateSkipsAbandonedJobs(t *testing.T) {
-	g := newTestGate(16, time.Second, 0)
+func TestGateSkipsStaleAndAbandonedJobs(t *testing.T) {
+	g := newTestGate(true, 88, 20*time.Millisecond)
+	stale := testJob("stale")
+	stale.queuedAt = time.Now().Add(-time.Second)
 	ctx, cancel := context.WithCancel(context.Background())
-	gone, _ := testJob("gone")
+	gone := testJob("gone")
 	gone.ctx = ctx
-	live, _ := testJob("live")
-	g.admit(live)
+	g.admit(testJob("live"))
+	g.admit(stale)
 	g.admit(gone)
 	cancel()
-	var batch [maxRiskLanes]riskJob
+	var batch [maxRiskLanes]*riskJob
 	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "live" {
-		t.Fatalf("expected the live job only, got %d: %q", count, batch[0].seed)
+		t.Fatalf("expected only the live job, got %d: %q", count, batch[0].seed)
+	}
+	if g.errors.Load() != 1 {
+		t.Fatalf("stale skip must be charged once, got %d", g.errors.Load())
 	}
 }
 
-func TestGateFrontDoorRejectRespectsBudget(t *testing.T) {
-	g := newTestGate(1, time.Second, 0.01)
-	first, _ := testJob("a")
-	second, _ := testJob("b")
-	third, _ := testJob("c")
-	if !g.admit(first) {
-		t.Fatal("first job should park")
+func TestGateFrontDoorShedsOnlyWhenBusyAndBudgeted(t *testing.T) {
+	g := newTestGate(true, 88, time.Second)
+	// Waiters parked but the budget denominator is tiny: park, do not shed.
+	g.admit(testJob("a"))
+	if !g.admit(testJob("b")) {
+		t.Fatal("tiny denominator: job should park")
 	}
-	// Stack full but no requests counted yet: the budget allows no errors, so
-	// the job must park rather than be rejected.
-	if !g.admit(second) {
-		t.Fatal("budget exhausted: job should park, not be rejected")
+	fillBudget(g, 10000)
+	if g.admit(testJob("c")) {
+		t.Fatal("no idle worker, waiters parked, budget room: job should be rejected")
 	}
-	for range 1000 {
-		g.countRequest()
+	// Spend the budget (88bp of 10,000 responses is 88 errors).
+	for range 88 {
+		g.countError()
 	}
-	if g.admit(third) {
-		t.Fatal("stack full with budget room: job should be rejected at the front door")
+	if !g.admit(testJob("d")) {
+		t.Fatal("budget exhausted: job should park rather than be rejected")
 	}
-	if g.rejected.Load() != 1 || g.parkedCount() != 2 {
-		t.Fatalf("rejected=%d parked=%d", g.rejected.Load(), g.parkedCount())
+	// With an idle worker, nothing is shed regardless of budget.
+	g2 := newTestGate(true, 88, time.Second)
+	fillBudget(g2, 10000)
+	g2.mu.Lock()
+	g2.idleWorkers = 1
+	g2.mu.Unlock()
+	g2.admit(testJob("x"))
+	if !g2.admit(testJob("y")) {
+		t.Fatal("an idle worker means no overload: job should park")
+	}
+}
+
+func TestWaitShedsAfterPatienceWithinBudget(t *testing.T) {
+	g := newTestGate(true, 88, 10*time.Millisecond)
+	fillBudget(g, 10000)
+	job := testJob("slow")
+	g.admit(job)
+	started := time.Now()
+	if _, ok := g.wait(job); ok {
+		t.Fatal("expected the waiter to shed itself after patience")
+	}
+	if time.Since(started) > 500*time.Millisecond {
+		t.Fatal("patience shed took too long")
+	}
+	if !job.abandoned {
+		t.Fatal("shed waiter must be marked abandoned for take-time skipping")
 	}
 }
 
 func TestRiskRejectionIs503AndPriceUnaffected(t *testing.T) {
 	previous := gate
-	gate = newTestGate(1, time.Second, 0.01)
+	gate = newTestGate(true, 88, time.Second)
 	defer func() { gate = previous }()
-	for range 1000 {
-		gate.countRequest()
-	}
-	// Fill the park slot directly so no worker consumes it.
-	blocker, _ := testJob("blocker")
-	gate.admit(blocker)
+	fillBudget(gate, 10000)
+	gate.admit(testJob("blocker")) // parked, no worker consumes it, no idle worker
 
 	response := request(t, "/risk?seed=shed")
 	if response.Code != http.StatusServiceUnavailable || !strings.Contains(response.Body.String(), "overloaded") {
 		t.Fatalf("expected 503 overloaded, got %d %s", response.Code, response.Body.String())
+	}
+	if gate.errors.Load() != 1 {
+		t.Fatalf("front-door rejection must be charged, got %d", gate.errors.Load())
 	}
 	price := request(t, "/price?symbol=AAPL")
 	if price.Code != http.StatusOK {
@@ -135,31 +146,9 @@ func TestRiskRejectionIs503AndPriceUnaffected(t *testing.T) {
 	}
 }
 
-func TestGateDefaultNeverSheds(t *testing.T) {
-	g := &riskGate{wake: make(chan struct{}, 64), parkMax: 1, patience: time.Millisecond, errorBudget: 0.01}
-	for range 1000 {
-		g.countRequest()
-	}
-	stale, staleResult := testJob("stale")
-	stale.queuedAt = time.Now().Add(-time.Second)
-	extra, _ := testJob("extra")
-	if !g.admit(stale) || !g.admit(extra) {
-		t.Fatal("default gate must park every job")
-	}
-	var batch [maxRiskLanes]riskJob
-	if count := g.take(4, batch[:]); count != 2 || batch[0].seed != "stale" {
-		t.Fatalf("default gate must serve FIFO without discards, got %d: %q", count, batch[0].seed)
-	}
-	select {
-	case <-staleResult:
-		t.Fatal("default gate rejected a job")
-	default:
-	}
-}
-
-func TestGateInertUnderConcurrentLoad(t *testing.T) {
-	// Under normal load nothing is rejected or discarded and every answer is
-	// correct; this guards the gate's no-op behaviour for the published siege.
+func TestGateInertUnderModerateLoad(t *testing.T) {
+	// Early in a run the budget denominator is small, so nothing is shed and
+	// every answer is correct.
 	const requests = 24
 	results := make(chan *httptest.ResponseRecorder, requests)
 	for index := range requests {
@@ -172,7 +161,16 @@ func TestGateInertUnderConcurrentLoad(t *testing.T) {
 			t.Fatalf("unexpected status %d under moderate load", response.Code)
 		}
 	}
-	if gate.rejected.Load() != 0 || gate.discarded.Load() != 0 {
-		t.Fatalf("gate acted under moderate load: rejected=%d discarded=%d", gate.rejected.Load(), gate.discarded.Load())
+}
+
+func TestPatienceTracksChainCost(t *testing.T) {
+	g := newTestGate(true, 88, time.Second)
+	g.observeChainCost(12 * time.Millisecond)
+	if got := g.patience(); got != riskLatencyBar-12*time.Millisecond-riskSafetyMargin {
+		t.Fatalf("patience after first sample = %s", got)
+	}
+	g.observeChainCost(10 * time.Second) // clamped to 500 ms
+	if got := g.patience(); got < minimumPatience || got > riskLatencyBar {
+		t.Fatalf("patience out of range after a freak sample: %s", got)
 	}
 }

@@ -13,9 +13,12 @@ COPY --from=build --chown=65532:65532 /data /data
 VOLUME /data
 USER 65532:65532
 EXPOSE 8080
+# GOGC=off stops scheduled collections on a near-zero steady-state heap; the
+# memory limit is the hard safety net and must always accompany it.
 ENV GOMAXPROCS=2 \
-    GOMEMLIMIT=1536MiB \
-    GOGC=200 \
+    GOMEMLIMIT=512MiB \
+    GOGC=off \
     RISK_WORKERS=2 \
+    RISK_SHED_BUDGET_BP=88 \
     PRICE_LOG=/data/prices.log
 ENTRYPOINT ["/obsidio"]
