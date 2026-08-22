@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T04:15:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "single-fused-x86-01",
+  "candidate": "single-lane-fused-iteration (advait app, 09a1879)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4003863, 4022632],
+    "candidate_score": 4060125,
+    "candidate_vs_stronger_champion_percent": 0.93,
+    "candidate_vs_champion_average_percent": 1.17,
+    "champion_drift_percent": 0.47,
+    "error_rate_percent": 0.58,
+    "all_latency_gates_passed": true
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "MARGINAL keep: +0.9% vs stronger side at a 0.8% noise floor with 0.47% drift — consistent with the mechanism (fused hashHex1 only affects lone-waiter chains, i.e. the ramp; the 200-VU peak path is byte-identical to champion)",
+    "kept because downside is structurally zero and the ramp mechanism is Tier-0-proven (92.3 -> 76.9ns per single iteration)",
+    "final champion of the day: 09a1879 — 1.95M -> 4.06M (+108%) in five steps"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Single-lane fused' entry"
+}

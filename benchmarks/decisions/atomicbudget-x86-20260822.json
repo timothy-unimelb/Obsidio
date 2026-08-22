@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T09:45:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "atomicbudget-x86-01",
+  "candidate": "atomic CAS shed-error reservation (advait app, 7eae870; port of Tim's 6808e7d semantics)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [1449684, 1469429],
+    "candidate_score": 1461273,
+    "candidate_vs_stronger_champion_percent": -0.6,
+    "error_rate_percent": 0.86,
+    "all_latency_gates_passed": true,
+    "profile": "screen"
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "kept on correctness, not score: -0.6% is inside the 0.8% noise floor (expected inert; Tim's equivalent change was inert on his stack too)",
+    "closes the check-then-charge race: a burst of concurrently waking waiters could all pass the budget check before any charge landed (Tim measured 1.489% errors against an 0.88% budget at 800 VUs on the racy form); with ~0.15pp margin to the 1% DQ gate this was the biggest disqualification risk in the shipped design",
+    "every ok=false exit of riskSubmit now charges respErr exactly once at decision time; the shed 503 writes uncounted; race-hammered unit test (TestShedReserveNoOvershoot, 64 goroutines) proves the budget can be spent to the cap but never past it",
+    "800-VU overdrive re-verification still owed (with the 4-lane candidate, one combined overdrive pass before freeze)"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Sprint-3 Item 2' entry"
+}

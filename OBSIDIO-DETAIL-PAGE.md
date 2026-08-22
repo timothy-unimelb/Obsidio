@@ -1,5 +1,17 @@
 # Obsidio: The Siege (Detailed Guide)
 
+<!-- PROVENANCE: This file came with the organizers' code skeleton. The official live
+version is the Notion page "Obsidio Directions & Resources":
+https://cissa-unimelb.notion.site/Obsidio-Directions-Resources-3c199473577c80968edcc87d91e386c7
+Verified against the live page on 2026-08-21: the Notion page is a CONDENSED revision of
+this document — identical rules, endpoints, weights, thresholds, score formula, caps,
+submission list, and bonus terms. No drift. Differences on the live page:
+  - It links the skeleton repo: https://github.com/solpercival/Obsidio
+  - Thresholds still marked "placeholders, finalised on the grading hardware before the event"
+  - Its "[Docker guide]" mention is literal placeholder text with no link
+Re-verify the live page before submission in case the locked threshold numbers land. -->
+
+
 > ⚔️ This page is the *how*. The track overview told you what Obsidio is; this page gives you the rules of the siege, the box you deploy into, the exact API you build, how it is graded, and how points are scored. Read it fully before you write code. The constraints here are the whole game.
 
 ---

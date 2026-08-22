@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-08-22T02:35:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "hex-packed-x86-01",
+  "candidate": "packed-pair-table-hex-encoder (advait app, a446bd0)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [1944994, 1947556],
+    "candidate_score": 2098957,
+    "candidate_vs_stronger_champion_percent": 7.774,
+    "candidate_vs_champion_average_percent": 7.841,
+    "champion_drift_percent": 0.132,
+    "error_rate_percent": 0.565,
+    "all_latency_gates_passed": true,
+    "risk_p95_ms_candidate": 141.6,
+    "prior_same_testbed_noise_floor_percent": 0.8
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (Xeon Platinum 8488C, SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "network": "same-AZ private IPv4",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "champion=02e4f99, candidate=a446bd0; only kernel delta is hex.Encode -> 256-entry uint16 pair table",
+    "gain larger than draft-branch equivalent (+2-3%) — our chain hex-encodes inside the tight 50k loop both at seed and per iteration",
+    "correctness: 256-value stdlib equivalence + full 50k-chain digest reference + race hammer, and digest guard runs in the Docker build"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Packed pair-table hex encoder' entry"
+}

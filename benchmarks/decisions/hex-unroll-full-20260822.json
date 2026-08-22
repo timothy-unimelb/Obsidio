@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-08-21T23:12:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "hex-unroll-full-20260822",
+  "candidate": "compact-four-at-a-time-hex-unrolling",
+  "verdict": "unresolved",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [2892463, 2783480],
+    "candidate_score": 2919075,
+    "candidate_vs_stronger_champion_percent": 0.92,
+    "candidate_vs_champion_average_percent": 2.8578,
+    "champion_drift_percent": -3.7678,
+    "error_rate": 0,
+    "all_latency_gates_passed": true,
+    "focused_kernel_gain_percent": 2.4965,
+    "screen_candidate_vs_stronger_champion_percent": 1.5132,
+    "screen_candidate_vs_champion_average_percent": 2.1306
+  },
+  "limitations": [
+    "same-host local Apple Silicon environment",
+    "full-run champion drift exceeded the conservative candidate gain",
+    "one candidate full run is insufficient to resolve a sub-noise improvement",
+    "not an interleaved six-run milestone"
+  ],
+  "next_evidence": "Retain the experiment commit but keep 64e38e0 as champion; revisit in an interleaved finalist comparison or separated x86 validation before combining it with PGO.",
+  "report": "benchmarks/experiments/2026-08-22-packed-champion-profile.md"
+}

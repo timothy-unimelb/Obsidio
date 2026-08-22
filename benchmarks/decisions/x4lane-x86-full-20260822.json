@@ -1,0 +1,34 @@
+{
+  "recorded_at": "2026-08-22T10:05:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "x4lane-x86-full-01",
+  "candidate": "4-lane SHA-NI chain kernel, quad batches (advait app, ee09171; asm vendored from Tim's submission/go risk_amd64.s)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4398236, 4399807],
+    "candidate_score": 4814186,
+    "candidate_vs_stronger_champion_percent": 9.42,
+    "champion_drift_percent": 0.036,
+    "error_rate_percent": 0.86,
+    "all_latency_gates_passed": true,
+    "price_p95_ms": {"champion": 6.3, "candidate": 9.8},
+    "risk_p95_ms": {"champion": 77.5, "candidate": 83.1},
+    "screen": {"set": "x4lane-x86-01", "champion": [1455922, 1450040], "candidate": 1596733, "percent": 9.7},
+    "boot_race": "quad 10.48ms vs pair-2 11.75ms (1.12x) on SPR"
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "+9.4% vs the stronger champion side at 0.036% drift — the tightest bracket recorded; closes Tim's head-to-head gap (his 4,835,626 on his instance vs our 4,814,186 here; his controls of our old build read ~1% below ours)",
+    "day compound: 4.30M freeze -> 4.43M (stride 256) -> 4.81M (quad) = +12%; the raw-TCP +2.5% partially overlapped with the cheap-path gains rather than stacking",
+    "unlike x16 (flat: ~15-waiter batch floor), a quad needs only 4 parked waiters — inside the governor's queue equilibrium, so batches fire constantly",
+    "walls: 640-case boot differential vs crypto/sha256, test suite (differential n up to 1000, full-chain vs walled scalar, lane independence, GC/preemption stress) green on target silicon, boot race >=5% win required, RISK_X4 kill switch, gate silent off-SHA-NI by construction",
+    "price p95 6.3 -> 9.8ms (quad chunks hold the core ~2x longer per yield slice) — 20x inside the 200ms bar"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Sprint-3 Item 3' entry"
+}
