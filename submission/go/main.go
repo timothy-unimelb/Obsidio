@@ -22,6 +22,9 @@ const (
 	defaultRiskQueue = 32
 	defaultRiskLanes = 4
 	maxRiskLanes     = 4
+	// defaultYieldRounds bounds how long a worker stays inside the assembly
+	// kernel before letting the scheduler run waiting cheap handlers.
+	defaultYieldRounds = 256
 )
 
 type priceSeries [500]float64
@@ -54,6 +57,7 @@ var (
 	riskWorkerCount = envInt("RISK_WORKERS", defaultRiskJobs, 1, 2)
 	riskQueue       = make(chan riskJob, envInt("RISK_QUEUE", defaultRiskQueue, 1, 200))
 	riskLaneLimit   = envInt("RISK_LANES", defaultRiskLanes, 1, maxRiskLanes)
+	riskYieldRounds = envInt("RISK_YIELD_ROUNDS", defaultYieldRounds, 0, riskIterations)
 	riskWorkersOnce sync.Once
 	emitRiskTiming  = os.Getenv("RISK_TIMING") == "1"
 )
@@ -314,8 +318,14 @@ func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]b
 	encodedB := unsafe.Slice((*byte)(unsafe.Pointer(&wordsB[0])), sha256.Size*2)
 
 	if useSHANIPair {
-		riskChain2x((*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsA[0])),
-			(*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsB[0])), riskIterations-1)
+		bufA := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsA[0]))
+		bufB := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsB[0]))
+		for remaining := riskIterations - 1; remaining > 0; {
+			rounds := yieldChunk(remaining)
+			riskChain2x(bufA, bufB, rounds)
+			remaining -= rounds
+			yieldAfterChunk(remaining)
+		}
 	} else {
 		for iteration := 1; iteration < riskIterations; iteration++ {
 			digestA = sha256.Sum256(encodedA)
@@ -347,10 +357,16 @@ func calculateRiskQuad(seeds [maxRiskLanes]string) (results [maxRiskLanes][sha25
 	encoded3 := unsafe.Slice((*byte)(unsafe.Pointer(&words3[0])), sha256.Size*2)
 
 	if useSHANIPair {
-		riskChain4x((*[sha256.Size * 2]byte)(unsafe.Pointer(&words0[0])),
-			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words1[0])),
-			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words2[0])),
-			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words3[0])), riskIterations-1)
+		buf0 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words0[0]))
+		buf1 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words1[0]))
+		buf2 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words2[0]))
+		buf3 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words3[0]))
+		for remaining := riskIterations - 1; remaining > 0; {
+			rounds := yieldChunk(remaining)
+			riskChain4x(buf0, buf1, buf2, buf3, rounds)
+			remaining -= rounds
+			yieldAfterChunk(remaining)
+		}
 	} else {
 		for iteration := 1; iteration < riskIterations; iteration++ {
 			digest0 = sha256.Sum256(encoded0)
@@ -369,6 +385,23 @@ func calculateRiskQuad(seeds [maxRiskLanes]string) (results [maxRiskLanes][sha25
 	copy(results[2][:], encoded2)
 	copy(results[3][:], encoded3)
 	return results
+}
+
+// yieldChunk returns how many kernel rounds to run before the next scheduling
+// point. The assembly loop cannot be preempted asynchronously, so without
+// chunking a worker would hold its core for a whole chain while cheap handlers
+// wait behind it.
+func yieldChunk(remaining int) int {
+	if riskYieldRounds == 0 || remaining <= riskYieldRounds {
+		return remaining
+	}
+	return riskYieldRounds
+}
+
+func yieldAfterChunk(remaining int) {
+	if remaining > 0 && riskYieldRounds != 0 {
+		runtime.Gosched()
+	}
 }
 
 // encodeDigest writes two lowercase hexadecimal bytes with one native-width
