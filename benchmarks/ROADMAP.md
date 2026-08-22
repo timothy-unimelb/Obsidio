@@ -6,40 +6,33 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** interleaved multi-lane risk batching, commit `b29480e`
-  (workers drain up to four queued jobs and hash them as interleaved
-  independent chains). Built on two permanent risk workers, bounded FIFO
-  queue, cheap-path bypass, allocation-free packed-hex kernel with compact
-  unrolling.
-- **Latest accepted evidence:** `risk-lanes-x86-full-20260822`; candidate
-  2,062,911, +2.21% over the stronger control with −0.75% drift, zero errors,
-  all gates passed. Local arm64 bracket was +9.11% with +0.02% drift.
-- **Mechanism:** the earlier 58% `encodeDigest` attribution was the core
-  stalling on hardware SHA results; interleaving independent chains overlaps
-  that latency. Kernel gain ≈25% on Apple Silicon, ≈5% on SHA-NI, neutral with
-  `GODEBUG=cpu.all=off`. `RISK_LANES=4` default (pair ≈ quad on x86).
-- **Rejected this session:** Go PGO (−19.7% kernel, 50k allocs) and
-  fixed-shape scalar SHA-256 (5.9× slower). Both stopped at Level 0.
+- **Champion:** two-lane SHA-NI risk kernel, commit `8075efe`
+  (`submission/go/risk_amd64.s`): both lanes' fixed 64-byte SHA-256 in one
+  interleaved assembly routine, constant padding block precomputed, CPUID
+  gated with `RISK_SHANI=0` fallback. On top of multi-lane batching, two
+  permanent workers, bounded queue, cheap-path bypass, packed-hex encoder.
+- **Latest accepted evidence:** `shani-x86-full-20260822`; candidate
+  2,545,521, +21.76% over the stronger control with −0.92% drift, zero
+  errors. Kernel: 6.21 → 2.99 ms per chain on Sapphire Rapids (−52%).
+- **Origin:** the idea and references came from Advait's `PLAN.md`
+  (`fork/advait`, never started there).
+- **Cost to watch:** `/price` p95 is now ~40 ms on x86 (was ~24 ms). Bar is
+  200 ms. First knobs if the locked grader tightens it: `RISK_LANES=2` or a
+  periodic yield in the batch loop.
+- **Rejected this session:** Go PGO, fixed-shape scalar SHA-256.
 - **Outstanding finalist evidence:** interleaved six-run milestone,
-  optional-instruction portability full-run set, and a rerun after the
-  organizers lock the grader.
-- **Separated environment:** AWS stack destroyed after the comparison; the
-  CloudFormation lifecycle scripts under `benchmarks/aws/` re-create it.
+  `RISK_SHANI=0` full-run portability set, rerun after the grader locks.
+- **Separated environment:** AWS stack destroyed.
 
 ## Active sequence
 
-1. **Completed: multi-lane Level 0, local screen, local full.** See
-   `experiments/2026-08-22-risk-lanes.md`.
-2. **Completed: separated x86 screen and full bracket.** +1.57% screen, +2.21%
-   full; accepted.
-3. **Completed: x86 kernel lane-count check.** Pair and quad equivalent on
-   SHA-NI; default stays 4.
-4. **Next: decide whether more kernel work is worth it.** The remaining
-   measured cost is the SHA chain itself; Go-level options are now largely
-   exhausted (scalar SHA, PGO, hex encoding, lanes). Candidates below are
-   speculative and each needs a Level 0 case before any load run.
-5. **Then:** six-run milestone and portability set for the finalist, and a
-   final docs pass before submission.
+1. **Completed: SHA-NI kernel Level 0, x86 screen (+23.3%), x86 full
+   (+21.8%).** See `experiments/2026-08-22-shani-kernel.md`.
+2. **Next candidate (optional): in-register hex via `PSHUFB` inside the
+   kernel** so the 64-byte hex input for the next round is produced in
+   assembly and the Go `encodeDigest` calls disappear. Level 0 on x86 first.
+3. **Then: finalist validation.** Six-run milestone `A B B A A B` on x86,
+   `RISK_SHANI=0` full set, update `submission/go` docs from those results.
 
 ## Candidate queue after the active sequence
 
@@ -67,8 +60,7 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** multi-lane batching (`b29480e`) is the accepted champion on both
-local arm64 and separated x86. AWS stack destroyed. Submission docs updated
-with the x86 numbers. Next: either a Level 0 case for a further kernel idea
-from the candidate queue, or move to finalist validation (six-run milestone,
-portability set). Re-provision AWS only for an exact x86 comparison.
+**Status:** SHA-NI kernel (`8075efe`) is the accepted champion on separated
+x86. AWS destroyed. Submission docs still describe the Go-lanes champion and
+need the kernel section and the new x86 figures. Next: docs update, then
+either the in-kernel hex candidate (Level 0 on x86) or finalist validation.
