@@ -23,6 +23,7 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	_ "net/http/pprof" // registers on DefaultServeMux; exposed only when OBSIDIO_PPROF=1 (see main)
 	"os"
@@ -668,11 +669,17 @@ func raceKernelPairing() {
 var respOK, respErr int64
 
 func writeJSON(w http.ResponseWriter, code int, body []byte) {
-	h := w.Header()
-	h.Set("Content-Type", "application/json")
-	h.Set("Content-Length", strconv.Itoa(len(body)))
-	w.WriteHeader(code)
-	w.Write(body)
+	if rw, ok := w.(*rawResponse); ok {
+		// Raw fast path: preassembled header block, one conn.Write, no
+		// header map. Counters below are shared — accounting identical.
+		rw.writeResponse(code, body)
+	} else {
+		h := w.Header()
+		h.Set("Content-Type", "application/json")
+		h.Set("Content-Length", strconv.Itoa(len(body)))
+		w.WriteHeader(code)
+		w.Write(body)
+	}
 	if code < 400 {
 		atomic.AddInt64(&respOK, 1)
 	} else {
@@ -988,15 +995,34 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	errc := make(chan error, 1)
-	go func() { errc <- srv.ListenAndServe() }()
-	log.Printf("obsidio engineered backend on :%s (GOMAXPROCS=%d riskSlots=%d)", port, runtime.GOMAXPROCS(0), riskSlots)
+	// Server front-end: raw HTTP/1.1 loop by default (see rawserver.go);
+	// RISK_HTTP=std is the ship-day kill switch back to stock net/http.
+	// Both share the same handlers, WAL, and governor accounting.
+	useStd := os.Getenv("RISK_HTTP") == "std"
+	var rawLn net.Listener
+	if useStd {
+		go func() { errc <- srv.ListenAndServe() }()
+	} else {
+		ln, err := net.Listen("tcp", srv.Addr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		rawLn = ln
+		go func() { errc <- rawServe(ln) }()
+	}
+	log.Printf("obsidio engineered backend on :%s (GOMAXPROCS=%d riskSlots=%d http=%s)",
+		port, runtime.GOMAXPROCS(0), riskSlots, map[bool]string{true: "std", false: "raw"}[useStd])
 	select {
 	case err := <-errc:
 		log.Fatal(err)
 	case <-ctx.Done():
 		logThrottleStats("shutdown")
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutdownCtx)
+		if useStd {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = srv.Shutdown(shutdownCtx)
+		} else {
+			rawShutdown(rawLn)
+		}
 	}
 }

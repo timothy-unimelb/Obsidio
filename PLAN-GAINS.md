@@ -189,9 +189,9 @@ auto-derives to 88% of the gate) and re-run one grading verification.
 - [x] A4: Tier-0 delta measured — NEGATIVE: pair 114.9ns v3 vs 114.1 v2 (−0.7%), single flat. Overhead was OOO-hidden; kernel already latency-bound
 - [x] A5: skipped — v3 defaults off, shipped behavior unchanged (Tier-0 gate failed)
 - [x] A6: bracket skipped per plan decision rule (Tier-0 −0.7% cannot clear ≥+1% keep); negative result logged in EXPERIMENTS.md, kill switch default off
-- [ ] B1: rawserver.go (parser, adapter, precomputed responses, keep-alive, POST)
-- [ ] B2: RISK_HTTP=std kill switch in main()
-- [ ] B3: parser unit tests + smoke (both servers) + WAL re-run + race suite
+- [x] B1: rawserver.go (parser, adapter, precomputed responses, keep-alive, POST) — one buffer-compaction lifetime bug found by the unit tests and fixed (head slices interned before body fill)
+- [x] B2: RISK_HTTP=std kill switch in main() (default = raw; boot log prints http=raw|std)
+- [x] B3: 11 parser unit tests (split reads, pipelining, oversized head, encoded query, POST framing, chunked reject, /risk e2e) + race suite green + smoke 35/35 on BOTH servers (capped containers) + WAL survives docker kill through raw server
 - [ ] B4: bracket rawhttp-x86-01 → keep/revert recorded + pushed
 - [ ] B5: if kept — co-located + overdrive + slow-box revalidation
 - [ ] C1: vendor minio AVX-512 16-lane asm + shims (Apache-2.0 attribution kept)
