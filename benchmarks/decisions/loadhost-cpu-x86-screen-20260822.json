@@ -1,0 +1,4 @@
+{"recorded_at":"2026-08-22T11:36:00Z","type":"comparison_decision","comparison_set":"loadhost-cpu-x86-screen-20260822","candidate":"load-generator-cpu-diagnostic-no-code-change","candidate_commit":"8cc47de","champion_commit":"8cc47de","verdict":"kept",
+"basis":{"sequence":["final-a1"],"screen_score":1461553,"error_rate":0.0085,"load_host_busy_percent_at_200_vus":[32,37,40,23,30,29,37,30,34,38,38,27],"target_host_busy_percent_at_200_vus":"50-51 of 4 vCPUs (container at its 2-CPU quota)"},
+"interpretation":"The c7i.large running k6 has 60%+ headroom at the published peak; the testbed does not cap server-side gains. Recorded because two results (the raw server raising throughput while cheap latency rose; the sixteen-lane path flat on SHA-NI) could have been read as generator saturation.",
+"report":"benchmarks/experiments/2026-08-22-raw-http-x16.md"}

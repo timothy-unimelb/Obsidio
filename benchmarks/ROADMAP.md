@@ -6,40 +6,38 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** `6808e7d` (governor `d52d74b` with atomic error reservation) — the yielding SHA-NI kernel build plus the
-  budgeted shedding governor (88bp, on by default; `RISK_SHED=0` restores the
-  zero-error build), single-lane fused kernel, `GOGC=off`/512MiB limit,
-  durable `POST /price`.
-- **Latest accepted evidence:** `governor-x86-full-20260822`: 4,854,704 vs
-  4,143,222 / 4,141,819 (+17.2%, −0.03% drift, errors 0.847%, risk p95 80 ms).
-  Passes all bars at 800 VUs (0.80% errors). See
-  `experiments/2026-08-22-governor.md`.
-- **Head-to-head:** ours 4,835,626 vs Advait's frozen build 4,321,831 /
-  4,285,200 on the same c7i pair (+11.9%, same error budget); the difference
-  is cheap-path latency (yield cadence, 4-lane batches).
-- **Tail:** held stale waiters remain held by design; serving them late was
-  measured to break both gates at 800 VUs (late queue reverted). Budget
-  reservation is now atomic; errors sit at exactly 88bp under overload.
-- **Mechanism:** once the kernel made risk cheap, the closed-loop request rate
-  was bound by cheap requests waiting ~17 ms behind an unpreemptible asm loop.
-  Yielding freed the fast path; score ∝ request rate.
+- **Champion:** `8cc47de` — the governor build `6808e7d` plus the raw-TCP
+  HTTP/1.1 server and the sixteen-lane AVX-512 insurance kernel (both ported
+  from `fork/advait`). `RISK_HTTP=std`, `RISK_X16=off`, `RISK_SHED=0`,
+  `RISK_SHANI=0` each restore the plainer build.
+- **Milestone (Level 3, `milestone-x86-full-20260822`):** final 4,397,038
+  (4,380,394–4,402,197) vs governor-off 4,187,402 (4,177,395–4,204,856),
+  +5.0% on medians, 0.85% errors, all bars, spread 0.5%. This instance runs
+  the old `6808e7d` build at 4.31–4.34M (4.85M on the previous one); the
+  governor-off build is flat across instances, the governor build moves with
+  the hardware. Load generator checked at the peak: 23–40% busy, not the cap.
+- **Raw server:** +1.90% bracket, repeat pair confirms; pooled medians +1.6%,
+  ranges disjoint, errors unchanged; `/price` p95 9.5 → 10.2 ms, `/risk` mean
+  92 → 83 ms. See `experiments/2026-08-22-raw-http-x16.md`.
+- **Sixteen-lane kernel:** off on SHA-NI processors by default (forced race
+  1.20×). Simulated no-SHA-NI grader: 769,042 / 773,118 portable →
+  3,311,947 (4.3×), bars pass in both regimes; boot race 7.45×.
 - **Rejected / settled:** PGO; scalar fixed-shape SHA; yield every 2,048
-  rounds (−9.8%); pure LIFO shedding at the published load (errors for no
-  score); shedding at 800 VUs (+28% score at 3.5% errors vs plain design
-  passing every bar).
-- **Outstanding finalist evidence:** six-run milestone, `RISK_SHANI=0` full
-  set, rerun after the grader locks. AWS stack destroyed.
+  rounds (−9.8%); pure LIFO shedding at the published load; late queue
+  (broke both gates at 800 VUs); shedding at 800 VUs.
+- **Not re-measured:** the 800-VU stress on the final build (the overload
+  policy is unchanged; the raw server's only behavioural difference there is
+  that a client that gives up no longer cancels its parked job, which makes the
+  budget accounting more conservative, never less).
 
 ## Active sequence
 
-1. **Next score lever: the HTTP path.** With risk cheap, `net/http` overhead
-   on ~1.4M cheap requests is the largest remaining CPU share. Profile the
-   champion under full load first; then either allocation trims or a minimal
-   hand-rolled HTTP/1.1 server for the four GET paths (est. +10–25%, a day).
-2. **Cheap sweeps in one AWS session:** yield cadence 64/128 vs 256;
-   `RISK_LANES=2` vs 4 and `RISK_WORKERS=1` vs 2 under the new regime.
-3. **Finalist validation** (six-run milestone, `RISK_SHANI=0` set, fresh-clone
-   build), then docs freeze.
+Submission frozen at the deadline. If work resumes after the grader locks:
+
+1. Re-run the milestone on the locked grader.
+2. If the error bar tightens below 1%, ship `RISK_SHED=0` (zero errors,
+   −5 to −17% depending on the instance).
+3. Cheap sweeps: yield cadence 64/128 vs 256; `RISK_LANES=2` vs 4.
 
 ## Candidate queue after the active sequence
 
@@ -67,8 +65,6 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** `draft` at `432b27d` is a complete verified submission (champion
-`6808e7d`). Porting Advait's raw HTTP server (done, untested under load) and
-AVX-512 x16 kernel (not started) is in progress on branch
-`port-advait-items-b-c`; see `HANDOVER.md` at the repo root for exact state
-and the freeze checklist.
+**Status:** `draft` is the submission: champion `8cc47de` plus docs and
+evidence commits on top. Six-run milestone, raw-server brackets, and the
+no-SHA-NI simulation are recorded; AWS destroyed. See `HANDOVER.md`.

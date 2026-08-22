@@ -77,12 +77,11 @@ node benchmarks/record-decision.mjs benchmarks/decisions/<comparison-set>.json
 - Date: 2026-08-22
 - Environment: separated AWS x86-64 (`c7i.xlarge` target capped to 2 CPUs /
   2 GiB, `c7i.large` load host, same AZ, private network)
-- Sequence: Go-lanes champion `88855af` → SHA-NI kernel candidate `8075efe` →
-  champion
-- Exact scores: 2,090,598 → 2,545,521 → 2,071,268
-- Candidate improvement: +21.76% over the stronger champion side; −0.92%
-  champion drift
-- Errors: 0.00%; every published p95 gate passed (`/price` p95 40 ms)
-- Verdict: accepted champion, pending six-run milestone and `RISK_SHANI=0` set
+- Milestone `A B B A A B`: final `8cc47de` → same build with `RISK_SHED=0`
+- Exact scores: final 4,380,394 / 4,402,197 / 4,397,038 (median 4,397,038);
+  governor off 4,177,395 / 4,204,856 / 4,187,402 (median 4,187,402)
+- Final vs governor off: +5.0% on medians; errors 0.85% vs 0.00%; every
+  published p95 gate passed in all six runs
+- Load generator at the 200-VU peak: 23–40% busy (not the cap)
 - Detailed evidence:
-  [`experiments/2026-08-22-shani-kernel.md`](experiments/2026-08-22-shani-kernel.md)
+  [`experiments/2026-08-22-raw-http-x16.md`](experiments/2026-08-22-raw-http-x16.md)
