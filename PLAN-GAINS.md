@@ -183,12 +183,12 @@ shed budget by updating `RISK_ERR_GATE_BP` in `app/Dockerfile` (budget
 auto-derives to 88% of the gate) and re-run one grading verification.
 
 ## Progress
-- [ ] A1: generator emits pairHashHexN/hashHex1N (loop-in-asm, ASCII→message back-edge)
-- [ ] A2: Go plumbing + N-variant self-tests + RISK_KERNEL_V3 kill switch
-- [ ] A3: differential walls + race suite green on dev box
-- [ ] A4: Tier-0 delta measured (target ≤105ns/pair-iter)
-- [ ] A5: smoke on capped container
-- [ ] A6: bracket kernelv3-x86-01 → keep/revert recorded + pushed
+- [x] A1: generator emits pairHashHexN/hashHex1N (loop-in-asm, ASCII→message back-edge) — regenerated .s is byte-identical for existing routines; assembles + vets clean
+- [x] A2: Go plumbing + N-variant self-tests + kill switch (default OFF after A4's negative result; v3 needs RISK_KERNEL_V3=on)
+- [x] A3: differential walls + race suite green on dev box (incl. forced-on 50k chain vs naive reference)
+- [x] A4: Tier-0 delta measured — NEGATIVE: pair 114.9ns v3 vs 114.1 v2 (−0.7%), single flat. Overhead was OOO-hidden; kernel already latency-bound
+- [x] A5: skipped — v3 defaults off, shipped behavior unchanged (Tier-0 gate failed)
+- [x] A6: bracket skipped per plan decision rule (Tier-0 −0.7% cannot clear ≥+1% keep); negative result logged in EXPERIMENTS.md, kill switch default off
 - [ ] B1: rawserver.go (parser, adapter, precomputed responses, keep-alive, POST)
 - [ ] B2: RISK_HTTP=std kill switch in main()
 - [ ] B3: parser unit tests + smoke (both servers) + WAL re-run + race suite

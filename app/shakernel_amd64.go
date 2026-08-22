@@ -91,6 +91,20 @@ func pairHashHex(pa, pb *[64]byte)
 //go:noescape
 func hashHex1(pa *[64]byte)
 
+// pairHashHexN (kernel v3) runs n fused chain iterations for two lanes with
+// the loop INSIDE the asm: each iteration's ASCII digest stays in registers
+// and is re-flipped as the next message, so intermediate digests never touch
+// memory and the per-iteration Go→asm call overhead disappears. NOSPLIT asm
+// is not async-preemptible, so callers must chunk n (yield-stride cadence).
+//
+//go:noescape
+func pairHashHexN(pa, pb *[64]byte, n int)
+
+// hashHex1N: single-lane n-iteration variant of pairHashHexN.
+//
+//go:noescape
+func hashHex1N(pa *[64]byte, n int)
+
 // kernelSum64Pair hashes two independent 64-byte inputs on one core via the
 // interleaved 2-lane routine. Caller must ensure kernelUseSHANI.
 func kernelSum64Pair(inA, inB *[64]byte, outA, outB *[32]byte) {
@@ -199,10 +213,49 @@ func initRiskKernel() {
 			if singleOK {
 				riskIter1 = hashHex1
 			}
+			// Kernel v3 (loop-in-asm N variants): OFF by default — Tier-0
+			// on c7i (Xeon 8488C) measured 114.9ns/pair-iter vs v2's 114.1:
+			// the per-iteration call + store/load/flip overhead the loop
+			// deletes was already fully hidden behind the second lane's SHA
+			// dependency chain. Kept behind RISK_KERNEL_V3=on for A/B on
+			// other silicon; differential wall still runs in the test suite.
+			if singleOK && os.Getenv("RISK_KERNEL_V3") == "on" {
+				v3OK := true
+				for _, n := range []int{1, 2, 3, 17, 256} {
+					for c := 0; c < 128 && v3OK; c++ {
+						rnd.Read(a[:])
+						rnd.Read(b[:])
+						wantA, wantB = a, b
+						for k := 0; k < n; k++ {
+							pairHashHex(&wantA, &wantB)
+						}
+						ga, gb := a, b
+						pairHashHexN(&ga, &gb, n)
+						if ga != wantA || gb != wantB {
+							v3OK = false
+							log.Printf("risk kernel: V3 PAIR SELF-TEST FAILED (n=%d case %d) — v2 per-iteration path kept", n, c)
+						}
+						w1 := a
+						for k := 0; k < n; k++ {
+							hashHex1(&w1)
+						}
+						g1 := a
+						hashHex1N(&g1, n)
+						if g1 != w1 {
+							v3OK = false
+							log.Printf("risk kernel: V3 SINGLE SELF-TEST FAILED (n=%d case %d) — v2 per-iteration path kept", n, c)
+						}
+					}
+				}
+				if v3OK {
+					riskPairIterN = pairHashHexN
+					riskIter1N = hashHex1N
+				}
+			}
 		}
 	}
-	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair=%v fused=%v)",
-		path, kernelPairOK, riskPairIter != nil)
+	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair=%v fused=%v v3loop=%v)",
+		path, kernelPairOK, riskPairIter != nil, riskPairIterN != nil)
 }
 
 // kernelPairOK: the interleaved 2-lane path passed its boot self-test.

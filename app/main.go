@@ -533,6 +533,14 @@ var riskPairIter func(a, b *[64]byte)
 // it when set.
 var riskIter1 func(a *[64]byte)
 
+// riskPairIterN / riskIter1N (kernel v3): when non-nil, run n fused
+// iterations per asm call — the chain loop lives inside the asm and
+// intermediate digests stay in registers, deleting the per-iteration call
+// and store/load/flip overhead. Enabled only after the v3 boot self-test
+// (chained-vs-composed); RISK_KERNEL_V3=off keeps the v2 per-iteration path.
+var riskPairIterN func(a, b *[64]byte, n int)
+var riskIter1N func(a *[64]byte, n int)
+
 // riskChainPair advances two chains in lockstep through the pair kernel.
 // Identical math to two riskChain calls (differentially tested); one Gosched
 // yield per iteration covers both lanes.
@@ -543,6 +551,24 @@ func riskChainPair(seedA, seedB string) (string, string) {
 	hexEncode64(&bufA, &sumA)
 	hexEncode64(&bufB, &sumB)
 	mask := riskYieldMask
+	if iterN := riskPairIterN; iterN != nil {
+		// Chunked in-asm loop: same yield cadence as the v2 path (every
+		// mask+1 iterations). stride overflows to 0 when yielding is
+		// disabled (mask == ^0), which runs the whole chain in one call.
+		stride := mask + 1
+		for done := uint32(1); done < 50000; {
+			n := 50000 - done
+			if stride != 0 && n > stride {
+				n = stride
+			}
+			iterN(&bufA, &bufB, int(n))
+			done += n
+			if done < 50000 {
+				runtime.Gosched()
+			}
+		}
+		return string(bufA[:]), string(bufB[:])
+	}
 	if iter := riskPairIter; iter != nil {
 		for i := uint32(1); i < 50000; i++ {
 			iter(&bufA, &bufB)
@@ -571,6 +597,21 @@ func riskChain(seed string) string {
 	sum := sha256.Sum256([]byte(seed)) // seed is variable-length: stdlib path
 	hexEncode64(&buf, &sum)
 	mask := riskYieldMask
+	if itN := riskIter1N; itN != nil {
+		stride := mask + 1 // 0 (== mask ^0 overflow) → whole chain, no yields
+		for done := uint32(1); done < 50000; {
+			n := 50000 - done
+			if stride != 0 && n > stride {
+				n = stride
+			}
+			itN(&buf, int(n))
+			done += n
+			if done < 50000 {
+				runtime.Gosched()
+			}
+		}
+		return string(buf[:])
+	}
 	if it := riskIter1; it != nil {
 		for i := uint32(1); i < 50000; i++ {
 			it(&buf)

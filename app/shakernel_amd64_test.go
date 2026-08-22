@@ -250,6 +250,120 @@ func BenchmarkSingleFused(b *testing.B) {
 	}
 }
 
+// TestPairHashHexNMatchesComposed: the v3 loop-in-asm routine must equal the
+// already-verified single-shot fused routine composed n times, for arbitrary
+// 64-byte starts and every chunk shape the shipped loop can produce.
+func TestPairHashHexNMatchesComposed(t *testing.T) {
+	if riskPairIter == nil {
+		t.Skip("fused pair path inactive on this machine")
+	}
+	rnd := rand.New(rand.NewSource(2026))
+	var a, b [64]byte
+	for _, n := range []int{1, 2, 3, 4, 5, 17, 256, 4096, 4335} {
+		cases := 64
+		if n >= 256 {
+			cases = 8
+		}
+		for c := 0; c < cases; c++ {
+			rnd.Read(a[:])
+			rnd.Read(b[:])
+			wa, wb := a, b
+			for k := 0; k < n; k++ {
+				pairHashHex(&wa, &wb)
+			}
+			ga, gb := a, b
+			pairHashHexN(&ga, &gb, n)
+			if ga != wa || gb != wb {
+				t.Fatalf("n=%d case %d: v3 (%s,%s) != composed (%s,%s)", n, c, ga, gb, wa, wb)
+			}
+		}
+	}
+	// Equal-lane inputs must not leak across lanes.
+	for c := 0; c < 100; c++ {
+		rnd.Read(a[:])
+		b = a
+		pairHashHexN(&a, &b, 17)
+		if a != b {
+			t.Fatalf("case %d: equal-lane divergence", c)
+		}
+	}
+	// n=0 must be a no-op that leaves the buffers untouched.
+	rnd.Read(a[:])
+	rnd.Read(b[:])
+	ca, cb := a, b
+	pairHashHexN(&a, &b, 0)
+	if a != ca || b != cb {
+		t.Fatal("n=0 modified the buffers")
+	}
+}
+
+// TestHashHex1NMatchesComposed: single-lane v3 vs composed hashHex1.
+func TestHashHex1NMatchesComposed(t *testing.T) {
+	if riskIter1 == nil {
+		t.Skip("fused single path inactive on this machine")
+	}
+	rnd := rand.New(rand.NewSource(2027))
+	var x [64]byte
+	for _, n := range []int{1, 2, 3, 4, 5, 17, 256, 4096, 4335} {
+		cases := 64
+		if n >= 256 {
+			cases = 8
+		}
+		for c := 0; c < cases; c++ {
+			rnd.Read(x[:])
+			w := x
+			for k := 0; k < n; k++ {
+				hashHex1(&w)
+			}
+			g := x
+			hashHex1N(&g, n)
+			if g != w {
+				t.Fatalf("n=%d case %d: v3 %s != composed %s", n, c, g, w)
+			}
+		}
+	}
+	rnd.Read(x[:])
+	c := x
+	hashHex1N(&x, 0)
+	if x != c {
+		t.Fatal("n=0 modified the buffer")
+	}
+}
+
+// BenchmarkPairFusedN reports per-iteration cost of the v3 loop at the
+// shipped chunk size — compare ns/op directly against BenchmarkPairFused.
+func BenchmarkPairFusedN(b *testing.B) {
+	if riskPairIter == nil {
+		b.Skip("fused pair path inactive")
+	}
+	var inA, inB [64]byte
+	inA[0], inB[0] = 1, 2
+	const chunk = 4096
+	for i := 0; i < b.N; i += chunk {
+		n := chunk
+		if rem := b.N - i; rem < chunk {
+			n = rem
+		}
+		pairHashHexN(&inA, &inB, n)
+	}
+}
+
+func BenchmarkSingleFusedN(b *testing.B) {
+	if riskIter1 == nil {
+		b.Skip("fused single path inactive")
+	}
+	var in [64]byte
+	in[0] = 1
+	const chunk = 4096
+	for i := 0; i < b.N; i += chunk {
+		n := chunk
+		if rem := b.N - i; rem < chunk {
+			n = rem
+		}
+		hashHex1N(&in, n)
+	}
+}
+
 // TestRiskChainPairMatchesSingle: full 50k-iteration paired chains must equal
 // the single-lane chains digest-for-digest (this is the shipped combination).
 func TestRiskChainPairMatchesSingle(t *testing.T) {

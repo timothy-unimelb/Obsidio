@@ -506,3 +506,30 @@ Entry format (see the /experiment skill):
   (RISK_ERR_GATE_BP, default 100bp → budget 88bp, override clamped to 95%
   of gate; unit-tested) — a locked-script threshold change is a one-ENV
   update, closing the "#1 could-fuck-us" procedural risk.
+
+## 2026-08-22 Sprint-2 Item A: kernel v3 — chunked in-asm chain loop (NEGATIVE, kill-switched off)
+
+- **Hypothesis:** pairHashHex pays ~10-15ns/iter of removable overhead
+  (Go→asm call + 8 stores/8 loads/4 flips round-tripping the digest through
+  memory each iteration). Moving the loop inside the asm — epilogue leaves
+  ASCII in the dead W registers, back-edge PSHUFB-flips them in place as the
+  next message — should cut the 114.1ns pair-iter to ≤105ns (+3-7% score).
+- **Change:** `benchmarks/gen2lane.py` now also emits `pairHashHexN`/
+  `hashHex1N` (loop-in-asm, DECQ/JNZ, memory touched only at entry/exit;
+  flip_mask doubles as the epilogue's bswap32). Chunked Go loop preserves
+  the exact v2 yield cadence (stride = riskYieldMask+1). Full walls: boot
+  self-test chains N∈{1,2,3,17,256}×128 starts against the composed v2
+  routine; differential tests incl. chunk-boundary shapes + n=0; race suite.
+- **Measured (dev box c7i.large, Xeon 8488C, count=3, spread <0.1%):**
+  pair 114.9ns/iter v3 vs **114.1 v2 (−0.7%)**; single 76.6 vs 76.75 (flat).
+  Target ≤105 decisively missed.
+- **Why:** the overhead the loop deletes was never on the critical path —
+  the OOO core hides call + store-forwarded reload entirely behind the
+  second lane's serial SHA256RNDS2 chain. The kernel was already
+  latency-bound at the silicon floor; v3's extra in-loop work (IV/state
+  reload, per-use hexlut loads) costs slightly more than it saves.
+- **Verdict:** REJECTED for default. No testbed bracket run (Tier-0 gate
+  failed; a −0.7% kernel cannot produce the ≥+1% keep threshold). Code kept
+  behind `RISK_KERNEL_V3=on` (off by default) for A/B on other silicon;
+  differential walls run unconditionally in the test suite, so the disabled
+  path stays verified. Estimate was +3-7%; reality 0. Measure, don't argue.
