@@ -314,13 +314,8 @@ func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]b
 	encodedB := unsafe.Slice((*byte)(unsafe.Pointer(&wordsB[0])), sha256.Size*2)
 
 	if useSHANIPair {
-		inA := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsA[0]))
-		inB := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsB[0]))
-		for iteration := 1; iteration < riskIterations; iteration++ {
-			sum256x2(inA, inB, &digestA, &digestB)
-			encodeDigest(&wordsA, &digestA)
-			encodeDigest(&wordsB, &digestB)
-		}
+		riskChain2x((*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsA[0])),
+			(*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsB[0])), riskIterations-1)
 	} else {
 		for iteration := 1; iteration < riskIterations; iteration++ {
 			digestA = sha256.Sum256(encodedA)
@@ -333,11 +328,6 @@ func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]b
 	copy(resultA[:], encodedA)
 	copy(resultB[:], encodedB)
 	return resultA, resultB
-}
-
-// sum256Portable is the reference for the assembly kernel on other platforms.
-func sum256Portable(input *[sha256.Size * 2]byte) [sha256.Size]byte {
-	return sha256.Sum256(input[:])
 }
 
 // calculateRiskQuad is the four-lane form of calculateRiskPair.
@@ -357,18 +347,10 @@ func calculateRiskQuad(seeds [maxRiskLanes]string) (results [maxRiskLanes][sha25
 	encoded3 := unsafe.Slice((*byte)(unsafe.Pointer(&words3[0])), sha256.Size*2)
 
 	if useSHANIPair {
-		in0 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words0[0]))
-		in1 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words1[0]))
-		in2 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words2[0]))
-		in3 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words3[0]))
-		for iteration := 1; iteration < riskIterations; iteration++ {
-			sum256x2(in0, in1, &digest0, &digest1)
-			sum256x2(in2, in3, &digest2, &digest3)
-			encodeDigest(&words0, &digest0)
-			encodeDigest(&words1, &digest1)
-			encodeDigest(&words2, &digest2)
-			encodeDigest(&words3, &digest3)
-		}
+		riskChain4x((*[sha256.Size * 2]byte)(unsafe.Pointer(&words0[0])),
+			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words1[0])),
+			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words2[0])),
+			(*[sha256.Size * 2]byte)(unsafe.Pointer(&words3[0])), riskIterations-1)
 	} else {
 		for iteration := 1; iteration < riskIterations; iteration++ {
 			digest0 = sha256.Sum256(encoded0)
