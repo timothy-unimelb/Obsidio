@@ -67,6 +67,7 @@ const options = [
     helps: "The number of active hash loops becomes explicit, and workers can collect jobs into batches without coupling that logic to HTTP handlers.",
     cost: "Every risk request gains a queue hand-off. A queue that is too long hides overload as latency.",
     evidence: "Queue wait, risk service time, cheap-path p95, weighted work score",
+    outcome: "Kept · local +3% over bounded permits; the base every later row builds on",
   },
   {
     number: "02",
@@ -76,6 +77,7 @@ const options = [
     helps: "Dependencies inside one chain leave limited instruction-level parallelism. Independent chains give the CPU more unrelated work to interleave.",
     cost: "Waiting to fill a batch adds latency. Larger batches use more registers and may reduce rather than improve throughput.",
     evidence: "Hashes per second at batch sizes 1, 2, 4, 8; batch-fill wait; risk p95",
+    outcome: "Kept · 4 lanes: +9.11% local, +2.21% on x86 in Go; then a two-lane SHA-NI assembly routine took it to +21.76% on x86",
   },
   {
     number: "03",
@@ -85,6 +87,7 @@ const options = [
     helps: "Rounds 2–50,000 share the same message length and padding structure, so general-purpose length and padding setup can be removed.",
     cost: "A small padding or state error produces a plausible but wrong digest. The standard library may already optimize much of this path in assembly.",
     evidence: "Reference-vector equality; nanoseconds per 50,000-round chain; CPU profile",
+    outcome: "Rejected in scalar Go (5.86× slower than the hardware path); kept inside the assembly kernel, where the constant padding block's schedule is precomputed",
   },
   {
     number: "04",
@@ -94,6 +97,7 @@ const options = [
     helps: "The compiler can make better inlining, layout, and devirtualization decisions around code paths that the service actually uses.",
     cost: "The improvement is usually incremental, and an unrepresentative or stale profile can guide the build in the wrong direction.",
     evidence: "Binary-to-binary full-load comparison across repeated runs",
+    outcome: "Rejected at Level 0 · kernel 19.67% slower, 50,000 allocations per request reintroduced",
   },
   {
     number: "05",
@@ -103,6 +107,7 @@ const options = [
     helps: "It can reduce scheduler and collection overhead and reveal whether the system is CPU-limited, queue-limited, or memory-sensitive.",
     cost: "The controls interact. For example, a higher GOGC may save CPU while consuming enough memory to make a long run unstable.",
     evidence: "CPU time, heap peak, GC pauses, queue wait, endpoint p95s",
+    outcome: "Partly done · yield cadence 256 rounds beats 2,048 by 9.8%; lane and worker sweeps under the new regime still open",
   },
   {
     number: "06",
@@ -112,6 +117,7 @@ const options = [
     helps: "Small savings apply to price and stats as well as risk, and fewer allocations reduce background GC work.",
     cost: "Custom protocol code is harder to validate, while hashing still dominates the expensive endpoint.",
     evidence: "Allocations per endpoint; non-hash CPU share; price and stats throughput",
+    outcome: "Open · now the largest remaining lever: with risk cheap, the request rate is bound by net/http overhead on 1.4M cheap requests",
   },
   {
     number: "07",
@@ -121,6 +127,7 @@ const options = [
     helps: "This can protect the qualifying latency bars during bursts without changing any response or skipping required work.",
     cost: "A noisy feedback signal can oscillate, and protecting price too aggressively lowers valuable risk throughput.",
     evidence: "Per-endpoint p95 during the ramp; worker utilization; weighted score",
+    outcome: "Kept as the yield: chunking the kernel every 256 rounds cut /price p95 43 → 10 ms and scored +53.8%. Load shedding stays opt-in: at 800 VUs it traded 3.5% errors for +28% score",
   },
   {
     number: "08",
@@ -130,6 +137,7 @@ const options = [
     helps: "Native code gives direct control over SIMD layout, instruction scheduling, and CPU-specific implementations while Go keeps the server simple.",
     cost: "CGO, cross-compilation, portability, and debugging become more complex. Small calls can lose their gain to boundary overhead.",
     evidence: "End-to-end gain after FFI overhead; architecture-specific builds; reference vectors",
+    outcome: "Done without FFI · Go assembly, no cgo: CPUID-gated SHA-NI routine with the Go path as fallback everywhere else",
   },
 ];
 
@@ -277,7 +285,7 @@ export default function OptimizationsPage() {
         <div className="referenceIntro">
           <span className="sectionNumber inverse">OPTIMIZATION REFERENCE</span>
           <h2>What changes,<br />and why?</h2>
-          <p>Use these as hypotheses to test. The useful signal is not whether an idea sounds fast; it is whether the expected mechanism appears in the measurements.</p>
+          <p>These began as hypotheses; each row now carries its measured outcome. The useful signal was never whether an idea sounded fast, but whether the expected mechanism appeared in the measurements—and twice it did not.</p>
         </div>
         <div className="referenceHeader" aria-hidden="true"><span>OPTION</span><span>WHY IT CAN HELP</span><span>WHAT IT COSTS</span><span>WHAT TO MEASURE</span></div>
         <div className="referenceList">
@@ -286,7 +294,7 @@ export default function OptimizationsPage() {
               <div className="referenceIdentity"><span>{option.number}</span><small>{option.area}</small><h3>{option.title}</h3><p>{option.change}</p></div>
               <div className="referenceCell helpsCell"><small>WHY IT CAN HELP</small><p>{option.helps}</p></div>
               <div className="referenceCell costCell"><small>WHAT IT COSTS</small><p>{option.cost}</p></div>
-              <div className="referenceCell evidenceCell"><small>WHAT TO MEASURE</small><p>{option.evidence}</p></div>
+              <div className="referenceCell evidenceCell"><small>WHAT TO MEASURE</small><p>{option.evidence}</p><p className="referenceOutcome"><b>OUTCOME</b> {option.outcome}</p></div>
             </article>
           ))}
         </div>

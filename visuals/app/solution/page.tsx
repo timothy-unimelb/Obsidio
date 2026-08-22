@@ -8,9 +8,9 @@ export const metadata: Metadata = {
 };
 
 const results = [
-  { metric: "/price p95", value: "24.34", unit: "ms", bar: "12.2%", tone: "mint", limit: "200 ms bar" },
-  { metric: "/stats p95", value: "24.39", unit: "ms", bar: "4.9%", tone: "amber", limit: "500 ms bar" },
-  { metric: "/risk p95", value: "298.54", unit: "ms", bar: "19.9%", tone: "coral", limit: "1,500 ms bar" },
+  { metric: "/price p95", value: "10.43", unit: "ms", bar: "5.2%", tone: "mint", limit: "200 ms bar" },
+  { metric: "/stats p95", value: "10.44", unit: "ms", bar: "2.1%", tone: "amber", limit: "500 ms bar" },
+  { metric: "/risk p95", value: "257.99", unit: "ms", bar: "17.2%", tone: "coral", limit: "1,500 ms bar" },
 ];
 
 export default function SolutionPage() {
@@ -42,7 +42,7 @@ export default function SolutionPage() {
 
         <div className="controlDiagram" aria-label="The risk worker queue and Go scheduler are two separate controls">
           <article className="controlLayer admissionLayer">
-            <header><span>01 · OUR CODE</span><code>workers = 2 · FIFO = 32</code></header>
+            <header><span>01 · OUR CODE</span><code>workers = 2 · lanes = 4 · yield = 256</code></header>
             <div className="admissionBoard">
               <div className="routeLabel mint"><b>/price</b><small>BYPASS</small></div>
               <div className="routeLine"><i /><span>→</span></div>
@@ -54,9 +54,9 @@ export default function SolutionPage() {
 
               <div className="routeLabel coral"><b>/risk</b><small>ENQUEUE FIFO</small></div>
               <div className="permitGate"><span>01</span><span>02</span></div>
-              <div className="admissionResult riskResult"><b>2 HASHERS</b><small>REST QUEUED</small></div>
+              <div className="admissionResult riskResult"><b>2 HASHERS × 4 LANES</b><small>REST QUEUED</small></div>
             </div>
-            <p>Only risk requests enter this FIFO. Two permanent workers remove jobs in order; later handlers wait on their result instead of creating another runnable hash loop.</p>
+            <p>Only risk requests enter this queue. Two permanent workers each take up to four jobs and hash them as interleaved chains in a SHA-NI assembly routine, yielding every 256 rounds so a waiting price lookup runs within microseconds.</p>
           </article>
 
           <div className="controlHandoff" aria-hidden="true"><span>THEN</span><b>→</b></div>
@@ -152,7 +152,7 @@ export default function SolutionPage() {
         <div className="bufferIntro">
           <span className="sectionNumber inverse">THE HOT LOOP</span>
           <h2>Same 50,000 hashes.<br />Almost none of the garbage.</h2>
-          <p>The starter converts bytes → string → bytes on every round. We keep the 64 hexadecimal characters in one fixed buffer and feed it straight back into SHA-256.</p>
+          <p>The starter converts bytes → string → bytes on every round. We keep the 64 hexadecimal characters in one fixed buffer, and on x86 with SHA extensions a single assembly routine hashes two chains at once and writes the next hex input itself. Per-chain cost on a Xeon 8488C, stdlib versus kernel.</p>
         </div>
         <div className="bufferCompare">
           <div className="beforePanel">
@@ -170,7 +170,7 @@ export default function SolutionPage() {
             </div>
             <div className="bufferLabel"><span>64 BYTES</span><em>reused 49,999 times</em></div>
             <div className="compareMetric after"><strong>0</strong><span>loop allocations</span></div>
-            <div className="speedBadge"><span>5.38 ms</span><b>→</b><strong>3.86 ms</strong></div>
+            <div className="speedBadge"><span>6.21 ms</span><b>→</b><strong>2.99 ms</strong></div>
           </div>
         </div>
       </section>
@@ -189,8 +189,8 @@ export default function SolutionPage() {
       </section>
 
       <section className="resultsSection">
-        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Median of three full 4m30s published k6 runs · 200 VUs · 2 CPU / 2 GB local grader-shaped result.</p></div>
-        <div className="heroScore"><small>WORK SCORE</small><strong>2,874,253</strong><span>10,645.59 weighted points / sec</span></div>
+        <div className="resultsIntro"><span className="sectionNumber inverse">THE FULL SIEGE</span><h2>Correct work,<br />at speed.</h2><p>Full 4m30s published k6 run · 200 VUs · separate x86 load host · 2 CPU / 2 GB target · 0 errors.</p></div>
+        <div className="heroScore"><small>WORK SCORE</small><strong>3,598,675</strong><span>13,328 weighted points / sec</span></div>
         <div className="resultBars">
           {results.map((result) => (
             <div className="resultRow" key={result.metric}>
