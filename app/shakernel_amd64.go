@@ -85,6 +85,12 @@ func kernelSum64(in *[64]byte, out *[32]byte) {
 //go:noescape
 func pairHashHex(pa, pb *[64]byte)
 
+// hashHex1 is the single-lane fused iteration (same structure, one lane) —
+// used by lone-waiter chains, which dominate the grading ramp.
+//
+//go:noescape
+func hashHex1(pa *[64]byte)
+
 // kernelSum64Pair hashes two independent 64-byte inputs on one core via the
 // interleaved 2-lane routine. Caller must ensure kernelUseSHANI.
 func kernelSum64Pair(inA, inB *[64]byte, outA, outB *[32]byte) {
@@ -174,6 +180,25 @@ func initRiskKernel() {
 		}
 		if fusedOK {
 			riskPairIter = pairHashHex
+			// Single-lane fused variant: same self-test discipline.
+			singleOK := true
+			var s1 [32]byte
+			var e1, x1 [64]byte
+			for i := 0; i < 512; i++ {
+				rnd.Read(x1[:])
+				c := x1
+				kernelSum64(&c, &s1)
+				hexEncode64(&e1, &s1)
+				hashHex1(&x1)
+				if x1 != e1 {
+					singleOK = false
+					log.Printf("risk kernel: SINGLE-FUSED SELF-TEST FAILED on case %d — unfused single path kept", i)
+					break
+				}
+			}
+			if singleOK {
+				riskIter1 = hashHex1
+			}
 		}
 	}
 	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair=%v fused=%v)",

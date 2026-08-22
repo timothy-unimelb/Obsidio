@@ -996,6 +996,319 @@ TEXT ·pairHashHex(SB), NOSPLIT, $96-16
 	VMOVDQU X7, 48(R9)
 	RET
 
+// func hashHex1(pa *[64]byte)
+// One fused chain iteration for a single lane, in place (hex -> hex).
+TEXT ·hashHex1(SB), NOSPLIT, $64-8
+	MOVQ    pa+0(FP), SI
+	VMOVDQA flip_mask<>+0(SB), X14
+	LEAQ    K256<>+0(SB), AX
+	LEAQ    wk_pad<>+0(SB), BX
+	VMOVDQU iv_words<>+0(SB), X1
+	VMOVDQU iv_words<>+16(SB), X2
+	PSHUFD  $0xb1, X1, X1
+	PSHUFD  $0x1b, X2, X2
+	VMOVDQA X1, X7
+	PALIGNR $0x08, X2, X1
+	PBLENDW $0xf0, X7, X2
+	VMOVDQU X1, (SP)
+	VMOVDQU X2, 16(SP)
+	// lane A rounds 0-3
+	VMOVDQU     (SI), X0
+	PSHUFB      X14, X0
+	VMOVDQA     X0, X3
+	PADDD       (AX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A rounds 4-7
+	VMOVDQU     16(SI), X0
+	PSHUFB      X14, X0
+	VMOVDQA     X0, X4
+	PADDD       32(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X4, X3
+	// lane A rounds 8-11
+	VMOVDQU     32(SI), X0
+	PSHUFB      X14, X0
+	VMOVDQA     X0, X5
+	PADDD       64(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X5, X4
+	// lane A rounds 12-15
+	VMOVDQU     48(SI), X0
+	PSHUFB      X14, X0
+	VMOVDQA     X0, X6
+	PADDD       96(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X6, X7
+	PALIGNR     $0x04, X5, X7
+	PADDD       X7, X3
+	SHA256MSG2  X6, X3
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X6, X5
+	// lane A rounds 16-19
+	VMOVDQA     X3, X0
+	PADDD       128(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X3, X7
+	PALIGNR     $0x04, X6, X7
+	PADDD       X7, X4
+	SHA256MSG2  X3, X4
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X3, X6
+	// lane A rounds 20-23
+	VMOVDQA     X4, X0
+	PADDD       160(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X4, X7
+	PALIGNR     $0x04, X3, X7
+	PADDD       X7, X5
+	SHA256MSG2  X4, X5
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X4, X3
+	// lane A rounds 24-27
+	VMOVDQA     X5, X0
+	PADDD       192(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X5, X7
+	PALIGNR     $0x04, X4, X7
+	PADDD       X7, X6
+	SHA256MSG2  X5, X6
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X5, X4
+	// lane A rounds 28-31
+	VMOVDQA     X6, X0
+	PADDD       224(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X6, X7
+	PALIGNR     $0x04, X5, X7
+	PADDD       X7, X3
+	SHA256MSG2  X6, X3
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X6, X5
+	// lane A rounds 32-35
+	VMOVDQA     X3, X0
+	PADDD       256(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X3, X7
+	PALIGNR     $0x04, X6, X7
+	PADDD       X7, X4
+	SHA256MSG2  X3, X4
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X3, X6
+	// lane A rounds 36-39
+	VMOVDQA     X4, X0
+	PADDD       288(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X4, X7
+	PALIGNR     $0x04, X3, X7
+	PADDD       X7, X5
+	SHA256MSG2  X4, X5
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X4, X3
+	// lane A rounds 40-43
+	VMOVDQA     X5, X0
+	PADDD       320(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X5, X7
+	PALIGNR     $0x04, X4, X7
+	PADDD       X7, X6
+	SHA256MSG2  X5, X6
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X5, X4
+	// lane A rounds 44-47
+	VMOVDQA     X6, X0
+	PADDD       352(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X6, X7
+	PALIGNR     $0x04, X5, X7
+	PADDD       X7, X3
+	SHA256MSG2  X6, X3
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X6, X5
+	// lane A rounds 48-51
+	VMOVDQA     X3, X0
+	PADDD       384(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X3, X7
+	PALIGNR     $0x04, X6, X7
+	PADDD       X7, X4
+	SHA256MSG2  X3, X4
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	SHA256MSG1  X3, X6
+	// lane A rounds 52-55
+	VMOVDQA     X4, X0
+	PADDD       416(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X4, X7
+	PALIGNR     $0x04, X3, X7
+	PADDD       X7, X5
+	SHA256MSG2  X4, X5
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A rounds 56-59
+	VMOVDQA     X5, X0
+	PADDD       448(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	VMOVDQA     X5, X7
+	PALIGNR     $0x04, X4, X7
+	PADDD       X7, X6
+	SHA256MSG2  X5, X6
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A rounds 60-63
+	VMOVDQA     X6, X0
+	PADDD       480(AX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// feedforward 1, save H1
+	VMOVDQU (SP), X7
+	PADDD   X7, X1
+	VMOVDQU 16(SP), X7
+	PADDD   X7, X2
+	VMOVDQU X1, 32(SP)
+	VMOVDQU X2, 48(SP)
+	// lane A pad-block rounds 0-3 (precomputed WK)
+	VMOVDQA     0(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 4-7 (precomputed WK)
+	VMOVDQA     16(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 8-11 (precomputed WK)
+	VMOVDQA     32(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 12-15 (precomputed WK)
+	VMOVDQA     48(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 16-19 (precomputed WK)
+	VMOVDQA     64(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 20-23 (precomputed WK)
+	VMOVDQA     80(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 24-27 (precomputed WK)
+	VMOVDQA     96(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 28-31 (precomputed WK)
+	VMOVDQA     112(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 32-35 (precomputed WK)
+	VMOVDQA     128(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 36-39 (precomputed WK)
+	VMOVDQA     144(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 40-43 (precomputed WK)
+	VMOVDQA     160(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 44-47 (precomputed WK)
+	VMOVDQA     176(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 48-51 (precomputed WK)
+	VMOVDQA     192(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 52-55 (precomputed WK)
+	VMOVDQA     208(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 56-59 (precomputed WK)
+	VMOVDQA     224(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// lane A pad-block rounds 60-63 (precomputed WK)
+	VMOVDQA     240(BX), X0
+	SHA256RNDS2 X0, X1, X2
+	PSHUFD      $0x0e, X0, X0
+	SHA256RNDS2 X0, X2, X1
+	// feedforward 2
+	VMOVDQU 32(SP), X7
+	PADDD   X7, X1
+	VMOVDQU 48(SP), X7
+	PADDD   X7, X2
+	VMOVDQA bswap32<>+0(SB), X3
+	VMOVDQA mask0f<>+0(SB), X4
+	VMOVDQA hexlut<>+0(SB), X5
+	// lane A: unshuffle to h-order dwords
+	PSHUFD  $0x1b, X1, X1
+	PSHUFD  $0xb1, X2, X2
+	VMOVDQA X1, X7
+	PBLENDW $0xf0, X2, X1
+	PALIGNR $0x08, X7, X2
+	// lane A: digest bytes 0-15 -> 32 hex chars
+	PSHUFB  X3, X1
+	VMOVDQA X1, X6
+	PSRLW   $0x04, X6
+	PAND    X4, X6
+	PAND    X4, X1
+	VMOVDQA X5, X7
+	PSHUFB  X6, X7
+	VMOVDQA X5, X6
+	PSHUFB  X1, X6
+	VMOVDQA X7, X0
+	PUNPCKLBW X6, X0
+	PUNPCKHBW X6, X7
+	VMOVDQU X0, 0(SI)
+	VMOVDQU X7, 16(SI)
+	// lane A: digest bytes 16-31 -> 32 hex chars
+	PSHUFB  X3, X2
+	VMOVDQA X2, X6
+	PSRLW   $0x04, X6
+	PAND    X4, X6
+	PAND    X4, X2
+	VMOVDQA X5, X7
+	PSHUFB  X6, X7
+	VMOVDQA X5, X6
+	PSHUFB  X2, X6
+	VMOVDQA X7, X0
+	PUNPCKLBW X6, X0
+	PUNPCKHBW X6, X7
+	VMOVDQU X0, 32(SI)
+	VMOVDQU X7, 48(SI)
+	RET
+
 DATA wk_pad<>+0(SB)/4, $0xc28a2f98
 DATA wk_pad<>+4(SB)/4, $0x71374491
 DATA wk_pad<>+8(SB)/4, $0xb5c0fbcf

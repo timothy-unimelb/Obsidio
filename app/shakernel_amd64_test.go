@@ -162,6 +162,51 @@ func BenchmarkPairFused(b *testing.B) {
 	}
 }
 
+// TestHashHex1MatchesComposed: single-lane fused iteration vs the composed
+// reference for arbitrary 64-byte inputs.
+func TestHashHex1MatchesComposed(t *testing.T) {
+	if riskIter1 == nil {
+		t.Skip("single-lane fused path inactive on this machine")
+	}
+	rnd := rand.New(rand.NewSource(123))
+	var x, e [64]byte
+	var s [32]byte
+	for i := 0; i < 50000; i++ {
+		rnd.Read(x[:])
+		c := x
+		kernelSum64(&c, &s)
+		hexEncode64(&e, &s)
+		hashHex1(&x)
+		if x != e {
+			t.Fatalf("case %d: fused %s != composed %s", i, x, e)
+		}
+	}
+}
+
+func BenchmarkSingleComposed(b *testing.B) {
+	if !kernelUseSHANI && !kernelUseAVX2 {
+		b.Skip("kernel inactive")
+	}
+	var in [64]byte
+	var s [32]byte
+	in[0] = 1
+	for i := 0; i < b.N; i++ {
+		kernelSum64(&in, &s)
+		hexEncode64(&in, &s)
+	}
+}
+
+func BenchmarkSingleFused(b *testing.B) {
+	if riskIter1 == nil {
+		b.Skip("single fused inactive")
+	}
+	var in [64]byte
+	in[0] = 1
+	for i := 0; i < b.N; i++ {
+		hashHex1(&in)
+	}
+}
+
 // TestRiskChainPairMatchesSingle: full 50k-iteration paired chains must equal
 // the single-lane chains digest-for-digest (this is the shipped combination).
 func TestRiskChainPairMatchesSingle(t *testing.T) {

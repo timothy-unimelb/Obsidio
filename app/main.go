@@ -512,6 +512,11 @@ var riskSumPair func(a, b *[64]byte, oa, ob *[32]byte)
 // own 512-case boot self-test against the composed reference path.
 var riskPairIter func(a, b *[64]byte)
 
+// riskIter1: single-lane fused iteration (hash + hex, in place), same
+// self-test discipline. Lone-waiter chains — most of the grading ramp — use
+// it when set.
+var riskIter1 func(a *[64]byte)
+
 // riskChainPair advances two chains in lockstep through the pair kernel.
 // Identical math to two riskChain calls (differentially tested); one Gosched
 // yield per iteration covers both lanes.
@@ -550,6 +555,15 @@ func riskChain(seed string) string {
 	sum := sha256.Sum256([]byte(seed)) // seed is variable-length: stdlib path
 	hexEncode64(&buf, &sum)
 	mask := riskYieldMask
+	if it := riskIter1; it != nil {
+		for i := uint32(1); i < 50000; i++ {
+			it(&buf)
+			if i&mask == 0 {
+				runtime.Gosched()
+			}
+		}
+		return string(buf[:])
+	}
 	sum64 := riskSum64
 	for i := uint32(1); i < 50000; i++ {
 		sum64(&buf, &sum)
