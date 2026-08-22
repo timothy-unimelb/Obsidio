@@ -29,13 +29,9 @@ import (
 // 3.6M on the separated x86 reference.
 
 const (
-	riskLatencyBar   = 1500 * time.Millisecond
-	riskSafetyMargin = 300 * time.Millisecond
-	minimumPatience  = 100 * time.Millisecond
-	// holdCapMultiple bounds how long a waiter past patience may be held when
-	// the error budget cannot afford to shed it; after that it is re-parked
-	// as fresh and served late rather than left until its client gives up.
-	holdCapMultiple     = 2
+	riskLatencyBar      = 1500 * time.Millisecond
+	riskSafetyMargin    = 300 * time.Millisecond
+	minimumPatience     = 100 * time.Millisecond
 	defaultShedBudgetBP = 88
 	parkBackstop        = 4096 // memory backstop only; ~20x the published peak
 	budgetMinResponses  = 500
@@ -48,13 +44,11 @@ type riskJob struct {
 	result    chan riskResult
 	taken     bool // under gate.mu: a worker owns it and a result will arrive
 	abandoned bool // under gate.mu: the waiter left; skip at take time
-	late      bool // re-parked after the hold cap: serve regardless of age
 }
 
 type riskGate struct {
 	mu          sync.Mutex
 	parked      []*riskJob
-	late        []*riskJob // re-parked after the hold cap; served before the stack
 	idleWorkers int
 	wake        chan struct{}
 
@@ -110,13 +104,24 @@ func (g *riskGate) countResponse() { g.responses.Add(1) }
 
 func (g *riskGate) countError() { g.errors.Add(1) }
 
-// budgetAllows reports whether one more error keeps the run inside the budget.
-func (g *riskGate) budgetAllows() bool {
+// reserveError atomically charges one error if doing so keeps the run inside
+// the budget. Check-and-charge must be one step: with a separate check,
+// hundreds of waiters waking together can all pass it before any charge
+// lands (measured 1.49% errors against an 0.88% budget at 800 VUs).
+func (g *riskGate) reserveError() bool {
 	total := g.responses.Load()
 	if total < budgetMinResponses {
 		return false // early ramp: park rather than shed on a tiny denominator
 	}
-	return (g.errors.Load()+1)*10000 <= total*g.budgetBP
+	for {
+		errors := g.errors.Load()
+		if (errors+1)*10000 > total*g.budgetBP {
+			return false
+		}
+		if g.errors.CompareAndSwap(errors, errors+1) {
+			return true
+		}
+	}
 }
 
 // admit parks a job, or returns false when it is rejected at the front door.
@@ -126,7 +131,7 @@ func (g *riskGate) admit(job *riskJob) bool {
 		g.mu.Unlock()
 		return false
 	}
-	if g.shed && len(g.parked) > 0 && g.idleWorkers == 0 && g.budgetAllows() {
+	if g.shed && len(g.parked) > 0 && g.idleWorkers == 0 && g.reserveError() {
 		g.mu.Unlock()
 		return false
 	}
@@ -152,10 +157,7 @@ func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
 		}
 	}
 
-	patience := g.patience()
-	holdCap := time.NewTimer(holdCapMultiple * patience)
-	defer holdCap.Stop()
-	timer := time.NewTimer(patience)
+	timer := time.NewTimer(g.patience())
 	defer timer.Stop()
 	for {
 		select {
@@ -165,53 +167,16 @@ func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
 			return g.abandon(job)
 		case <-timer.C:
 			// Past patience the waiter is stale and would be skipped at take
-			// time anyway: shed now if the budget allows, otherwise stay
-			// parked (a parked client reduces offered load without spending
-			// an error) and check again shortly.
-			if g.budgetAllows() {
+			// time anyway: shed now if an error can be reserved, otherwise
+			// stay parked (a parked client reduces offered load without
+			// spending an error) and check again shortly. Re-parking held
+			// waiters for late service was measured at 800 VUs: late serves
+			// exceeded 5% of risk samples and broke the p95 bar.
+			if g.reserveError() {
 				return g.abandon(job)
 			}
 			timer.Reset(100 * time.Millisecond)
-		case <-holdCap.C:
-			// The budget never recovered. Holding the client until it times
-			// out would turn one stale request into a multi-second sample;
-			// re-park it as fresh instead. It was already charged as an error
-			// when skipped, so serving it late only over-counts.
-			if late, ok := g.readmit(job); ok {
-				return g.waitLate(late)
-			}
-			return <-job.result, true // a worker already owns it
 		}
-	}
-}
-
-// readmit moves a stale waiter to the late queue, which workers drain before
-// the stack: on top of a LIFO stack under sustained load it would sink beneath
-// newer arrivals and never be reached. It returns ok=false when a worker
-// already owns the original.
-func (g *riskGate) readmit(job *riskJob) (*riskJob, bool) {
-	g.mu.Lock()
-	if job.taken {
-		g.mu.Unlock()
-		return nil, false
-	}
-	job.abandoned = true
-	late := &riskJob{seed: job.seed, queuedAt: time.Now(), ctx: job.ctx, result: job.result, late: true}
-	g.late = append(g.late, late)
-	g.mu.Unlock()
-	select {
-	case g.wake <- struct{}{}:
-	default:
-	}
-	return late, true
-}
-
-func (g *riskGate) waitLate(job *riskJob) (riskResult, bool) {
-	select {
-	case result := <-job.result:
-		return result, true
-	case <-job.ctx.Done():
-		return g.abandon(job)
 	}
 }
 
@@ -237,17 +202,6 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 		count := 0
 		now := time.Now()
 		stale := g.patience()
-		for count < limit && len(g.late) > 0 {
-			job := g.late[0]
-			g.late[0] = nil
-			g.late = g.late[1:]
-			if job.abandoned || job.ctx.Err() != nil {
-				continue
-			}
-			job.taken = true
-			batch[count] = job
-			count++
-		}
 		for count < limit && len(g.parked) > 0 {
 			var job *riskJob
 			if g.shed {
@@ -262,7 +216,7 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 			if job.abandoned || job.ctx.Err() != nil {
 				continue
 			}
-			if g.shed && !job.late && now.Sub(job.queuedAt) > stale {
+			if g.shed && now.Sub(job.queuedAt) > stale {
 				g.errors.Add(1) // counted now; its client will see a timeout or a 503
 				continue
 			}
@@ -272,9 +226,6 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 		}
 		if len(g.parked) == 0 && cap(g.parked) > 4*parkBackstop {
 			g.parked = nil
-		}
-		if len(g.late) == 0 {
-			g.late = nil
 		}
 		if count > 0 {
 			g.mu.Unlock()

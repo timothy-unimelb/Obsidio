@@ -188,8 +188,8 @@ func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 	startRiskWorkers()
 	job := &riskJob{seed: seed, queuedAt: time.Now(), ctx: r.Context(), result: make(chan riskResult, 1)}
 
+	// Rejections have already reserved their error inside the gate.
 	if !gate.admit(job) {
-		gate.countError()
 		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}
@@ -198,7 +198,6 @@ func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 		if r.Context().Err() != nil {
 			return
 		}
-		gate.countError()
 		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}

@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -124,6 +126,31 @@ func TestWaitShedsAfterPatienceWithinBudget(t *testing.T) {
 	if !job.abandoned {
 		t.Fatal("shed waiter must be marked abandoned for take-time skipping")
 	}
+	if g.errors.Load() != 1 {
+		t.Fatalf("patience shed must reserve exactly one error, got %d", g.errors.Load())
+	}
+}
+
+func TestReserveErrorIsAtomicUnderContention(t *testing.T) {
+	g := newTestGate(true, 88, time.Second)
+	fillBudget(g, 100000) // budget: 880 errors
+	var granted atomic.Int64
+	var wg sync.WaitGroup
+	for range 64 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range 100 {
+				if g.reserveError() {
+					granted.Add(1)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if granted.Load() != 880 || g.errors.Load() != 880 {
+		t.Fatalf("reserved %d errors, charged %d; budget is 880", granted.Load(), g.errors.Load())
+	}
 }
 
 func TestRiskRejectionIs503AndPriceUnaffected(t *testing.T) {
@@ -172,42 +199,5 @@ func TestPatienceTracksChainCost(t *testing.T) {
 	g.observeChainCost(10 * time.Second) // clamped to 500 ms
 	if got := g.patience(); got < minimumPatience || got > riskLatencyBar {
 		t.Fatalf("patience out of range after a freak sample: %s", got)
-	}
-}
-
-func TestHeldWaiterIsServedLateInsteadOfAbandoned(t *testing.T) {
-	g := newTestGate(true, 88, 10*time.Millisecond)
-	fillBudget(g, 10000)
-	for range 88 {
-		g.countError() // budget exhausted: the waiter cannot shed itself
-	}
-	job := testJob("held")
-	g.admit(job)
-	done := make(chan struct{})
-	var result riskResult
-	var ok bool
-	go func() {
-		result, ok = g.wait(job)
-		close(done)
-	}()
-	// After the hold cap the waiter re-parks as fresh; a worker then serves it.
-	deadline := time.Now().Add(2 * time.Second)
-	var batch [maxRiskLanes]*riskJob
-	for time.Now().Before(deadline) {
-		if job.abandoned {
-			break
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-	g.admit(testJob("newer-1")) // newer arrivals must not bury the late job
-	g.admit(testJob("newer-2"))
-	count := g.take(1, batch[:])
-	if count != 1 || !batch[0].late || batch[0].seed != "held" {
-		t.Fatalf("expected the late job to be served before the stack, got %d: %q", count, batch[0].seed)
-	}
-	batch[0].result <- riskResult{hash: [64]byte{'x'}}
-	<-done
-	if !ok || result.hash[0] != 'x' {
-		t.Fatal("late job was not served to the original waiter")
 	}
 }
