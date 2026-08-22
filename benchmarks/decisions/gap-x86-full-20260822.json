@@ -1,0 +1,8 @@
+{"recorded_at":"2026-08-22T05:21:17Z","type":"comparison_decision","comparison_set":"gap-x86-full-20260822","candidate":"opt-in-overload-gate-plus-durable-post-price","candidate_commit":"4d1d2ea","champion_commit":"5c3d681","verdict":"kept",
+"basis":{"sequence":["champion-a1","candidate-b1","champion-a2"],"champion_scores":[3607469,3611091],"candidate_score":3601743,"candidate_vs_stronger_champion_percent":-0.2589,"champion_drift_percent":0.1004,"error_rate":0,"all_latency_gates_passed":true,"interpretation":"inert under the published load, as required",
+"rejected_variants":{"lifo-park-64":{"screen_percent":1.9,"error_rate":0.0063},"lifo-park-256":{"screen_percent":0.2,"error_rate":0.0022},"adaptive-fifo-lifo":{"screen_percent":-0.9,"error_rate":0}},
+"stress_800vu":{"champion":{"score":1332296,"error_rate":0,"risk_p95_ms":1266.0,"gates_passed":true},"gate_lifo_patience_v1":{"score":1453914,"error_rate":0.0141,"risk_p95_ms":2585.1,"risk_max_ms":29032,"gates_passed":false},"gate_sweep_v2":{"score":1705624,"error_rate":0.0353,"risk_p95_ms":1209.0,"gates_passed":false}},
+"persistence":"killtest.sh: two POST /price updates survived docker kill and restart on a /data volume"},
+"environment":{"id":"obsidio-bench-us-east-1-us-east-1a","target":"c7i.xlarge with Docker capped to 2 CPUs and 2 GiB","load_generator":"separate c7i.large","target_architecture":"x86_64"},
+"limitations":["shedding is off by default (RISK_SHED=1); it fails the 1% error gate at 800 VUs while the plain design passes every bar there","persistence bonus value is unspecified by the rules"],
+"report":"benchmarks/experiments/2026-08-22-kernel-hex-yield.md"}

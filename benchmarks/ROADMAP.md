@@ -6,33 +6,33 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** two-lane SHA-NI risk kernel, commit `8075efe`
-  (`submission/go/risk_amd64.s`): both lanes' fixed 64-byte SHA-256 in one
-  interleaved assembly routine, constant padding block precomputed, CPUID
-  gated with `RISK_SHANI=0` fallback. On top of multi-lane batching, two
-  permanent workers, bounded queue, cheap-path bypass, packed-hex encoder.
-- **Latest accepted evidence:** `shani-x86-full-20260822`; candidate
-  2,545,521, +21.76% over the stronger control with −0.92% drift, zero
-  errors. Kernel: 6.21 → 2.99 ms per chain on Sapphire Rapids (−52%).
-- **Origin:** the idea and references came from Advait's `PLAN.md`
-  (`fork/advait`, never started there).
-- **Cost to watch:** `/price` p95 is now ~40 ms on x86 (was ~24 ms). Bar is
-  200 ms. First knobs if the locked grader tightens it: `RISK_LANES=2` or a
-  periodic yield in the batch loop.
-- **Rejected this session:** Go PGO, fixed-shape scalar SHA-256.
-- **Outstanding finalist evidence:** interleaved six-run milestone,
-  `RISK_SHANI=0` full-run portability set, rerun after the grader locks.
-- **Separated environment:** AWS stack destroyed.
+- **Champion:** `5c3d681` — SHA-NI kernel with hex encoding and the chain loop
+  in assembly, called in 256-round chunks with a yield between them — carried
+  forward in `4d1d2ea` with durable `POST /price` (fsynced WAL on `/data`) and
+  an opt-in overload gate (`RISK_SHED=1`, off by default).
+- **Latest accepted evidence:** `shani-yield-x86-full-20260822`: 3,598,675 vs
+  2,338,684 / 2,339,747 (+53.8%, +0.05% drift, 0 errors, price p95 10.4 ms).
+  `gap-x86-full-20260822` confirms the additions are inert (−0.26%, 0 errors).
+- **Mechanism:** once the kernel made risk cheap, the closed-loop request rate
+  was bound by cheap requests waiting ~17 ms behind an unpreemptible asm loop.
+  Yielding freed the fast path; score ∝ request rate.
+- **Rejected / settled:** PGO; scalar fixed-shape SHA; yield every 2,048
+  rounds (−9.8%); pure LIFO shedding at the published load (errors for no
+  score); shedding at 800 VUs (+28% score at 3.5% errors vs plain design
+  passing every bar).
+- **Outstanding finalist evidence:** six-run milestone, `RISK_SHANI=0` full
+  set, rerun after the grader locks. AWS stack destroyed.
 
 ## Active sequence
 
-1. **Completed: SHA-NI kernel Level 0, x86 screen (+23.3%), x86 full
-   (+21.8%).** See `experiments/2026-08-22-shani-kernel.md`.
-2. **Next candidate (optional): in-register hex via `PSHUFB` inside the
-   kernel** so the 64-byte hex input for the next round is produced in
-   assembly and the Go `encodeDigest` calls disappear. Level 0 on x86 first.
-3. **Then: finalist validation.** Six-run milestone `A B B A A B` on x86,
-   `RISK_SHANI=0` full set, update `submission/go` docs from those results.
+1. **Next score lever: the HTTP path.** With risk cheap, `net/http` overhead
+   on ~1.4M cheap requests is the largest remaining CPU share. Profile the
+   champion under full load first; then either allocation trims or a minimal
+   hand-rolled HTTP/1.1 server for the four GET paths (est. +10–25%, a day).
+2. **Cheap sweeps in one AWS session:** yield cadence 64/128 vs 256;
+   `RISK_LANES=2` vs 4 and `RISK_WORKERS=1` vs 2 under the new regime.
+3. **Finalist validation** (six-run milestone, `RISK_SHANI=0` set, fresh-clone
+   build), then docs freeze.
 
 ## Candidate queue after the active sequence
 
@@ -60,7 +60,7 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** SHA-NI kernel (`8075efe`) is the accepted champion on separated
-x86. AWS destroyed. Submission docs still describe the Go-lanes champion and
-need the kernel section and the new x86 figures. Next: docs update, then
-either the in-kernel hex candidate (Level 0 on x86) or finalist validation.
+**Status:** champion `5c3d681`/`4d1d2ea` at 3.60M on separated x86; gaps
+bridged (persistence on, shedding opt-in); visuals and the results artifact
+updated; AWS destroyed. Next: profile the HTTP path under load before
+choosing between allocation trims and a custom HTTP server.
