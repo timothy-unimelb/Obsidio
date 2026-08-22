@@ -28,7 +28,10 @@ bearing part of this log, not the exact figures.
 | 6 | + queue safety factor ×3 | 7.17ms | 7.18ms | 1.19s | **1.43% ✗** | 1.26s | 665,988 | **No** |
 | 7 | + nice value softened (10→2) | 5.04ms | 5.08ms | 1.19s | **1.44% ✗** | 1.21s | 792,416 | **No** |
 | — | *(side test, not a k6 run: stdlib vs SIMD SHA-256 benchmark)* | — | — | — | — | — | — | *not adopted* |
-| 8 | **Reverted to semaphore design (run 3's shape) + self-calibration** | 5.16ms | 5.17ms | 1.18s | **0.06% ✓** | 1.21s | 936,546 | **Yes — final** |
+| 8 | Reverted to semaphore design (run 3's shape) + self-calibration | 5.16ms | 5.17ms | 1.18s | 0.06% ✓ | 1.21s | 936,546 | **Yes** |
+| 9 | + zero-allocation hash kernel (fixed-buffer `hex.Encode`) | 85.57ms | 85.57ms | 96.7ms | 0.00% ✓ | 233.7ms | 1,533,667 | **Yes** |
+| 10 | + calibrated `runtime.Gosched()` yield in the hash loop | 12.91ms | 12.9ms | 632ms | 0.00% ✓ | 850.3ms | 1,501,997 | *reverted — see note* |
+| 11 | Gosched reverted (final confirmation run) | 88.48ms | 88.11ms | 103.56ms | **0.00% ✓** | 329.9ms | **1,559,837** | **Yes — final** |
 
 ## The linear story
 
@@ -180,6 +183,81 @@ numbers into it instead of the hardcoded constants.
 `http_req_failed` 0.06% (versus run 3's 0.09%), all latency thresholds
 comfortable. This is the design currently on `joel/draft`.
 
+### Cross-branch comparison — where joel/draft stood against teammates' work
+
+Two teammates (`advait`, `draft`) built independent Go submissions on other
+branches. All three were built fresh and graded identically — same machine,
+same unmodified `k6/grading.js`, run one at a time so they never competed
+with each other for CPU:
+
+| Branch | `work_score` | `/risk` p95 | `http_req_failed` |
+|---|---|---|---|
+| advait | 1,910,532 | 83.73ms | 0.00% |
+| draft | 1,960,819 | 426.5ms | 0.00% |
+| joel/draft (run 8, before this session) | 935,754 | 1.19s | 0.06% |
+
+Reading both other branches' source directly (`app/main.go` for advait,
+`submission/go/main.go` for draft) showed the gap wasn't architectural — it
+traced to one specific thing neither prior joel/draft run had: both other
+implementations encode each of the 50,000 SHA-256 rounds into a **reused
+fixed-size buffer** (`hex.Encode` into a `[64]byte`) instead of allocating a
+fresh string every iteration (`hex.EncodeToString`, what joel/draft was still
+doing through run 8). A teammate's own internal planning document (shared
+separately, referred to below as "PLAN.md") independently confirmed the same
+finding from their own measurements, plus one further idea worth testing: a
+periodic `runtime.Gosched()` yield inside the hash loop, to address scheduler
+queueing latency on the fast path. Runs 9–11 below are that investigation.
+
+### Run 9 — zero-allocation hash kernel
+
+Replaced `sha256Chain`'s per-iteration `hex.EncodeToString` with a `[64]byte`
+buffer written via `hex.Encode`; only the final `string(buf[:])` conversion
+allocates, matching advait's and draft's approach. Verified output-identical
+(`seed=0.42` still produces the same known digest as every prior run).
+
+**Result: the single biggest jump in this whole log.** `work_score` rose 64%
+(936,546 → 1,533,667), `http_req_failed` improved to a clean 0.00%, and
+`/risk` p95 fell 12x (1.18s → 96.7ms). This alone closed most of the gap to
+both teammates' branches. Side effect worth noting: `/price`/`/stats` p95
+rose to ~85ms (from ~5ms) even though their handlers didn't change — with
+`/risk` now much cheaper per request, the closed-loop test generates far more
+total throughput (1,393 → 2,270 req/s), so there's more `/risk` CPU work
+competing for scheduler slices between cheap requests. Still comfortably
+inside the 200ms/500ms bars, but the mechanism motivated run 10.
+
+### Run 10 — Gosched yield (tested, reverted)
+
+PLAN.md's hypothesis: `/price`/`/stats` p95 is scheduler queueing (Go's
+~10ms async-preemption quantum), not handler cost, and a voluntary
+`runtime.Gosched()` yield partway through the hash loop should let a waiting
+cheap-request goroutine in sooner. Added a calibrated `yieldEvery` (targeting
+~1ms slices, derived from the same boot-time `unitCost` measurement) and
+called `runtime.Gosched()` every `yieldEvery` iterations.
+
+**Result: the mechanism worked exactly as claimed, but the net effect on the
+scored metric was slightly negative.** `/price`/`/stats` p95 dropped 6.6x
+(85.57ms → 12.91ms) — confirming the queueing diagnosis was correct — but
+that latency didn't disappear, it moved: `/risk` p95 rose 6.5x (96.7ms →
+632ms), and `work_score` came out ~2% *lower* (1,533,667 → 1,501,997). Both
+variants cleared every bar with comfortable margin, so there was no
+bar-safety problem for the yield to justify. Reverted, per the same
+"measure, don't assume" standard applied to the nice-priority and SIMD-SHA256
+experiments earlier in this log — a change that demonstrably does what it
+claims can still be the wrong change if it doesn't move the metric that's
+actually scored.
+
+### Queue-depth sanity check against a teammate's rule of thumb
+
+A separately-shared "Field Guide" document suggested sizing the `/risk` queue
+to roughly 150 jobs per worker (for a ~10ms unit cost against the 1500ms
+bar — i.e., zero margin, worst-case wait exactly equal to the budget). Post-kernel,
+joel/draft's calibrated queue was ~423/worker, well beyond that. Not
+adjusted: run 5 in this log already demonstrated that sizing the queue
+against an idealized, zero-margin boot-time measurement causes real
+rejections under contention, and run 9's actual measured `/risk` p95
+(96.7ms, ~6% of the 1500ms budget) is direct evidence the current queue is
+safe in practice, not a rule of thumb to second-guess it against.
+
 ## What shipped, and why
 
 - **Self-calibration was kept**: unambiguously validated — it derives
@@ -197,3 +275,14 @@ comfortable. This is the design currently on `joel/draft`.
 - **A SIMD SHA-256 library was benchmarked and not adopted**, for the same
   reason: measured, found no real gain, declined the added dependency
   rather than carrying it on faith.
+- **The zero-allocation hash kernel was adopted**: the single largest win in
+  this log (+64% `work_score`), found by reading teammates' independent
+  implementations and confirmed correct before trusting the numbers.
+- **The Gosched yield was implemented, measured, and reverted**: it did
+  exactly what it claimed (cut fast-path p95 6.6x) but shifted that cost onto
+  `/risk` for a net loss on the actual scored metric — a reminder that a
+  validated mechanism and a worthwhile change aren't always the same thing.
+
+Final state (run 11): `work_score` 1,559,837, `http_req_failed` 0.00%,
+`/risk` p95 103.56ms against a 1500ms bar — up from run 8's 936,546 at the
+start of this session, driven almost entirely by the kernel fix.
