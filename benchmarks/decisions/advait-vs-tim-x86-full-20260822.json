@@ -1,0 +1,7 @@
+{"recorded_at":"2026-08-22T07:48:53Z","type":"comparison_decision","comparison_set":"advait-vs-tim-x86-full-20260822","candidate":"tim-governor-build-vs-advait-frozen-build","candidate_commit":"c6bf541","champion_commit":"c0c8f95 (fork/advait, context app/)","verdict":"kept",
+"basis":{"sequence":["advait-a1","tim-b1","advait-a2"],"champion_scores":[4321831,4285200],"candidate_score":4835626,"candidate_vs_stronger_champion_percent":11.889,"champion_drift_percent":-0.8476,"candidate_error_rate":0.00865,"champion_error_rate":0.00841,"all_latency_gates_passed":true,
+"price_median_ms":{"advait":6.79,"tim":3.35},"risk_p95_ms":{"advait":76.2,"tim":89.2},"screen":{"advait":[1439623,1440896],"tim":1610532,"percent":11.8},
+"interpretation":"same error budget and equivalent kernels; the difference is cheap-path latency (256-round yield cadence, 4-lane batches), which converts to requests in the budget-limited closed loop"},
+"environment":{"id":"obsidio-bench-us-east-1-us-east-1a","target":"c7i.xlarge with Docker capped to 2 CPUs and 2 GiB","load_generator":"separate c7i.large","target_architecture":"x86_64"},
+"limitations":["both builds show multi-second risk maxima from held stale waiters (Advait 57 s, Tim 60 s); fixed for Tim in 49cfafb (late queue served before the stack): risk max 2.4 s on the verification screen with unchanged score and errors"],
+"report":"benchmarks/experiments/2026-08-22-governor.md"}

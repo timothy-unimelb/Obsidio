@@ -6,7 +6,7 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** `d52d74b` — the yielding SHA-NI kernel build plus the
+- **Champion:** `49cfafb` (governor `d52d74b` plus the late-queue tail fix) — the yielding SHA-NI kernel build plus the
   budgeted shedding governor (88bp, on by default; `RISK_SHED=0` restores the
   zero-error build), single-lane fused kernel, `GOGC=off`/512MiB limit,
   durable `POST /price`.
@@ -14,9 +14,11 @@ reaches a gate, or changes what should happen next.
   4,143,222 / 4,141,819 (+17.2%, −0.03% drift, errors 0.847%, risk p95 80 ms).
   Passes all bars at 800 VUs (0.80% errors). See
   `experiments/2026-08-22-governor.md`.
-- **Known tail:** waiters past patience with the budget exhausted are held
-  until the client gives up (risk max 42.7 s at published load). p95 is
-  unaffected; fix by serving them late after ~2× patience — next bracket.
+- **Head-to-head:** ours 4,835,626 vs Advait's frozen build 4,321,831 /
+  4,285,200 on the same c7i pair (+11.9%, same error budget); the difference
+  is cheap-path latency (yield cadence, 4-lane batches).
+- **Tail fixed:** held stale waiters are re-parked on a priority queue after
+  2× patience; risk max 2.4 s (was 60 s), score and errors unchanged.
 - **Mechanism:** once the kernel made risk cheap, the closed-loop request rate
   was bound by cheap requests waiting ~17 ms behind an unpreemptible asm loop.
   Yielding freed the fast path; score ∝ request rate.
@@ -64,7 +66,8 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** governor build `d52d74b` accepted on separated x86 (+17.2%,
-0.85% errors by design). AWS destroyed. Next: (1) cap the post-patience hold
-and serve late, re-bracket; (2) update submission README/RESILIENCE and the
-results artifact for the governor; (3) the HTTP-path CPU profile.
+**Status:** `49cfafb` accepted: governor +17.2% over the zero-error build,
++11.9% over Advait's frozen build, tail bounded at ~2.4 s. AWS destroyed.
+Next: (1) attribute the head-to-head gap (yield cadence vs lanes) in two
+screens; (2) update submission README/RESILIENCE, visuals, and the results
+artifact for the governor; (3) HTTP-path CPU profile.
