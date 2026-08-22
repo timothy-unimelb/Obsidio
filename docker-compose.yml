@@ -1,0 +1,19 @@
+# Persistence-bonus deployment: identical app + a named volume for the
+# fsync'd price WAL. Same total budget as the plain graded run (2 CPUs / 2 GB
+# for the single service). No privileged, no cap_add, no cpuset — per the
+# competition's container-privilege rules.
+services:
+  app:
+    build: ./app
+    ports:
+      - "8080:8080"
+    environment:
+      PRICE_WAL: /data/prices.wal
+    volumes:
+      - pricedata:/data
+    cpus: 2.0
+    mem_limit: 2g
+    restart: unless-stopped
+
+volumes:
+  pricedata:

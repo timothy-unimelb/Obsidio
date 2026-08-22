@@ -20,6 +20,43 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestPriceWALDurabilityAndReplay: accepted POSTs must survive a hard kill —
+// replay applies complete lines in order (last write wins) and skips a torn
+// final line, which by construction was never acknowledged with a 200.
+func TestPriceWALDurabilityAndReplay(t *testing.T) {
+	path := t.TempDir() + "/prices.wal"
+	t.Setenv("PRICE_WAL", path)
+	initPriceWAL()
+	if walFile == nil {
+		t.Fatal("WAL did not activate")
+	}
+	if !appendWAL("ZZZT", 12.5) || !appendWAL("ZZZT", 99.25) || !appendWAL("NEWCO", 1.75) {
+		t.Fatal("durable append failed")
+	}
+	// Crash mid-append: torn line, no fsync, no 200 ever sent.
+	if _, err := walFile.WriteString(`{"symbol":"TORN","price":`); err != nil {
+		t.Fatal(err)
+	}
+	walFile.Close()
+	walFile = nil
+
+	initPriceWAL() // simulated restart
+	mu.RLock()
+	defer mu.RUnlock()
+	if prices["ZZZT"] != 99.25 {
+		t.Fatalf("ZZZT = %v, want last-written 99.25", prices["ZZZT"])
+	}
+	if prices["NEWCO"] != 1.75 {
+		t.Fatalf("NEWCO = %v, want 1.75", prices["NEWCO"])
+	}
+	if _, ok := prices["TORN"]; ok {
+		t.Fatal("torn (unacknowledged) line must not replay")
+	}
+	if _, ok := priceResp["NEWCO"]; !ok {
+		t.Fatal("replayed symbol missing prebuilt GET body")
+	}
+}
+
 // naiveRiskChain is the straightforward starter algorithm, kept as an
 // independent reference so kernel optimisations can't silently change the
 // digest (a wrong digest scores zero).
