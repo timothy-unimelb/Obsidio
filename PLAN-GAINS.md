@@ -201,5 +201,5 @@ auto-derives to 88% of the gate) and re-run one grading verification.
 - [x] C5: KEPT — forced grading 3,530,813 vs 812,074 baseline = 4.3× (+335%), boot race 6.84×, risk p95 88.9ms, 4/4 bars
 - [x] C6: gate silent on SHA-NI box (0 x16 log lines); plain run 4,332,215 @ 0.85%, bars green — unchanged within noise
 - [x] Item D (unplanned, evidence-driven): x16 batching on SHA-NI boxes — Tier-0 +25%/chain and boot race +24%, but bracket FLAT (−0.26%); reverted to RISK_X16=on opt-in, decision + EXPERIMENTS recorded
-- [ ] Freeze: 3× cold-boot bracket of submission commit + fresh-clone build + smoke
-- [ ] EXPERIMENTS/decisions/artifact updated for A, B, C (incl. any revert)
+- [x] Freeze: freeze2-x86-01 — 4,299,037/4,289,957/4,305,181 (spread 0.355%), 4/4 bars every boot; fresh-clone build + capped smoke green on arm64 Mac. Submission commit: 5c42e72
+- [x] EXPERIMENTS/decisions updated for A (negative), B (kept), C (kept), D (reverted) + freeze entry; bracket decisions in benchmarks/decisions/, validation summaries in benchmarks/results/val-*

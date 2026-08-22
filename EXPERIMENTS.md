@@ -616,3 +616,22 @@ The hand-rolled server holds in every regime where it could diverge.
   no-SHA-NI insurance enablement (C5: 4.3×) is unchanged. Boot race on the
   HT-sibling dev box (c7i.large, one physical core) had already measured the
   win at only 3.8% — the per-machine race is doing its job.
+
+## 2026-08-22 Sprint-2 freeze verification (submission build 5c42e72, x86 ×3)
+
+- **SHA:** 5c42e72 as both bracket sides (freeze2-x86-01) — three full
+  grading runs across three cold container boots, plus a fresh-clone
+  `docker build` + capped-container /smoke on the arm64 dev Mac (35/35 —
+  proves the portable fallback + gates end to end).
+- **Result:** 4,299,037 / 4,289,957 / 4,305,181 — **spread 0.355%**; errors
+  0.85% (88bp governor, k6 view) every run; all four bars pass every run
+  (price/stats p95 11.2ms, risk p95 63.5-65.6ms — 23× margin).
+- **Verdict:** FROZEN. Sprint-2 headline: **4,298,000 ± 8,000 work_score**
+  on c7i-class hardware — +3.2% over the sprint-1 freeze (4,166k), from
+  Item B's raw HTTP path. Sprint-2's bigger win is regime insurance: a
+  no-SHA-NI (Skylake-class) grader now scores **3.53M instead of 812k
+  (4.3×)** via the AVX-512 16-lane path, and every keep/revert decision
+  (A: no, B: yes, C: yes, D: no) is bracket-recorded with kill switches
+  (RISK_KERNEL_V3, RISK_HTTP, RISK_X16) shipping in the binary.
+- **Launch-blocker unchanged:** when final thresholds publish, update
+  RISK_ERR_GATE_BP in app/Dockerfile and re-run one grading verification.
