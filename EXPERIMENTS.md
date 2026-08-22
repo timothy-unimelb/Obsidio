@@ -371,3 +371,33 @@ Entry format (see the /experiment skill):
 - **Verdict:** the gate degrades gracefully at 2× with the 1.37×-faster
   kernel; memory design point holds. Overdrive exhibit (FIFO self-DQ vs
   governor) plus this run = the resilience story's bookends.
+
+## 2026-08-22 Fused pair iteration (x86 full A/B — KEPT, 4M broken)
+
+- **SHA:** candidate 999a87f vs champion fa6ffbd (pairing), set fused-x86-01.
+- **Hypothesis:** three fusible costs remained per iteration: the constant
+  padding block's message schedule (precomputable at build time), the Go hex
+  encode (PSHUFB nibble LUT does it in-register), and 4 Go↔asm call
+  crossings (one fused call does everything in place).
+- **Change:** pairHashHex in generated asm (benchmarks/gen2lane.py): block 1
+  full schedule, block 2 from a compile-time W+K table, byte-swap + hex
+  expansion in-register. 143.2 → 114.1ns per pair-iteration (−20%);
+  in-chain boot ratio 1.35 → 1.62×. Same wall: 50k differential vs composed
+  path, 512-case boot self-test, stdlib fallback.
+- **Result (bracketed full grading.js):** 3,466,470 / **4,032,045** /
+  3,473,144 — **+16.1% vs the stronger champion side** (drift 0.19%);
+  errors 0.589%; risk p95 84.4ms (best recorded); all bars pass.
+- **Verdict:** KEPT — champion 999a87f. Day: 1.95M → 4.03M (+107%).
+
+## 2026-08-22 Yield-stride sweep (devloop, hypothesis falsified)
+
+- **SHA:** 09a1879 image on the testbed, RISK_YIELD_STRIDE ∈ {auto/8192,
+  2048, 1024}, one devloop each from the load box.
+- **Hypothesis:** cheap traffic is now ~60% of score and cheap latency
+  (~7ms avg) is scheduler wait behind the hash workers — smaller yield
+  slices should convert into more closed-loop iterations and score.
+- **Result:** 1,184,468 / 1,168,099 / 1,182,164 — FLAT (within noise)
+  while price avg improved 6.85 → 5.11ms. VU cycle time is dominated by
+  /risk waits, so cheap-latency savings don't convert into volume.
+- **Verdict:** keep auto stride (8192): best score, no new knob. Logged as
+  considered-and-measured for the write-up.

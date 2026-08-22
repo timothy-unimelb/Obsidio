@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-08-22T03:45:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "fused-x86-01",
+  "candidate": "fused-pair-iteration (advait app, 999a87f)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [3466470, 3473144],
+    "candidate_score": 4032045,
+    "candidate_vs_stronger_champion_percent": 16.09,
+    "champion_drift_percent": 0.19,
+    "error_rate_percent": 0.584,
+    "all_latency_gates_passed": true
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "champion=fa6ffbd (pairing), candidate=999a87f (fused pair iteration: precomputed constant-pad-block W+K schedule + in-asm PSHUFB byte-swap/hex, one call per iteration)",
+    "per pair-iteration 143.2 -> 114.1ns; in-chain boot ratio 1.35 -> 1.62x",
+    "day so far: 1.95M -> 4.03M (+107%)"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Fused pair iteration' entry"
+}
