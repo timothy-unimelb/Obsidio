@@ -6,22 +6,22 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** commit `64e38e0`, Go server with two permanent risk workers,
+- **Champion:** compact four-at-a-time hex unrolling from implementation commit
+  `5bb6824` (evaluated source `c18b148`), on top of the Go server with two permanent risk workers,
   bounded FIFO queue, cheap-path bypass, allocation-free risk loop, and packed
   lowercase-hex feedback.
-- **Latest accepted evidence:** `hex-packed-full-20260822`; candidate scored
-  2,852,984, 2.14% above the stronger bracket champion, with zero errors. This
-  remains local Apple Silicon evidence with substantial host drift, not a judge
-  prediction.
+- **Latest accepted evidence:** `hex-unroll-x86-full-20260822`; candidate scored
+  1,987,151, 1.70% above the stronger bracket champion and 2.10% above the
+  bracket average, with zero errors. Control drift was only -0.79%.
 - **Architecture phase:** the major concurrency and allocation improvements are
   complete. Work has moved into evidence-led compute-kernel and compiler
   optimization.
-- **Outstanding finalist evidence:** interleaved six-run milestone, separated
-  x86-64 validation, optional-instruction portability run, and rerun after the
-  organizers lock the grader.
+- **Outstanding finalist evidence:** interleaved six-run milestone,
+  optional-instruction portability run, and rerun after the organizers lock the
+  grader.
 - **Separated environment:** reproducible AWS CloudFormation and lifecycle
-  scripts live under `benchmarks/aws/`. Provisioning awaits authenticated AWS
-  CLI access; no AWS result has been recorded yet.
+  scripts live under `benchmarks/aws/`. The first x86 comparison was validated
+  successfully; all paid resources were destroyed afterward.
 
 ## Active sequence
 
@@ -43,6 +43,10 @@ reaches a gate, or changes what should happen next.
    at 2,892,463 and 2,783,480. It was +0.92% versus the stronger side and +2.86%
    versus the bracket average, but control drift was -3.77%. Verdict: unresolved;
    `64e38e0` remains champion and `5bb6824` preserves the candidate.
+6. **Completed: separated x86 resolution.** The x86 screen showed +2.91% versus
+   the stronger control with -0.85% control drift. The exact full bracket showed
+   +1.70% versus the stronger control with -0.79% drift. The candidate is kept
+   as the current champion.
 
 ## Candidate queue after the active sequence
 
@@ -72,9 +76,7 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** the compact-unroll sequence is complete and unresolved because its
-exact gain did not exceed host noise. Next, keep this change isolated and test
-Go PGO against champion `64e38e0`; do not combine PGO with unrolling until each
-change has independent evidence. Revisit unrolling in an interleaved finalist
-comparison or separated x86 validation. Before either, finish and validate the
-remote AWS runner after the two-host CloudFormation stack is provisioned.
+**Status:** compact hex unrolling is accepted with separated x86 evidence, and
+the AWS stack is destroyed. Next, test Go PGO independently against this new
+champion. Re-provision AWS only after local Level 0 and bracketed screening earn
+an exact x86 comparison; always destroy it when the set completes.

@@ -79,7 +79,7 @@
       "claim_limit": "local relative evidence only"
     },
     "separated_x86": {
-      "status": "planned-reference",
+      "status": "validated-reproducible-reference",
       "target_host": "fixed-performance x86_64 Linux with more than 2 visible vCPUs",
       "target_container_cpus": 2,
       "target_container_memory_bytes": 2147483648,
@@ -87,7 +87,10 @@
       "load_host": "separate fixed-performance x86_64 Linux",
       "network": "same-region private low-latency",
       "aws_reference_target": "c7i.xlarge",
-      "aws_reference_load_generator": "c7i.large"
+      "aws_reference_load_generator": "c7i.large",
+      "validated_environment_id": "obsidio-bench-us-east-1-us-east-1a",
+      "last_validated_at": "2026-08-22T00:50:00Z",
+      "lifecycle_state": "destroyed-after-comparison"
     }
   },
   "recording": {
@@ -106,7 +109,7 @@
     ]
   },
   "recorded_evidence": {
-    "latest_set": "hex-packed-full-20260822",
+    "latest_set": "hex-unroll-x86-full-20260822",
     "sets": [
       {
         "id": "local-2026-08-21",
@@ -174,6 +177,34 @@
           "not an interleaved six-run milestone"
         ],
         "report": "benchmarks/experiments/2026-08-22-packed-hex.md"
+      },
+      {
+        "id": "hex-unroll-x86-full-20260822",
+        "recorded_at": "2026-08-22T00:50:00Z",
+        "status": "accepted-separated-x86-full-comparison",
+        "environment_id": "obsidio-bench-us-east-1-us-east-1a",
+        "execution_order": ["champion-a1", "candidate-b1", "champion-a2"],
+        "protocol_interpretation": "current-champion-pending-six-run-milestone-and-portability-set",
+        "candidate": {
+          "name": "compact-four-at-a-time-hex-unrolling",
+          "work_score": 1987151,
+          "requests": 796456,
+          "error_rate": 0,
+          "price_p95_ms": 25.066288,
+          "stats_p95_ms": 24.903424,
+          "risk_p95_ms": 442.781735,
+          "raw_summary": "benchmarks/results/candidate-hex-unroll-x86-full-b1-summary.json"
+        },
+        "champion_scores": [1953954, 1938551],
+        "candidate_vs_stronger_champion_percent": 1.699,
+        "candidate_vs_champion_average_percent": 2.1014,
+        "champion_drift_percent": -0.7883,
+        "limitations": [
+          "judge CPU model remains unspecified",
+          "not an interleaved six-run milestone",
+          "optional-instruction portability set remains outstanding"
+        ],
+        "report": "benchmarks/experiments/2026-08-22-packed-champion-profile.md"
       }
     ]
   }

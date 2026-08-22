@@ -68,17 +68,19 @@ test("exports the performance record", async () => {
 
   assert.match(html, /<title>Performance Record — Obsidio<\/title>/i);
   assert.match(html, /Performance,/);
-  assert.match(html, /LOCAL GRADER-SHAPED RUNS/);
+  assert.match(html, /GRADER-SHAPED RUNS/);
   assert.match(html, /The protocol matches/);
   assert.match(html, /1,425,795/);
   assert.match(html, /2,874,253/);
   assert.match(html, /2,852,984/);
-  assert.match(html, /\+2\.14%/);
+  assert.match(html, /1,987,151/);
+  assert.match(html, /\+1\.70%/);
   assert.match(html, /\+101\.6%/);
   assert.match(html, /Permanent workers \+ queue/);
   assert.match(html, /Packed lowercase hex/);
-  assert.match(html, /Measured · current champion · bracketed full run/);
-  assert.match(html, /pending six-run milestone/i);
+  assert.match(html, /Compact hex unrolling/);
+  assert.match(html, /Measured · current champion · separated x86 full bracket/);
+  assert.match(html, /six-run finalist milestone remains outstanding/i);
   assert.match(html, /INSIDE A PEAK \/RISK REQUEST/);
   assert.match(html, /320\.70 ms/);
   assert.match(html, /STARTER → WORKERS/);

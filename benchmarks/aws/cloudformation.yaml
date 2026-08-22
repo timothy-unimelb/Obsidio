@@ -37,6 +37,26 @@ Parameters:
     Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
 
 Resources:
+  BenchmarkHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - {Key: Project, Value: ObsidioBench}
+
+  BenchmarkHostInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref BenchmarkHostRole]
+
   MonthlyCostBudget:
     Type: AWS::Budgets::Budget
     Properties:
@@ -178,6 +198,7 @@ Resources:
             VolumeSize: 16
             VolumeType: gp3
       ImageId: !Ref AmazonLinuxAmi
+      IamInstanceProfile: !Ref BenchmarkHostInstanceProfile
       InstanceInitiatedShutdownBehavior: stop
       InstanceType: !Ref TargetInstanceType
       KeyName: !Ref KeyName
@@ -213,6 +234,7 @@ Resources:
             VolumeSize: 16
             VolumeType: gp3
       ImageId: !Ref AmazonLinuxAmi
+      IamInstanceProfile: !Ref BenchmarkHostInstanceProfile
       InstanceInitiatedShutdownBehavior: stop
       InstanceType: !Ref LoadInstanceType
       KeyName: !Ref KeyName

@@ -38,16 +38,25 @@ const checkpoints = [
   {
     number: "03",
     name: "Packed lowercase hex",
-    status: "Measured · current champion · bracketed full run",
+    status: "Measured · previous champion · bracketed full run",
     detail: "Profiling found hex expansion—not SHA compression—at 62% of CPU. A native-endian pair table halves stores while preserving every required lowercase byte.",
     score: 2_852_984,
     requests: 1_141_016,
     tone: "acid",
   },
-  { number: "04", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
-  { number: "05", name: "Fixed-shape SHA path", status: "Not implemented", detail: "Specialize rounds 2–50,000 and verify every digest against reference vectors.", score: null, requests: null, tone: "pending" },
-  { number: "06", name: "PGO + runtime tuning", status: "Not implemented", detail: "Record PGO and each runtime control separately so their effects remain attributable.", score: null, requests: null, tone: "pending" },
-  { number: "07", name: "Native kernel, if justified", status: "Conditional", detail: "Only add a row if profiling still points to the kernel and a C or Rust prototype passes the same tests.", score: null, requests: null, tone: "pending" },
+  {
+    number: "04",
+    name: "Compact hex unrolling",
+    status: "Measured · current champion · separated x86 full bracket",
+    detail: "Expands four digest bytes per loop. A separate x86 load host confirmed the gain under the same 2 CPU / 2 GiB target cap.",
+    score: 1_987_151,
+    requests: 796_456,
+    tone: "acid",
+  },
+  { number: "05", name: "Go PGO", status: "Next experiment", detail: "Train Go's compiler on the published traffic shape, then compare the resulting binary independently against checkpoint 04.", score: null, requests: null, tone: "pending" },
+  { number: "06", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
+  { number: "07", name: "Fixed-shape SHA path", status: "Not implemented", detail: "Specialize rounds 2–50,000 and verify every digest against reference vectors.", score: null, requests: null, tone: "pending" },
+  { number: "08", name: "Native kernel, if justified", status: "Conditional", detail: "Only add a row if profiling still points to the kernel and a C or Rust prototype passes the same tests.", score: null, requests: null, tone: "pending" },
 ];
 
 const metrics = [
@@ -71,7 +80,7 @@ const evidenceLinks = [
   ["All raw k6 summaries", "https://github.com/timothy-unimelb/Obsidio/tree/draft/benchmarks/results"],
   ["Peak queue timing summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/workers-timing-summary.json"],
   ["Recorded protocol", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/protocol.json"],
-  ["Latest packed-hex report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-packed-hex.md"],
+  ["Latest x86 comparison report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-packed-champion-profile.md"],
 ];
 
 export default function PerformancePage() {
@@ -85,13 +94,13 @@ export default function PerformancePage() {
           <div>
             <h1>Performance,<br /><em>run by run.</em></h1>
             <p className="lede lightText">A checkpoint enters this record only after a complete published siege. Measured stages show raw results; unimplemented ideas stay visibly empty.</p>
-            <div className="recordStatus"><span>LOCAL GRADER-SHAPED RUNS</span><b>4 measured</b><i>4 awaiting implementation</i></div>
+            <div className="recordStatus"><span>GRADER-SHAPED RUNS</span><b>5 measured</b><i>4 awaiting implementation</i></div>
           </div>
-          <div className="scoreComparison" aria-label="In the latest full bracket, work score increased from 2,793,090 for the stronger champion reference to 2,852,984 for packed hex">
-            <div className="scoreCompareHead"><span>LATEST FULL BRACKET</span><small>same session · same script · same caps</small></div>
-            <div className="scoreBar baselineScore"><span>CHAMPION A1</span><i /><strong>2,793,090</strong></div>
-            <div className="scoreBar currentScore"><span>PACKED HEX B1</span><i /><strong>2,852,984</strong></div>
-            <div className="scoreDelta"><strong>+2.14%</strong><span>vs stronger side</span><small>+6.03% vs champion bracket average</small></div>
+          <div className="scoreComparison" aria-label="In the latest separated x86 full bracket, work score increased from 1,953,954 for the stronger champion reference to 1,987,151 for compact hex unrolling">
+            <div className="scoreCompareHead"><span>LATEST X86 FULL BRACKET</span><small>separate load host · same script · same caps</small></div>
+            <div className="scoreBar baselineScore"><span>CHAMPION A1</span><i /><strong>1,953,954</strong></div>
+            <div className="scoreBar currentScore"><span>UNROLLED HEX B1</span><i /><strong>1,987,151</strong></div>
+            <div className="scoreDelta"><strong>+1.70%</strong><span>vs stronger side</span><small>+2.10% vs champion bracket average</small></div>
           </div>
         </div>
       </section>
@@ -99,17 +108,17 @@ export default function PerformancePage() {
       <section className="comparabilitySection">
         <div className="comparabilityIntro">
           <span className="sectionNumber">HOW CLOSE IS THIS TO GRADING?</span>
-          <h2>The protocol matches.<br />The hardware does not.</h2>
-          <p>These results are strong for comparing our own checkpoints. They are not a prediction of the final leaderboard because the organizer’s machine, CPU architecture, and separated load generator are not available locally.</p>
+          <h2>The protocol matches.<br />The silicon is still unknown.</h2>
+          <p>The latest comparison uses Linux x86-64 and a separate load generator, matching the judge’s disclosed shape. It is still not a leaderboard prediction because the organizer has not specified the final CPU model.</p>
         </div>
         <div className="matchGrid">
           <article><span className="match yes">MATCH</span><h3>Workload</h3><p>The exact published <code>k6/grading.js</code>, including its current ramp and traffic mix.</p></article>
           <article><span className="match yes">MATCH</span><h3>Target limits</h3><p>A fresh Docker container capped at exactly <code>2 CPU</code> and <code>2 GB</code>.</p></article>
           <article><span className="match yes">MATCH</span><h3>Scoring metrics</h3><p>Work score, completed requests, errors, and endpoint-specific p95 latency.</p></article>
-          <article><span className="match no">DIFFERS</span><h3>Physical environment</h3><p>Local Apple Silicon host and Linux arm64 VM; the grader keeps load generation separate.</p></article>
+          <article><span className="match no">UNKNOWN</span><h3>Exact silicon</h3><p>The reference run used a fixed-performance C7i host; the judge may use a different x86-64 CPU.</p></article>
         </div>
-        <div className="environmentDiagram" aria-label="Local load generator sends the published workload to a resource-capped Linux container">
-          <div className="loadMachine"><small>LOAD GENERATOR</small><b>k6 v2.2.0</b><span>macOS · arm64</span></div>
+        <div className="environmentDiagram" aria-label="A separate Linux x86 load generator sends the published workload to a resource-capped Linux x86 container">
+          <div className="loadMachine"><small>LOAD GENERATOR</small><b>k6 v2.2.0</b><span>separate Linux x86-64 host</span></div>
           <div className="loadWire"><span>4m30s · 200 VUs</span><i>→</i><small>60% price · 30% stats · 10% risk</small></div>
           <div className="targetMachine"><small>TARGET</small><b>LINUX CONTAINER</b><div><span>2 CPU</span><span>2 GB</span><span>:8080</span></div></div>
         </div>
@@ -119,7 +128,7 @@ export default function PerformancePage() {
       <section className="section progressionSection">
         <div className="sectionHead compact">
           <div><span className="sectionNumber">THE PROGRESSION</span><h2>One checkpoint.<br />One complete siege.</h2></div>
-          <p>The first optimized entry combines work completed before this log existed. Checkpoint 02 isolates scheduling. Checkpoint 03 follows a profile, changes only hex expansion, and wins both a bracketed screen and exact full comparison; it remains provisional until the six-run milestone.</p>
+          <p>The first optimized entry combines work completed before this log existed. Checkpoint 02 isolates scheduling. Checkpoint 03 optimizes hex stores; checkpoint 04 unrolls that loop and earns promotion in a low-drift separated x86 bracket. A six-run finalist milestone remains outstanding.</p>
         </div>
         <div className="checkpointList">
           {checkpoints.map((checkpoint) => (
@@ -175,7 +184,7 @@ export default function PerformancePage() {
         <div className="evidenceIntro"><span className="sectionNumber inverse">AUDIT TRAIL</span><h2>Keep the evidence<br />beside the claim.</h2><p>The raw summaries, recorded environment, runner, and script fingerprint remain in the repository so future rows can be checked and reproduced.</p></div>
         <div className="fingerprintCard">
           <div><small>GRADING SCRIPT SHA-256</small><code>d7b259eb36cd…9f56998d20f</code></div>
-          <div><small>LATEST COMPARISON SET</small><strong>2026-08-22 · hex-packed-full</strong></div>
+          <div><small>LATEST COMPARISON SET</small><strong>2026-08-22 · hex-unroll-x86-full</strong></div>
           <div><small>REPETITION STATUS</small><strong>A → B → A full bracket · pending six-run milestone</strong></div>
         </div>
         <div className="evidenceLinks">

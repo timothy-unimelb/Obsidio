@@ -100,3 +100,39 @@ and forgetting the candidate would discard useful evidence. But the exact-run
 advantage does not exceed observed environmental noise. Commit `5bb6824`
 preserves the candidate for an interleaved finalist comparison or separated
 x86-64 validation; commit `64e38e0` remains the accepted champion.
+
+## Separated x86-64 resolution
+
+The candidate was subsequently tested on the reusable AWS reference shape:
+
+- target: non-flex `c7i.xlarge`, with the container capped to exactly 2 CPUs
+  and 2 GiB;
+- load generator: separate non-flex `c7i.large`;
+- same availability zone, private IPv4 benchmark path;
+- Linux x86-64 on both hosts; and
+- pinned k6 2.2.0 running only on the load host.
+
+The bracketed 90-second screen scored 651,451 -> 670,413 -> 645,942. The
+candidate beat the stronger control by 2.91% and the bracket average by 3.35%,
+while control drift was -0.85%.
+
+The exact 4m30s grader then produced:
+
+| Run | Work score | Requests | Errors | Price p95 | Stats p95 | Risk p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Champion A1 | 1,953,954 | 779,720 | 0.00% | 23.73 ms | 23.70 ms | 478.81 ms |
+| Candidate B1 | 1,987,151 | 796,456 | 0.00% | 25.07 ms | 24.90 ms | 442.78 ms |
+| Champion A2 | 1,938,551 | 774,455 | 0.00% | 21.95 ms | 21.97 ms | 462.88 ms |
+
+The candidate was 1.70% above the stronger control and 2.10% above the control
+average. Control drift was only -0.79%, so the conservative candidate gain
+exceeded observed environmental movement and agreed with both the focused
+kernel benchmark and x86 screening result.
+
+## Final verdict
+
+**Keep compact four-at-a-time hex unrolling as the current champion.** The
+separated x86 evidence resolves the earlier noisy local comparison in its favor.
+Implementation commit `5bb6824` introduced the change; the exact evaluated
+source tree was at `c18b148`. A six-run interleaved finalist milestone and the
+optional-instruction portability set remain outstanding.

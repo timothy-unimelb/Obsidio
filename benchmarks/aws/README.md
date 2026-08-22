@@ -13,6 +13,7 @@ absolute score or CPU model.
   private address;
 - target port 8080 reachable only from the load host's security group;
 - SSH restricted to the provisioning workstation's current public IPv4 `/32`;
+- Systems Manager registration for identity-controlled teammate sessions;
 - Amazon Linux 2023 x86-64, encrypted 16 GiB gp3 roots, IMDSv2 required; and
 - instance-initiated automatic stop after four hours by default.
 
@@ -33,6 +34,19 @@ aws sts get-caller-identity
 The scripts never store AWS credentials in the repository. They create one
 ephemeral EC2 SSH key under ignored `.state/` and delete its AWS and local copies
 with the stack.
+
+## Team access
+
+Do not share the root login, AWS access keys, or the generated SSH private key.
+Give each teammate an individual IAM Identity Center login and a restricted
+permission set. Both hosts register with AWS Systems Manager, so authorized
+teammates can open a shell through Session Manager without opening another
+inbound port or possessing the benchmark SSH key.
+
+Session Manager access is for inspection and maintenance. The standardized
+`run-comparison.sh` controller remains tied to the provisioning workstation so
+one controller owns each comparison set and its local result recording. Do not
+run overlapping comparisons on the shared hosts.
 
 ## Provision
 

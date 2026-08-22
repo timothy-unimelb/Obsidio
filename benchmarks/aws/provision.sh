@@ -91,6 +91,7 @@ aws cloudformation deploy \
   --region "$AWS_BENCH_REGION" \
   --stack-name "$AWS_BENCH_STACK" \
   --template-file "$AWS_BENCH_DIR/cloudformation.yaml" \
+  --capabilities CAPABILITY_IAM \
   --no-fail-on-empty-changeset \
   --parameter-overrides \
     "AdminCidr=$admin_cidr" \

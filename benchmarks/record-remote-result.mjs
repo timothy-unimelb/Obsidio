@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { appendFile, readFile } from "node:fs/promises";
+import { relative } from "node:path";
 import process from "node:process";
 
 const [stage, profile, runId, summaryPath, sourceSha, imageId, exitCodeText, scriptPath] = process.argv.slice(2);
@@ -55,10 +56,10 @@ const entry = {
   },
   k6_image: process.env.BENCH_K6_IMAGE,
   k6_version: process.env.BENCH_K6_VERSION,
-  workload_script: scriptPath,
+  workload_script: relative(process.cwd(), scriptPath),
   workload_sha256: createHash("sha256").update(script).digest("hex"),
   k6_exit_code: Number(exitCodeText),
-  raw_summary: summaryPath,
+  raw_summary: relative(process.cwd(), summaryPath),
   result: {
     work_score: metric("work_score", "count"),
     http_reqs: metric("http_reqs", "count"),
@@ -71,4 +72,3 @@ const entry = {
 
 await appendFile("benchmarks/history.jsonl", `${JSON.stringify(entry)}\n`);
 console.log(`recorded remote ${profile} run ${runId} in benchmarks/history.jsonl`);
-
