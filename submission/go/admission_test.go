@@ -11,7 +11,7 @@ import (
 )
 
 func newTestGate(parkMax int, patience time.Duration, budget float64) *riskGate {
-	return &riskGate{wake: make(chan struct{}, 64), parkMax: parkMax, patience: patience, errorBudget: budget}
+	return &riskGate{wake: make(chan struct{}, 64), shed: true, parkMax: parkMax, patience: patience, errorBudget: budget}
 }
 
 func testJob(seed string) (riskJob, chan riskResult) {
@@ -39,7 +39,7 @@ func TestGateServesFIFOWhileWaitsAreShort(t *testing.T) {
 func TestGateSwitchesToNewestFirstUnderOverload(t *testing.T) {
 	g := newTestGate(16, time.Second, 0)
 	old, _ := testJob("old")
-	old.queuedAt = time.Now().Add(-600 * time.Millisecond) // past half of patience
+	old.queuedAt = time.Now().Add(-900 * time.Millisecond) // past 80% of patience
 	g.admit(old)
 	for _, seed := range []string{"second", "third"} {
 		job, _ := testJob(seed)
@@ -132,6 +132,28 @@ func TestRiskRejectionIs503AndPriceUnaffected(t *testing.T) {
 	price := request(t, "/price?symbol=AAPL")
 	if price.Code != http.StatusOK {
 		t.Fatalf("price should be unaffected by risk overload, got %d", price.Code)
+	}
+}
+
+func TestGateDefaultNeverSheds(t *testing.T) {
+	g := &riskGate{wake: make(chan struct{}, 64), parkMax: 1, patience: time.Millisecond, errorBudget: 0.01}
+	for range 1000 {
+		g.countRequest()
+	}
+	stale, staleResult := testJob("stale")
+	stale.queuedAt = time.Now().Add(-time.Second)
+	extra, _ := testJob("extra")
+	if !g.admit(stale) || !g.admit(extra) {
+		t.Fatal("default gate must park every job")
+	}
+	var batch [maxRiskLanes]riskJob
+	if count := g.take(4, batch[:]); count != 2 || batch[0].seed != "stale" {
+		t.Fatalf("default gate must serve FIFO without discards, got %d: %q", count, batch[0].seed)
+	}
+	select {
+	case <-staleResult:
+		t.Fatal("default gate rejected a job")
+	default:
 	}
 }
 

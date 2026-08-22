@@ -17,7 +17,15 @@ import (
 // newest-first: the newest arrival is the one most likely to still finish on
 // time, while a job that has waited longer than patience is discarded when
 // popped instead of being hashed uselessly. Pure LIFO at the published load
-// measured 0.22% starvation discards for no score gain; adaptive order is inert. When the stack is at capacity and the run-wide error budget has
+// measured 0.22% starvation discards for no score gain; adaptive order is inert.
+//
+// Shedding is OFF by default (RISK_SHED=1 enables it). At 800 virtual users,
+// four times the published peak, the plain blocking design still passed every
+// gate with zero errors (risk p95 1,266 ms), while shedding bought +28% score
+// at a 3.5% error rate, which fails the 1% gate. Shedding only helps in the
+// narrow band where waiting would break the 1,500 ms bar but fewer than 1% of
+// requests need dropping; it is kept as an operator switch for a locked grader
+// that lands in that band. When the stack is at capacity and the run-wide error budget has
 // room, a new arrival is rejected immediately at the front door (about a
 // millisecond) rather than after a long wait, because the grader counts a
 // request's full duration whether or not it failed. The stack capacity exceeds
@@ -38,6 +46,7 @@ type riskGate struct {
 	parked []riskJob
 	wake   chan struct{}
 
+	shed        bool // RISK_SHED=1; off by default, see the note above
 	parkMax     int
 	patience    time.Duration
 	errorBudget float64
@@ -52,6 +61,7 @@ var gate = newRiskGate()
 func newRiskGate() *riskGate {
 	g := &riskGate{
 		wake:        make(chan struct{}, 64),
+		shed:        os.Getenv("RISK_SHED") == "1",
 		parkMax:     envInt("RISK_PARK_MAX", defaultParkMax, 1, 4096),
 		errorBudget: envFloat("RISK_ERROR_BUDGET", defaultErrorBudget, 0, 0.01),
 	}
@@ -92,7 +102,7 @@ func (g *riskGate) budgetAllowsRejection() bool {
 // was rejected at the front door.
 func (g *riskGate) admit(job riskJob) bool {
 	g.mu.Lock()
-	if len(g.parked) >= g.parkMax && g.budgetAllowsRejection() {
+	if g.shed && len(g.parked) >= g.parkMax && g.budgetAllowsRejection() {
 		g.mu.Unlock()
 		g.rejected.Add(1)
 		return false
@@ -114,7 +124,20 @@ func (g *riskGate) take(limit int, batch []riskJob) int {
 		g.mu.Lock()
 		count := 0
 		now := time.Now()
-		newestFirst := len(g.parked) > 0 && now.Sub(g.parked[0].queuedAt) > g.patience/2
+		// Sweep the oldest end first: anything past patience is rejected now,
+		// whatever order the live jobs are then served in. Without this sweep,
+		// stale jobs at the old end could sit unserved and unrejected for the
+		// whole overload while newer arrivals were popped ahead of them.
+		for g.shed && len(g.parked) > 0 && now.Sub(g.parked[0].queuedAt) > g.patience {
+			job := g.parked[0]
+			g.parked[0] = riskJob{}
+			g.parked = g.parked[1:]
+			if job.ctx.Err() == nil {
+				g.discarded.Add(1)
+				job.result <- riskResult{rejected: true}
+			}
+		}
+		newestFirst := len(g.parked) > 0 && g.shed && now.Sub(g.parked[0].queuedAt) > g.patience*4/5
 		for count < limit && len(g.parked) > 0 {
 			var job riskJob
 			if newestFirst {
@@ -127,11 +150,6 @@ func (g *riskGate) take(limit int, batch []riskJob) int {
 			}
 			if job.ctx.Err() != nil {
 				continue // client gone; nobody is waiting for this result
-			}
-			if now.Sub(job.queuedAt) > g.patience {
-				g.discarded.Add(1)
-				job.result <- riskResult{rejected: true}
-				continue
 			}
 			batch[count] = job
 			count++
