@@ -27,7 +27,7 @@ ssh_args=(
 for host in "$target_public" "$load_public"; do
   ready=false
   for _ in {1..30}; do
-    if ssh "${ssh_args[@]}" "ec2-user@$host" 'cloud-init status --wait >/dev/null && docker version >/dev/null' 2>/dev/null; then
+    if ssh "${ssh_args[@]}" "ec2-user@$host" 'cloud-init status --wait >/dev/null 2>&1 || true; docker version >/dev/null && sudo test -f /run/systemd/shutdown/scheduled' 2>/dev/null; then
       ready=true
       break
     fi
