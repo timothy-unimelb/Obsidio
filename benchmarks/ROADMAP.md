@@ -6,7 +6,7 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** `49cfafb` (governor `d52d74b` plus the late-queue tail fix) — the yielding SHA-NI kernel build plus the
+- **Champion:** `6808e7d` (governor `d52d74b` with atomic error reservation) — the yielding SHA-NI kernel build plus the
   budgeted shedding governor (88bp, on by default; `RISK_SHED=0` restores the
   zero-error build), single-lane fused kernel, `GOGC=off`/512MiB limit,
   durable `POST /price`.
@@ -17,8 +17,9 @@ reaches a gate, or changes what should happen next.
 - **Head-to-head:** ours 4,835,626 vs Advait's frozen build 4,321,831 /
   4,285,200 on the same c7i pair (+11.9%, same error budget); the difference
   is cheap-path latency (yield cadence, 4-lane batches).
-- **Tail fixed:** held stale waiters are re-parked on a priority queue after
-  2× patience; risk max 2.4 s (was 60 s), score and errors unchanged.
+- **Tail:** held stale waiters remain held by design; serving them late was
+  measured to break both gates at 800 VUs (late queue reverted). Budget
+  reservation is now atomic; errors sit at exactly 88bp under overload.
 - **Mechanism:** once the kernel made risk cheap, the closed-loop request rate
   was bound by cheap requests waiting ~17 ms behind an unpreemptible asm loop.
   Yielding freed the fast path; score ∝ request rate.
@@ -66,8 +67,8 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** `49cfafb` accepted: governor +17.2% over the zero-error build,
-+11.9% over Advait's frozen build, tail bounded at ~2.4 s. AWS destroyed.
-Next: (1) attribute the head-to-head gap (yield cadence vs lanes) in two
-screens; (2) update submission README/RESILIENCE, visuals, and the results
-artifact for the governor; (3) HTTP-path CPU profile.
+**Status:** `6808e7d` accepted (governor +17.2% over the zero-error build,
++11.9% over Advait's frozen build; passes all bars at 800 VUs at 0.878%
+errors). AWS destroyed. Next: (1) attribute the head-to-head gap (yield
+cadence vs lanes) in two screens; (2) update submission README/RESILIENCE,
+visuals, and the results artifact for the governor; (3) HTTP-path profile.
