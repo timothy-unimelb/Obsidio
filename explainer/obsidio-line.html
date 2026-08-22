@@ -1,0 +1,471 @@
+<meta charset="utf-8" />
+<title>The Obsidio Line</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+
+<style>
+  :root {
+    --bg: #eaeef1;
+    --panel: #ffffff;
+    --panel-2: #f2f5f7;
+    --viz: #0f151b;          /* mini-screens stay dark in both themes */
+    --viz-2: #1a2632;
+    --viz-line: #263542;
+    --viz-ink: #e9f0f4;
+    --viz-muted: #8ba0ad;
+    --ink: #181e23;
+    --muted: #5a6971;
+    --line: #d6dce1;
+    --line-strong: #c4ccd2;
+
+    --drink: #2f7fb8;
+    --salad: #3f9d63;
+    --braise: #e0592f;
+    --flame: #e0912a;
+    --flame-hot: #f5741c;
+    --good: #3f9d63;
+    --bad: #d6493b;
+    --paper: #eef3f6;
+
+    --radius: 15px;
+    --shadow: 0 1px 2px rgba(16,24,32,.05), 0 16px 34px -22px rgba(16,24,32,.4);
+  }
+  :root:not([data-theme="light"]) { @media (prefers-color-scheme: dark) {
+    --bg:#0f151a; --panel:#19212a; --panel-2:#141c23; --ink:#e7eef2; --muted:#93a4ae; --line:#28333d; --line-strong:#394852;
+    --drink:#59a8dd; --salad:#5cc082; --braise:#f2764e; --flame:#f2b04a; --flame-hot:#ff8a3d; --good:#5cc082; --bad:#ef6152;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 20px 46px -26px rgba(0,0,0,.8);
+  }}
+  :root[data-theme="dark"] {
+    --bg:#0f151a; --panel:#19212a; --panel-2:#141c23; --ink:#e7eef2; --muted:#93a4ae; --line:#28333d; --line-strong:#394852;
+    --drink:#59a8dd; --salad:#5cc082; --braise:#f2764e; --flame:#f2b04a; --flame-hot:#ff8a3d; --good:#5cc082; --bad:#ef6152;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 20px 46px -26px rgba(0,0,0,.8);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: clamp(1.2rem,3vw,2.6rem) clamp(1rem,3vw,2rem) 3rem; }
+
+  /* ---------- header ---------- */
+  .eyebrow { font-family:"IBM Plex Mono",monospace; font-size:.72rem; letter-spacing:.22em; text-transform:uppercase;
+    color: var(--braise); margin:0 0 .7rem; display:flex; align-items:center; gap:.6rem; }
+  .eyebrow::before { content:""; width:26px; height:2px; background: var(--braise); }
+  h1 { font-family:"Fraunces",Georgia,serif; font-optical-sizing:auto; font-weight:600; font-size:clamp(2rem,6vw,3.6rem);
+    line-height:1; letter-spacing:-.015em; margin:0 0 .5rem; text-wrap:balance; }
+  h1 .em { font-style:italic; color: var(--braise); }
+  .dek { font-size:clamp(1rem,1.5vw,1.15rem); color:var(--muted); max-width:64ch; margin:0 0 1.2rem; }
+  .facts { display:flex; flex-wrap:wrap; gap:.5rem .55rem; margin-bottom:1.6rem; }
+  .fact { font-family:"IBM Plex Mono",monospace; font-size:.72rem; color:var(--muted);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:.35rem .6rem; }
+  .fact b { color:var(--ink); font-weight:600; }
+  .fact .d { color:var(--drink); } .fact .s { color:var(--salad); } .fact .b { color:var(--braise); }
+
+  /* ---------- gallery ---------- */
+  .grid { display:grid; gap:clamp(1rem,2vw,1.5rem); grid-template-columns:1fr; }
+  @media (min-width:760px) { .grid { grid-template-columns:1fr 1fr; } }
+
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);
+    padding:clamp(1.1rem,2vw,1.5rem); display:flex; flex-direction:column; gap:.95rem;
+    border-top:3px solid var(--accent, var(--line-strong)); }
+  .card[data-accent="foundation"] { --accent: var(--line-strong); }
+  .card[data-accent="structural"] { --accent: var(--drink); }
+  .card[data-accent="win"] { --accent: var(--salad); }
+  .card[data-accent="big"] { --accent: var(--flame-hot); }
+  .card[data-accent="twist"] { --accent: var(--braise); }
+  .card[data-accent="insurance"] { --accent: var(--muted); }
+
+  .card > header { display:flex; align-items:baseline; gap:.55rem; flex-wrap:wrap; }
+  .num { font-family:"Fraunces",serif; font-weight:600; font-size:1.5rem; color:var(--accent,var(--braise)); line-height:1;
+    font-variant-numeric:tabular-nums; }
+  .card[data-accent="foundation"] .num, .card[data-accent="insurance"] .num { color: var(--braise); }
+  .kick { font-family:"IBM Plex Mono",monospace; font-size:.64rem; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+  .card h3 { font-family:"Fraunces",serif; font-weight:600; font-size:clamp(1.2rem,2.2vw,1.5rem); line-height:1.05;
+    letter-spacing:-.01em; margin:.1rem 0 0; flex-basis:100%; text-wrap:balance; }
+
+  /* before/after mini-screens */
+  .viz { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+  .ba { margin:0; display:flex; flex-direction:column; gap:.4rem; }
+  .screen { background:radial-gradient(120% 120% at 30% 15%, var(--viz-2), var(--viz)); border:1px solid #05090d;
+    border-radius:10px; overflow:hidden; }
+  .screen svg { display:block; width:100%; height:auto; }
+  .balabel { font-family:"IBM Plex Mono",monospace; font-size:.66rem; color:var(--muted); display:flex; align-items:center; gap:.4rem; }
+  .badge { font-weight:600; letter-spacing:.06em; text-transform:uppercase; font-size:.58rem; padding:.12rem .4rem; border-radius:4px; }
+  .badge.b { color:var(--bad); background:color-mix(in srgb,var(--bad) 15%,transparent); }
+  .badge.g { color:var(--good); background:color-mix(in srgb,var(--good) 16%,transparent); }
+
+  .say { margin:0; font-size:.95rem; color:var(--ink); }
+  .impact { margin:0 0 0; margin-top:auto; display:flex; gap:.55rem; align-items:flex-start; padding:.7rem .85rem; border-radius:10px;
+    background:var(--panel-2); border:1px solid var(--line); border-left:4px solid var(--accent,var(--flame)); }
+  .impact .k { font-family:"IBM Plex Mono",monospace; font-size:.58rem; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); white-space:nowrap; padding-top:.15rem; }
+  .impact p { margin:0; font-size:.86rem; } .impact b { color:var(--ink); }
+
+  .code { font-family:"IBM Plex Mono",monospace; font-size:.78rem; color:var(--muted); background:var(--panel-2);
+    border:1px solid var(--line); border-radius:7px; padding:.2rem .45rem; }
+
+  footer { margin-top:2rem; padding-top:1.2rem; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; display:grid; gap:.4rem; }
+  footer .mono { font-family:"IBM Plex Mono",monospace; font-size:.74rem; }
+
+  /* ---------- SVG element styling ---------- */
+  .lbl { font-family:"IBM Plex Mono",monospace; font-size:9px; fill:var(--viz-muted); letter-spacing:.04em; }
+  .stove { fill:#0c1319; stroke:var(--viz-line); stroke-width:1.5; }
+  .ring { fill:none; stroke:color-mix(in srgb,var(--braise) 55%,#000); stroke-width:2.5; }
+  .cook { fill:#e7edf1; } .cook.ph { fill:#7f94a1; }
+  .chip { rx:2.5; }
+  .chip.d { fill:var(--drink); } .chip.s { fill:var(--salad); } .chip.b { fill:var(--braise); }
+  .paperchip { fill:var(--paper); }
+  .glass { fill:var(--drink); } .plate { fill:#cdd7de; stroke:#0a0f14; stroke-width:.6; }
+  .disk { fill:var(--viz-2); stroke:var(--viz-line); stroke-width:1.5; }
+  .txt-g { fill:var(--good); font-family:"IBM Plex Mono",monospace; font-weight:600; }
+  .txt-b { fill:var(--bad); font-family:"IBM Plex Mono",monospace; font-weight:600; }
+  .txt-f { fill:var(--flame); font-family:"IBM Plex Mono",monospace; font-weight:600; }
+
+  /* animations */
+  @keyframes jit { 0%,100%{transform:translate(0,0)} 25%{transform:translate(4px,-5px)} 50%{transform:translate(-3px,4px)} 75%{transform:translate(3px,3px)} }
+  @keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+  @keyframes laneflow { 0%{transform:translateX(0);opacity:0} 8%{opacity:1} 92%{opacity:1} 100%{transform:translateX(150px);opacity:0} }
+  @keyframes lanejam { 0%{transform:translateX(0);opacity:0} 12%{opacity:1} 55%{transform:translateX(52px)} 100%{transform:translateX(56px);opacity:1} }
+  @keyframes simmer { 0%,100%{transform:translateX(0)} 50%{transform:translateX(3px)} }
+  @keyframes fall { 0%{transform:translate(0,0);opacity:0} 15%{opacity:1} 100%{transform:translate(0,34px);opacity:1} }
+  @keyframes sweepx { 0%{transform:translateX(0)} 100%{transform:translateX(150px)} }
+  @keyframes glow { 0%,100%{opacity:.5} 50%{opacity:1; filter:drop-shadow(0 0 5px var(--flame-hot))} }
+  @keyframes fillbar { 0%{width:0} 100%{width:var(--w,60%)} }
+  @keyframes roundtrip { 0%{transform:translate(0,0)} 25%{transform:translate(60px,0)} 50%{transform:translate(60px,0)} 75%{transform:translate(0,0)} 100%{transform:translate(0,0)} }
+  @keyframes stayin { 0%,100%{transform:translate(0,0)} 50%{transform:translate(6px,0)} }
+  @keyframes stir { 0%,100%{transform:rotate(-14deg)} 50%{transform:rotate(16deg)} }
+  @keyframes qgrow { 0%{transform:scaleY(.15)} 100%{transform:scaleY(1)} }
+  @keyframes qserve { 0%{transform:scaleY(1);opacity:1} 100%{transform:scaleY(.15);opacity:.7} }
+  @keyframes glance { 0%,45%,100%{opacity:.15} 55%,70%{opacity:1} }
+  @keyframes served { 0%{transform:translateX(0);opacity:0} 20%{opacity:1} 100%{transform:translateX(46px);opacity:0} }
+  @keyframes bolt { 0%,58%,100%{opacity:0} 62%,68%{opacity:1} 65%{opacity:.3} }
+  @keyframes wipe { 0%,60%{opacity:1} 70%,100%{opacity:0} }
+  @keyframes restore { 0%,66%{opacity:0} 78%,100%{opacity:1} }
+  @keyframes agered { 0%{fill:var(--salad)} 100%{fill:var(--bad)} }
+  @keyframes shed { 0%{transform:translate(0,0);opacity:0} 15%{opacity:1} 100%{transform:translate(-30px,-24px);opacity:0} }
+
+  .anim-jit > * { animation:jit 1.3s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  .anim-bob > * { animation:bob 2s ease-in-out infinite; transform-box:fill-box; }
+  .flow { animation:laneflow 2.4s linear infinite; }
+  .jamchip { animation:lanejam 2.6s ease-out infinite; }
+  .simmer { animation:simmer 1.6s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  .fall { animation:fall 1.4s ease-in infinite; transform-box:fill-box; }
+  .sweep { animation:sweepx 2.2s linear infinite; }
+  .glowpot { animation:glow 1.5s ease-in-out infinite; transform-box:fill-box; transform-origin:center; }
+  .bar-fill > i { display:block; height:100%; border-radius:3px; animation:fillbar 1.8s ease-out infinite alternate; }
+  .rt { animation:roundtrip 2.4s ease-in-out infinite; transform-box:fill-box; }
+  .si { animation:stayin 1.8s ease-in-out infinite; transform-box:fill-box; }
+  .stir { animation:stir 1.2s ease-in-out infinite; transform-box:fill-box; transform-origin:15% 85%; }
+  .qgrow { animation:qgrow 2.4s ease-in infinite; transform-box:fill-box; transform-origin:bottom; }
+  .qserve { animation:qserve 1.6s ease-out infinite; transform-box:fill-box; transform-origin:bottom; }
+  .glance { animation:glance 1.6s ease-in-out infinite; }
+  .servedchip { animation:served 1.6s ease-in infinite; transform-box:fill-box; }
+  .bolt { animation:bolt 3s ease-in-out infinite; }
+  .wipe { animation:wipe 3s ease-in-out infinite; }
+  .restore { animation:restore 3s ease-in-out infinite; }
+  .agered { animation:agered 2.4s ease-in infinite alternate; }
+  .shedchip { animation:shed 2s ease-in infinite; transform-box:fill-box; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .anim-jit>*,.anim-bob>*,.flow,.jamchip,.simmer,.fall,.sweep,.glowpot,.bar-fill>i,.rt,.si,.stir,.qgrow,.qserve,
+    .glance,.servedchip,.bolt,.wipe,.restore,.agered,.shedchip { animation:none !important; }
+    .wipe{opacity:.35} .restore{opacity:1}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Obsidio · a performance siege, one idea at a time</p>
+    <h1>The Obsidio <span class="em">Line</span></h1>
+    <p class="dek">Nine optimizations took a small backend from buckling under load to serving every request on time. Here is each one on its own — what the kitchen was doing wrong, and the single change that fixed it. Read them in any order.</p>
+    <div class="facts">
+      <span class="fact"><b>2 CPUs · 2 GB</b> — the whole box</span>
+      <span class="fact">mix <span class="d">60% /price</span> · <span class="s">30% /stats</span> · <span class="b">10% /risk</span></span>
+      <span class="fact">score = <span class="d">1×</span> + <span class="s">3×</span> + <span class="b">10×</span> served on time</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- 01 PIN -->
+    <article class="card" data-accent="foundation">
+      <header><span class="num">01</span><span class="kick">The brigade</span><h3>Staff for two, not eight</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="stove" x="52" y="88" width="34" height="24" rx="4"/><rect class="stove" x="114" y="88" width="34" height="24" rx="4"/>
+            <g class="anim-jit">
+              <circle class="cook ph" cx="40" cy="40" r="7"/><circle class="cook ph" cx="72" cy="30" r="7"/>
+              <circle class="cook ph" cx="104" cy="44" r="7"/><circle class="cook ph" cx="136" cy="28" r="7"/>
+              <circle class="cook ph" cx="160" cy="46" r="7"/><circle class="cook ph" cx="88" cy="60" r="7"/>
+              <circle class="cook ph" cx="124" cy="62" r="7"/><circle class="cook ph" cx="56" cy="62" r="7"/>
+            </g>
+            <text class="lbl" x="10" y="16">8 cooks fighting for 2 stoves</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> runtime sees all host cores</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="stove" x="52" y="88" width="34" height="24" rx="4"/><rect class="stove" x="114" y="88" width="34" height="24" rx="4"/>
+            <g class="anim-bob"><circle class="cook" cx="69" cy="72" r="8"/><circle class="cook" cx="131" cy="72" r="8"/></g>
+            <text class="lbl" x="10" y="16">2 cooks, 2 stoves, steady</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> pinned to the real quota</figcaption>
+        </figure>
+      </div>
+      <p class="say">Under its cap the container can still <em>see</em> every core on the host, so the runtime spins up workers for cores it can't use — and they just thrash. Pin the count to the two you actually get.</p>
+      <p class="impact"><span class="k">Result</span><span><span class="code">GOMAXPROCS=2</span> — foundational. Stops the runtime overscheduling onto phantom cores.</span></p>
+    </article>
+
+    <!-- 02 BYPASS -->
+    <article class="card" data-accent="structural">
+      <header><span class="num">02</span><span class="kick">The pass</span><h3>A counter that skips the line</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <line x1="10" y1="70" x2="190" y2="70" stroke="var(--viz-line)" stroke-width="8" stroke-linecap="round"/>
+            <rect class="chip b" x="118" y="63" width="16" height="14" class="chip b"/>
+            <g class="jamchip"><rect class="chip d" x="20" y="63" width="16" height="14"/></g>
+            <g class="jamchip" style="animation-delay:.6s"><rect class="chip d" x="20" y="63" width="16" height="14"/></g>
+            <g class="jamchip" style="animation-delay:1.2s"><rect class="chip s" x="20" y="63" width="16" height="14"/></g>
+            <rect class="chip b" x="118" y="63" width="16" height="14"/>
+            <text class="lbl" x="10" y="24">one queue: drinks stuck behind a braise</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> everyone waits on /risk</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <line x1="10" y1="40" x2="176" y2="40" stroke="color-mix(in srgb,var(--drink) 40%,var(--viz-line))" stroke-width="7" stroke-linecap="round"/>
+            <line x1="10" y1="92" x2="176" y2="92" stroke="color-mix(in srgb,var(--braise) 40%,var(--viz-line))" stroke-width="7" stroke-linecap="round"/>
+            <g class="flow"><rect class="chip d" x="14" y="33" width="15" height="14"/></g>
+            <g class="flow" style="animation-delay:.8s"><rect class="chip s" x="14" y="33" width="15" height="14"/></g>
+            <g class="flow" style="animation-delay:1.6s"><rect class="chip d" x="14" y="33" width="15" height="14"/></g>
+            <g class="simmer"><rect class="chip b" x="90" y="85" width="15" height="14"/></g>
+            <text class="txt-g lbl" x="182" y="44" text-anchor="end" style="font-size:11px">✓</text>
+            <text class="lbl" x="10" y="20">fast lane bypasses the stove</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> cheap path is separate</figcaption>
+        </figure>
+      </div>
+      <p class="say">A price lookup does almost no work, yet in one shared queue it sits behind a 50,000-round braise. Give <span class="code">/price</span> and <span class="code">/stats</span> their own path that never enters the risk queue.</p>
+      <p class="impact"><span class="k">Result</span><span><b>Structural win.</b> The fast path stops waiting on the slow one — its p95 collapses.</span></p>
+    </article>
+
+    <!-- 03 ALLOC-FREE -->
+    <article class="card" data-accent="win">
+      <header><span class="num">03</span><span class="kick">Technique</span><h3>Braise without the mess</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <ellipse cx="60" cy="52" rx="20" ry="10" fill="#2c3945" stroke="#0a0f14"/>
+            <g class="fall"><rect class="plate" x="52" y="60" width="16" height="6" rx="3"/></g>
+            <g class="fall" style="animation-delay:.5s"><rect class="plate" x="52" y="60" width="16" height="6" rx="3"/></g>
+            <g class="fall" style="animation-delay:1s"><rect class="plate" x="52" y="60" width="16" height="6" rx="3"/></g>
+            <rect class="plate" x="44" y="98" width="16" height="6" rx="3"/><rect class="plate" x="56" y="92" width="16" height="6" rx="3"/>
+            <rect class="plate" x="48" y="104" width="16" height="6" rx="3"/>
+            <g class="stir" style="transform-origin:150px 100px"><line x1="150" y1="100" x2="168" y2="70" stroke="var(--viz-muted)" stroke-width="4" stroke-linecap="round"/></g>
+            <text class="lbl" x="120" y="112">GC sweeping</text>
+            <text class="txt-b lbl" x="10" y="18" style="font-size:10px">~150k allocations / request</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> garbage every round</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <ellipse cx="100" cy="58" rx="22" ry="11" fill="#2c3945" stroke="#0a0f14"/>
+            <rect x="88" y="50" width="24" height="7" rx="3" fill="var(--braise)"/>
+            <path class="glowpot" d="M92 40 q4 -6 0 -12" stroke="rgba(255,255,255,.5)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+            <path class="glowpot" d="M100 40 q4 -6 0 -12" stroke="rgba(255,255,255,.5)" stroke-width="2.5" fill="none" stroke-linecap="round" style="animation-delay:.7s"/>
+            <text class="txt-g lbl" x="100" y="100" text-anchor="middle" style="font-size:10px">0 allocations</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> one reused buffer</figcaption>
+        </figure>
+      </div>
+      <p class="say">The naive braise created a fresh string and byte slice on every one of its 50,000 rounds — a mountain of garbage that kept the collector busy. Reuse a single fixed buffer instead.</p>
+      <p class="impact"><span class="k">Result</span><span><b>~150k → 0</b> allocations per request. Keeps the garbage collector off the hot path.</span></p>
+    </article>
+
+    <!-- 04 MULTI-LANE -->
+    <article class="card" data-accent="win">
+      <header><span class="num">04</span><span class="kick">Batching</span><h3>One stir, many pots</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <text class="lbl" x="10" y="16">one chain: work, then idle, repeat</text>
+            <rect x="16" y="52" width="30" height="16" rx="3" fill="var(--braise)"/>
+            <rect x="46" y="52" width="30" height="16" rx="3" fill="var(--viz-line)"/>
+            <rect x="76" y="52" width="30" height="16" rx="3" fill="var(--braise)"/>
+            <rect x="106" y="52" width="30" height="16" rx="3" fill="var(--viz-line)"/>
+            <rect x="136" y="52" width="30" height="16" rx="3" fill="var(--braise)"/>
+            <text class="lbl" x="52" y="46" style="font-size:8px">idle</text><text class="lbl" x="112" y="46" style="font-size:8px">idle</text>
+            <g class="sweep"><line x1="16" y1="44" x2="16" y2="76" stroke="var(--flame)" stroke-width="1.5"/></g>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> the core waits between hashes</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <text class="lbl" x="10" y="14">four chains interleaved: no idle</text>
+            <rect x="16" y="30" width="34" height="9" rx="2" fill="var(--braise)"/><rect x="88" y="30" width="34" height="9" rx="2" fill="var(--braise)"/>
+            <rect x="34" y="42" width="34" height="9" rx="2" fill="color-mix(in srgb,var(--braise) 75%,var(--flame))"/><rect x="106" y="42" width="34" height="9" rx="2" fill="color-mix(in srgb,var(--braise) 75%,var(--flame))"/>
+            <rect x="52" y="54" width="34" height="9" rx="2" fill="var(--braise)"/><rect x="124" y="54" width="34" height="9" rx="2" fill="var(--braise)"/>
+            <rect x="70" y="66" width="34" height="9" rx="2" fill="color-mix(in srgb,var(--braise) 75%,var(--flame))"/><rect x="142" y="66" width="34" height="9" rx="2" fill="color-mix(in srgb,var(--braise) 75%,var(--flame))"/>
+            <g class="sweep"><line x1="16" y1="24" x2="16" y2="80" stroke="var(--flame)" stroke-width="1.5"/></g>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> waits overlap</figcaption>
+        </figure>
+      </div>
+      <p class="say">After each hash the CPU waits on the result before starting the next. Run several <em>independent</em> hashes at once and one chain's work fills another's wait.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+9% arm64 / +2% x86</b> (per-chain −25% / −5%). Bigger where the CPU has more latency to hide.</span></p>
+    </article>
+
+    <!-- 05 SHA-NI -->
+    <article class="card" data-accent="big">
+      <header><span class="num">05</span><span class="kick">The equipment</span><h3>The pro range</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <circle class="stove" cx="100" cy="60" r="26"/><circle class="ring" cx="100" cy="60" r="20"/>
+            <ellipse cx="100" cy="62" rx="16" ry="8" fill="#2c3945" stroke="#0a0f14"/><rect x="90" y="56" width="20" height="5" rx="2" fill="var(--braise)"/>
+            <text class="lbl" x="100" y="104" text-anchor="middle">generic hashing · 1×</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> software SHA</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <circle class="stove" cx="100" cy="58" r="26"/><circle class="ring glowpot" cx="100" cy="58" r="20" style="stroke:var(--flame-hot)"/>
+            <ellipse cx="100" cy="60" rx="16" ry="8" fill="#2c3945" stroke="#0a0f14"/><rect x="90" y="54" width="20" height="5" rx="2" fill="color-mix(in srgb,var(--braise) 60%,var(--flame-hot))"/>
+            <text class="txt-f lbl" x="100" y="100" text-anchor="middle" style="font-size:10px">SHA-NI · 2×</text>
+            <text class="lbl" x="100" y="113" text-anchor="middle" style="font-size:8px">has SHA? ✓ use · else fall back</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> hardware SHA</figcaption>
+        </figure>
+      </div>
+      <p class="say">Most server CPUs have a built-in SHA-256 instruction — a commercial range that cooks two pots at once. Detect it at startup, use it where present, and fall back to plain code where it isn't.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+22% — separated x86.</b> Per-chain cost −52%. The first big structural win.</span></p>
+    </article>
+
+    <!-- 06 IN-KERNEL HEX (TWIST) -->
+    <article class="card" data-accent="twist">
+      <header><span class="num">06</span><span class="kick">The twist</span><h3>Plate at the burner</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="disk" x="20" y="46" width="46" height="30" rx="5"/><text class="lbl" x="26" y="64">kernel</text>
+            <rect class="disk" x="132" y="46" width="48" height="30" rx="5"/><text class="lbl" x="138" y="64">Go fmt</text>
+            <g class="rt"><rect class="chip b" x="70" y="54" width="14" height="14"/></g>
+            <path d="M70 84 h60" stroke="var(--viz-line)" stroke-width="1" stroke-dasharray="3 3"/>
+            <text class="lbl" x="72" y="98" style="font-size:8px">hand back every round</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> round-trip to Go</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="disk" x="66" y="42" width="68" height="38" rx="6"/><text class="lbl" x="74" y="58">kernel</text><text class="lbl" x="74" y="70" style="fill:var(--flame)">+ format</text>
+            <g class="si"><rect class="chip b" x="96" y="52" width="12" height="12"/></g>
+            <text class="txt-b lbl" x="100" y="104" text-anchor="middle" style="font-size:9px">−10% / chain · score ——</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> no hand-off</figcaption>
+        </figure>
+      </div>
+      <p class="say">Formatting each result inside the kernel removed a per-round hand-off to Go and cut hash cost 10%… yet the score didn't move. The real bottleneck had shifted back to the fast path — which is what pointed to the next fix.</p>
+      <p class="impact"><span class="k">The lesson</span><span><b>A faster kernel, a flat score.</b> Always measure the whole system, not the part you changed.</span></p>
+    </article>
+
+    <!-- 07 YIELD -->
+    <article class="card" data-accent="big">
+      <header><span class="num">07</span><span class="kick">The payoff</span><h3>Watch the window</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <circle class="cook" cx="40" cy="78" r="9"/><rect class="stove" x="28" y="92" width="24" height="18" rx="3"/>
+            <text class="txt-b lbl" x="58" y="80" style="font-size:12px">⏸</text>
+            <g class="qgrow" style="transform-origin:150px 108px">
+              <rect class="glass" x="120" y="60" width="10" height="48"/><rect class="glass" x="134" y="60" width="10" height="48"/>
+              <rect class="glass" x="148" y="60" width="10" height="48"/><rect class="glass" x="162" y="60" width="10" height="48"/><rect class="glass" x="176" y="60" width="10" height="48"/>
+            </g>
+            <text class="lbl" x="118" y="52">drinks pile up</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> frozen mid-braise</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <circle class="cook" cx="40" cy="70" r="9"/><rect class="stove" x="28" y="84" width="24" height="18" rx="3"/>
+            <line class="glance" x1="48" y1="66" x2="150" y2="40" stroke="var(--flame)" stroke-width="1.5" stroke-dasharray="3 4"/>
+            <text class="txt-f lbl" x="70" y="58" style="font-size:8px">glance</text>
+            <g class="servedchip"><rect class="glass" x="120" y="70" width="10" height="22" rx="2"/></g>
+            <g class="servedchip" style="animation-delay:.8s"><rect class="glass" x="120" y="70" width="10" height="22" rx="2"/></g>
+            <text class="txt-g lbl" x="120" y="104" style="font-size:9px">drinks fly out</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> glance & serve</figcaption>
+        </figure>
+      </div>
+      <p class="say">The hashing loop couldn't be interrupted, so quick requests waited behind a whole braise. Pause it briefly between chunks to hand out whatever is waiting, then resume — the braise loses nothing.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+54% — separated x86.</b> Drink p95 43 ms → 10 ms. The single biggest win.</span></p>
+    </article>
+
+    <!-- 08 GATE -->
+    <article class="card" data-accent="insurance">
+      <header><span class="num">08</span><span class="kick">Resilience</span><h3>Triage the rush</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <text class="lbl" x="10" y="16">FIFO: serve the oldest first…</text>
+            <rect class="agered" x="30" y="40" width="140" height="12" rx="3"/>
+            <rect x="30" y="56" width="140" height="12" rx="3" fill="var(--braise)"/>
+            <rect x="30" y="72" width="140" height="12" rx="3" fill="color-mix(in srgb,var(--braise) 70%,var(--viz-2))"/>
+            <text class="txt-b lbl" x="176" y="49" text-anchor="end" style="font-size:8px">⌛ already too late</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> the doomed go first</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <text class="lbl" x="10" y="16">LIFO: newest first + shed overflow</text>
+            <rect x="30" y="72" width="120" height="12" rx="3" fill="color-mix(in srgb,var(--salad) 55%,var(--viz-2))"/>
+            <rect x="30" y="56" width="120" height="12" rx="3" fill="var(--salad)"/>
+            <text class="txt-g lbl" x="154" y="65" style="font-size:8px">✓ can still finish</text>
+            <g class="shedchip"><rect class="chip b" x="150" y="34" width="26" height="13" rx="3"/><text class="txt-b" x="154" y="44" style="font-size:8px">503</text></g>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> serve who can finish</figcaption>
+        </figure>
+      </div>
+      <p class="say">In a rush you can't clear, the oldest request will blow its deadline even if you serve it now. Serve the newest that can still make it, and wave off the overflow at the door before it costs you.</p>
+      <p class="impact"><span class="k">Result</span><span><b>Insurance.</b> A no-op today; under a rush that DQs a naive build at 5% errors, this holds it at 0.6%.</span></p>
+    </article>
+
+    <!-- 09 WAL -->
+    <article class="card" data-accent="win">
+      <header><span class="num">09</span><span class="kick">The bonus</span><h3>A blackout-proof book</h3></header>
+      <div class="viz">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="disk" x="66" y="40" width="68" height="40" rx="6"/><text class="lbl" x="80" y="56">memory</text>
+            <text class="wipe" x="82" y="72" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:var(--viz-ink)">190.0</text>
+            <path class="bolt" d="M150 20 L138 56 L150 56 L136 96" stroke="var(--flame)" stroke-width="3" fill="none"/>
+            <text class="txt-b lbl" x="100" y="108" text-anchor="middle" style="font-size:9px">after restart: gone</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> in memory only</figcaption>
+        </figure>
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 200 120">
+            <rect class="disk" x="60" y="38" width="56" height="42" rx="5"/>
+            <line x1="70" y1="50" x2="106" y2="50" stroke="var(--viz-muted)" stroke-width="2"/><line x1="70" y1="60" x2="106" y2="60" stroke="var(--viz-muted)" stroke-width="2"/><line x1="70" y1="70" x2="96" y2="70" stroke="var(--viz-muted)" stroke-width="2"/>
+            <text class="lbl" x="120" y="44">WAL + fsync</text>
+            <path class="bolt" d="M150 20 L138 52 L150 52 L136 88" stroke="var(--flame)" stroke-width="3" fill="none"/>
+            <text class="restore txt-g" x="100" y="106" text-anchor="middle" style="font-size:9px">after restart: 190.0 ✓</text>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge g">After</span> logged to disk first</figcaption>
+        </figure>
+      </div>
+      <p class="say">The bonus rewards surviving a hard restart. No database needed: append each price update to a file and flush it to disk before replying, then replay the file on startup. The scored siege is read-only, so it never pays this cost.</p>
+      <p class="impact"><span class="k">Result</span><span><b>Survives a hard kill.</b> Free on the scored path — pure additive bonus.</span></p>
+    </article>
+
+  </div>
+
+  <footer>
+    <div>Every percentage is a real measured delta from the project's benchmark trail — bracketed champion → candidate → champion runs on a separated x86-64 reference (a <span class="mono">c7i.xlarge</span> target with a separate load host), unless marked otherwise. Each card's gain is versus its own control, not a running total.</div>
+    <div class="mono">the challenge: keep /price fast while /risk runs 50,000 SHA-256 rounds · qualify: p95 200 / 500 / 1500 ms, errors &lt; 1%</div>
+  </footer>
+</div>
