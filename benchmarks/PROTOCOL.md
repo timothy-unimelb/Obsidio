@@ -141,6 +141,14 @@ A -> B -> B -> A -> A -> B
 
 Report medians and the complete range. Keep all six raw summaries.
 
+### Overload stress (not a level)
+
+`benchmarks/stress.js` ramps to four times the published peak. It is not a
+grading workload and is never publishable. Run it only when the overload
+policy itself changes (shedding logic, error budget, patience), because the
+published load cannot exercise that policy. Kernel, batching, yield, and
+cross-build comparisons do not need it.
+
 ## 5. Promotion and acceptance rules
 
 These rules are defaults, not substitutes for inspecting the data:
