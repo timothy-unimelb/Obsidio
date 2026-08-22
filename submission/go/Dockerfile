@@ -19,7 +19,11 @@ USER 65532:65532
 EXPOSE 8080
 # GOGC=off stops scheduled collections on a near-zero steady-state heap; the
 # memory limit is the hard safety net and must always accompany it.
-ENV GOMAXPROCS=2 \
+# Simulation of a grader without SHA extensions (never shipped): the
+# SHA-NI kernels and the standard library's SHA-NI path are both disabled.
+ENV RISK_SHANI=0 \
+    GODEBUG=cpu.sha=off \
+    GOMAXPROCS=2 \
     GOMEMLIMIT=512MiB \
     GOGC=off \
     RISK_WORKERS=2 \
