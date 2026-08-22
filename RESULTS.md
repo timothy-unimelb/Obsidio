@@ -18,6 +18,7 @@ Score = weighted 200s under the 4.5-min k6 grading load (1×/price + 3×/stats +
 | 8 | 2026-08-21 22:21 | [`911351a`](https://github.com/timothy-unimelb/Obsidio/commit/911351a)\* | Go 1.26 bump CLEAN re-run (prev line was contaminated by concurrent docker build; compare vs run 5, engineered v1 on Go 1.22) | **1,109,499** | +18% | 103.8 | 104.1 | 672.2 | 0.00% | 4/4 |
 | 9 | 2026-08-21 22:27 | [`911351a`](https://github.com/timothy-unimelb/Obsidio/commit/911351a)\* | boot-calibrated /risk gate (adapted from joel/draft): timed chains at boot derive queue depth + wait deadline + 503 shed; on Go 1.26 image | **1,041,111** | -6% | 96.6 | 96.5 | 1,046.0 | 0.05% | 4/4 |
 | 10 | 2026-08-22 00:30 | [`46894e4`](https://github.com/timothy-unimelb/Obsidio/commit/46894e4)\* | Wave 1 keeper build: GOGC=off+GOMEMLIMIT + calibrated Gosched yield + safety bundle (test-in-build, defer release, go.mod 1.26) | **1,154,625** | +11% | 12.0 | 12.1 | 955.5 | 0.01% | 4/4 |
+| 11 | 2026-08-22 10:21 | [`a8ec6c0`](https://github.com/timothy-unimelb/Obsidio/commit/a8ec6c0)\* | LIFO governor v2: staleness-skip at grant + front-door budgeted shed | **1,097,306** | -5% | 11.9 | 11.9 | 243.6 | 0.55% | 4/4 |
 
 \* dirty tree — run included uncommitted changes on top of that commit.
 

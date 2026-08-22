@@ -80,15 +80,16 @@ func init() {
 // and a deadline-based shed turns sustained overload into a 503 storm (closed
 // loop: a rejected VU retries within ~50ms, so the storm feeds itself and
 // blows the 1% error gate). LIFO serves the FRESHEST waiter: p95 stays low,
-// completed stragglers still score (only aggregate p95 is graded), abandoned
-// waiters are skipped at grant time via their request context, and the only
-// 503 left is a memory backstop that should never trip.
+// abandoned or stale waiters (too old to finish inside the 1500ms bar) are
+// skipped at grant time, and the only 503s are the error-budget governor's
+// sheds plus a memory backstop that should never trip.
 type riskWaiter struct {
 	ready     chan struct{} // closed by the granter, under riskMu
 	ctx       context.Context
 	next      *riskWaiter
-	granted   bool // set under riskMu; slot ownership transferred
-	abandoned bool // set under riskMu; client disconnected while waiting
+	enqueued  time.Time // staleness check at grant time (see releaseRiskSlot)
+	granted   bool      // set under riskMu; slot ownership transferred
+	abandoned bool      // set under riskMu; client disconnected while waiting
 }
 
 var (
@@ -122,7 +123,19 @@ func riskAcquire(ctx context.Context) bool {
 		riskMu.Unlock()
 		return false
 	}
-	w := &riskWaiter{ready: make(chan struct{}), ctx: ctx, next: riskStackTop}
+	// Genuinely overloaded (slots busy AND waiters already parked): spend the
+	// error budget HERE, on an instant shed, not on aged waiters. k6 folds
+	// failed-request durations into the graded percentile stream, so a 503
+	// emitted after parking ≥patience is a 1.2s+ sample that drags the /risk
+	// p95 over the bar (measured: 2.3s devloop p95 with patience-time sheds),
+	// while an at-arrival 503 is a ~1ms sample at the harmless bottom of the
+	// distribution — and it recycles the closed-loop VU into cheap scoring
+	// traffic ~1.2s sooner.
+	if riskStackDepth > 0 && shedBudgetAllows() {
+		riskMu.Unlock()
+		return false
+	}
+	w := &riskWaiter{ready: make(chan struct{}), ctx: ctx, next: riskStackTop, enqueued: time.Now()}
 	riskStackTop = w
 	riskStackDepth++
 	riskMu.Unlock()
@@ -137,8 +150,13 @@ wait:
 		case <-ctx.Done():
 			break wait
 		case <-patience.C:
-			// Shed only while the error budget holds; otherwise stay parked
+			// Past patience the waiter is stale — grant-time would skip it
+			// anyway — so its outcomes are only "shed now" (one ~1.2s error
+			// sample) or "hold the VU to the client's 60s timeout" (one 60s
+			// error sample). Shed if the budget holds; otherwise stay parked
 			// (a parked VU reduces offered load without spending an error).
+			// Under sustained load the front-door shed usually consumes the
+			// budget first, which is the cheaper place to spend it.
 			if shedBudgetAllows() {
 				break wait
 			}
@@ -158,9 +176,11 @@ wait:
 	return false
 }
 
-// releaseRiskSlot hands the slot to the newest live waiter, or retires it.
+// releaseRiskSlot hands the slot to the newest live, still-serviceable waiter,
+// or retires it.
 func releaseRiskSlot() {
 	riskMu.Lock()
+	now := time.Now()
 	for {
 		w := riskStackTop
 		if w == nil {
@@ -172,6 +192,15 @@ func releaseRiskSlot() {
 		riskStackDepth--
 		if w.abandoned || w.ctx.Err() != nil {
 			continue // dead waiter; its goroutine has left or will shed
+		}
+		if now.Sub(w.enqueued) > riskWaitTimeout {
+			// Stale: granted now it would finish past the 1500ms bar, and that
+			// duration sample would drag the graded p95 with it (measured: the
+			// governor served stragglers at 2-4s and breached the bar). Unlink
+			// and leave it parked — its goroutine sheds when the error budget
+			// allows, else holds its VU until the client gives up, which costs
+			// far less than serving it would.
+			continue
 		}
 		w.granted = true
 		close(w.ready)

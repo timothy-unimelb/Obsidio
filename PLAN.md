@@ -66,12 +66,19 @@ Kernel change ⇒ differential test + Tier-0 + /smoke (full 50k digests) before 
 
 ## SESSION-2 HANDOFF (2026-08-22 ~01:15, written for a fresh context after /clear)
 
-**⚠️ TREE STATE: the working tree (committed as WIP on `advait`) is NOT SHIPPABLE.**
-The last fully-green submittable build is commit **f1379c4** (Wave 1 keeper:
-1,154,625 recorded, 4/4 bars, /price p95 12ms). The tree since then contains the
-LIFO+governor gate: smoke-passing, race-clean, +4.9% devloop score at 0.45%
-errors, **but devloop risk p95 = 3.4s (bar breach)**. Fix forward or revert the
-gate before any submission.
+**TREE STATE (updated session 3, 2026-08-22 ~10:30): SHIPPABLE — governor v2
+green.** The staleness rule alone was insufficient (devloop risk p95 still 2.3s:
+the governor's own shed samples, emitted after ≥1.19s of parking, dominated the
+tier's percentile stream). The fix that landed is **staleness-skip at grant time
+PLUS front-door budgeted shed** (instant 503 on arrival when slots busy + stack
+non-empty + error budget open → ~1ms error samples + instant VU recycle;
+patience-shed kept only as a backstop drain). Measured: devloop 323,808 @ 0.52%
+err, risk p95 335ms (all devloop thresholds pass); grading.js 1,097,306 @ 0.551%
+err, risk p95 243.6ms, price/stats p95 11.9ms, 4/4 bars, peak RSS 480MiB
+(GOMEMLIMIT=512MiB verified). Score is −5.0% vs the keeper run on grading
+(inside the ~10% noise floor; devloop read +4.6%) → call it score-neutral with
+4× more /risk p95 margin and the FIFO self-DQ cliff structurally removed.
+Full data: EXPERIMENTS.md "Governor v2a/v2b" entries.
 
 **What Wave 2B discovered (full data in EXPERIMENTS.md trilogy entry):**
 - Score law CORRECTION: "score ≈ 25×chains" holds only at zero shed. Shedding a
@@ -86,13 +93,12 @@ gate before any submission.
   of only 1/60 err/s (its eventual k6 timeout); shedding the same demand costs
   ~78× more errors. Park to reduce demand, shed for freshness, is the right mix.
 
-**The designed-but-unbuilt fix (next session, ~1-2h): staleness rule at grant
-time.** In releaseRiskSlot, skip (leave parked) any waiter whose age already
-exceeds ~(1500ms − unitCost − margin) — serving it would emit a bar-breaking
-duration sample; its eventual 60s timeout is cheaper (1/60 err/s) than the p95
-damage. Add `enqueued time.Time` to riskWaiter. Then re-run the devloop trilogy
-comparison + a full grading run; expect ≥324k devloop, risk p95 back under bar,
-errors <0.6%. If it fails: `git checkout f1379c4 -- app/main.go` restores Wave 1.
+**[DONE session 3] Staleness rule built as designed** (enqueued timestamp +
+grant-time skip; unit test TestStaleWaiterSkippedAtGrant) — but it alone left
+devloop risk p95 at 2.3s, which forced the real insight: k6 grades failed-
+request DURATIONS too, so WHERE the error budget is spent decides the p95. The
+front-door shed (see TREE STATE above) completed the fix. Fallback remains
+`git checkout f1379c4 -- app/main.go` if anything regresses.
 
 **Other gotchas found:**
 - Boot calibration jitter: unitCost median-of-3 swung 11.9→15.8ms across boots
@@ -128,7 +134,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W1: cpu.stat — 37ms total throttled/run: CFS hypothesis dead, GOMAXPROCS=2 validated
 - [ ] W2A: x86 VM verification session (SHA-NI, ratios, grading run)
 - [ ] W2A: 2-lane SHA-NI kernel v1 + differential tests
-- [~] W2B: adaptive-LIFO gate — trilogy measured, governor built (race-clean, +4.9%), **staleness rule at grant time still needed (p95 breach)** — see SESSION-2 HANDOFF
+- [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
 - [ ] W2B: 400-VU overdrive FIFO-vs-governor exhibit (after staleness rule)
 - [ ] W2B: contended calibration + EWMA (also fixes boot-jitter gotcha)
 - [ ] W3: pairing dispatcher + boot kernel racing

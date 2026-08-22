@@ -134,8 +134,8 @@ Entry format (see the /experiment skill):
   3. LIFO + error-budget-governed patience (shed only while total error rate
      ≤0.6%, else park): 324,772 (+4.9%, above noise), 0.45% errors — but risk
      p95 3,403ms (devloop scale): parked stragglers served late blow the bar.
-- **Verdict:** pending — variant 3 is the right shape but needs a staleness
-  rule at grant time (see PLAN.md session-2 handoff). NOT shippable as-is.
+- **Verdict:** resolved by governor v2 (staleness-skip + front-door shed, next
+  entries) — variant 3's p95 breach fixed, gate now shippable.
 
 ## 2026-08-22 Gotcha: boot calibration jitter under Docker Desktop VM
 
@@ -143,3 +143,43 @@ Entry format (see the /experiment skill):
   15.8, 12.8 ms — ±15% boot-to-boot on this Mac. Derived knobs (patience,
   yield stride) inherit the jitter. Contended/EWMA calibration (planned) or
   more samples would stabilise; on real x86 hardware expect less VM noise.
+
+## 2026-08-22 Governor v2a: staleness rule at grant time (devloop A/B)
+
+- **SHA:** a8ec6c0, dirty tree
+- **Hypothesis:** the trilogy's variant-3 p95 breach comes from parked
+  stragglers SERVED at 2-4s; skipping any waiter older than the calibrated
+  patience window (1500ms − unitCost − 300ms margin) at grant time removes
+  those samples at 1/60-err/s cost each.
+- **Change:** app/main.go — `enqueued` timestamp on riskWaiter;
+  releaseRiskSlot unlinks-and-skips waiters aged past riskWaitTimeout.
+  New unit test TestStaleWaiterSkippedAtGrant; race hammer still green.
+- **Result (devloop, vs trilogy variant 3):** work_score 324,772 → 300,213;
+  risk p95 3,403 → 2,300ms (still over devloop bar); errors 0.45% → 0.48%.
+- **Verdict:** kept as a component, but insufficient alone — the remaining
+  p95 damage is the SHED samples themselves: the governor spends its budget
+  on waiters that already parked ≥1.19s, and k6 folds those 1.2-2.3s failed
+  durations into the graded percentile stream (~5% of the /risk tier ⇒ p95
+  lands on an error sample).
+
+## 2026-08-22 Governor v2b: front-door budgeted shed (devloop + grading)
+
+- **SHA:** a8ec6c0, dirty tree
+- **Hypothesis:** spend the same error budget at ARRIVAL instead (503
+  immediately when slots busy + stack non-empty + budget open): the error
+  sample costs ~1ms instead of 1.2s+, and the closed-loop VU recycles into
+  cheap scoring traffic ~1.2s sooner. Patience-shed retained only as a
+  backstop drain (a 1.2s error sample beats a 60s timeout sample).
+- **Change:** app/main.go riskAcquire — instant shed branch before parking;
+  patience-shed comment updated to backstop role.
+- **Result (devloop, vs v2a):** work_score 300,213 → 323,808; risk p95
+  2,300 → 335ms (all devloop thresholds pass); errors 0.48% → 0.52%.
+- **Result (grading.js, vs Wave-1 keeper line):** work_score 1,154,625 →
+  1,097,306 (−5.0%, inside the ~10% grading noise floor; devloop read +4.6%,
+  so score-neutral is the honest call); p95 price 12.0 → 11.9ms, stats
+  12.0 → 11.9ms, risk 955.5 → 243.6ms; errors 0.009% → 0.551%; 4/4 bars,
+  peak RSS 480MiB (GOMEMLIMIT=512MiB verified safe).
+- **Verdict:** KEPT — this is the shippable gate. Score within noise of the
+  keeper, /risk p95 margin 4× wider (244ms vs 1500ms bar), and the
+  FIFO-shed cliff (self-DQ on slow hardware) is structurally gone: sheds are
+  budget-capped at 0.6% by construction, overflow parks instead of storming.

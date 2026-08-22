@@ -39,6 +39,64 @@ func BenchmarkRiskChain(b *testing.B) {
 	}
 }
 
+// TestStaleWaiterSkippedAtGrant: a waiter older than the calibrated patience
+// window must NOT be served (its duration sample would land past the 1500ms
+// bar); the granter unlinks it and retires the slot instead.
+func TestStaleWaiterSkippedAtGrant(t *testing.T) {
+	savedTimeout := riskWaitTimeout
+	riskWaitTimeout = 50 * time.Millisecond
+	defer func() { riskWaitTimeout = savedTimeout }()
+
+	if !riskAcquire(context.Background()) || !riskAcquire(context.Background()) {
+		t.Fatal("could not fill the execution slots")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	granted := make(chan bool, 1)
+	go func() { granted <- riskAcquire(ctx) }()
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		riskMu.Lock()
+		depth := riskStackDepth
+		riskMu.Unlock()
+		if depth == 1 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("waiter never parked")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	time.Sleep(100 * time.Millisecond) // age the waiter past riskWaitTimeout
+
+	releaseRiskSlot()
+	select {
+	case g := <-granted:
+		t.Fatalf("stale waiter got a grant-time decision: granted=%v", g)
+	case <-time.After(50 * time.Millisecond):
+		// still parked: correct — shed budget is closed (tiny denominator)
+	}
+	riskMu.Lock()
+	running := riskRunning
+	riskMu.Unlock()
+	if running != 1 {
+		t.Fatalf("slot not retired past the stale waiter: riskRunning=%d", running)
+	}
+
+	cancel()
+	if g := <-granted; g {
+		t.Fatal("stale waiter reported granted after client disconnect")
+	}
+	releaseRiskSlot()
+	riskMu.Lock()
+	defer riskMu.Unlock()
+	if riskRunning != 0 || riskStackDepth != 0 || riskStackTop != nil {
+		t.Fatalf("gate state not restored: running=%d depth=%d", riskRunning, riskStackDepth)
+	}
+}
+
 // TestRiskGateRaceHammer drives the LIFO admission gate with concurrent
 // acquire / client-cancel / release traffic and then asserts the accounting
 // converged: no leaked slots, no stranded waiters. Run with -race.
