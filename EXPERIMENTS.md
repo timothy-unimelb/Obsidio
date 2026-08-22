@@ -299,3 +299,21 @@ Entry format (see the /experiment skill):
 - **Verdict:** KEPT — new champion is a446bd0. Gain ~3× Tim's equivalent
   (+2-3%) because our chain hex-encodes in the hot 50k loop every iteration.
   New x86 headline: **~2.10M work_score.**
+
+## 2026-08-22 Post-hex CPU profile on x86 (kernel go/no-go evidence)
+
+- **SHA:** a446bd0 (packed-hex champion), c7i.xlarge, 30s pprof at 200-VU
+  devloop steady state (profile: benchmarks/profiles/posthex-champion-
+  20260822-cpu.pb.gz). Boot receipt: isa=[sha_ni avx sse4_1 ssse3],
+  cgroup_cpus=2.00, unitCost 6.34ms idle / 6.30ms contended (real cores —
+  no VM noise; Docker-Desktop contended-vs-idle gap gone).
+- **Split (flat CPU):** blockSHANI 65.0%; hexEncode64 9.6%; sha256
+  Digest-wrapper overhead (New/Reset/Write/Sum/checkSum/memmove +
+  fips RecordApproved) ≈ 15-17%; handlers/runtime remainder ~8%.
+- **Reads:** hex is solved (62% → 9.6%). The lane order for the kernel is
+  now: (1) fixed-64-byte direct 2-block kernel with constant padding block —
+  deletes the ~15% wrapper cost, pure Go around vendored stdlib asm;
+  (2) 2-lane SHA-NI interleave — attacks the 65% (literature +38% SPR,
+  +60-98% Zen) → Amdahl ceiling ~+25% end-to-end; combined ceiling +30-40%.
+- **Verdict:** kernel lane GO, in that order, each step behind differential
+  tests + testbed A/B.
