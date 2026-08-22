@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-08-22T01:50:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "fixed-shape-sha-level0-20260822",
+  "candidate": "portable-go-fixed-64-byte-sha256",
+  "verdict": "reverted",
+  "basis": {
+    "stage_reached": "level-0-microbenchmark",
+    "sha_standard_median_ns_per_op": 43.235,
+    "sha_candidate_median_ns_per_op": 382.85,
+    "sha_candidate_slowdown_percent": 785.5094,
+    "risk_standard_median_ns_per_op": 3579498,
+    "risk_candidate_median_ns_per_op": 20964447,
+    "risk_candidate_slowdown_percent": 485.6812,
+    "sha_sample_count_per_build": 8,
+    "risk_sample_count_per_build": 5,
+    "control_allocations_per_op": 0,
+    "candidate_allocations_per_op": 0,
+    "randomized_sha_vectors": 10000,
+    "correctness_passed": true,
+    "portable_correctness_passed": true,
+    "screening_run": false
+  },
+  "environment": {
+    "id": "local-arm64-colima",
+    "go_version": "go1.26.6",
+    "target_architecture": "linux-arm64"
+  },
+  "next_evidence": "Do not promote portable scalar SHA. Any later SHA candidate must retain acceleration or prove a multi-message throughput advantage at Level 0.",
+  "report": "benchmarks/experiments/2026-08-22-fixed-shape-sha.md"
+}

@@ -16,9 +16,10 @@ reaches a gate, or changes what should happen next.
 - **Architecture phase:** the major concurrency and allocation improvements are
   complete. Work has moved into evidence-led compute-kernel and compiler
   optimization.
-- **Latest rejected candidate:** Go 1.26.6 PGO regressed the risk kernel by
-  19.67% and reintroduced 50,000 allocations per request. It was stopped at
-  Level 0 without spending screening or AWS time.
+- **Latest rejected candidates:** Go 1.26.6 PGO regressed the risk kernel by
+  19.67% and reintroduced 50,000 allocations per request. Portable fixed-shape
+  SHA was then 5.86x slower than Go's accelerated standard-library path. Both
+  were stopped at Level 0 without spending screening or AWS time.
 - **Outstanding finalist evidence:** interleaved six-run milestone,
   optional-instruction portability run, and rerun after the organizers lock the
   grader.
@@ -54,13 +55,18 @@ reaches a gate, or changes what should happen next.
    with the pinned Go 1.26.6 toolchain. The candidate remained correct but made
    `BenchmarkRisk` 19.67% slower and changed it from zero allocations to 50,000
    allocations and 6.4 MB per operation. Verdict: reverted before screening.
+8. **Completed: portable fixed-shape SHA Level 0.** A two-block SHA-256 path
+   reused the constant padding schedule and passed 10,000 randomized vectors,
+   complete risk vectors, and the portability run. It was 8.86x slower for one
+   SHA operation and 5.86x slower over the complete kernel. Verdict: reverted
+   before screening.
 
 ## Candidate queue after the active sequence
 
 Priority is evidence-dependent, not a promise to implement every item:
 
-1. Fixed-shape or multi-lane SHA processing: SHA still accounts for roughly 24%
-   of CPU, but keep a prototype only if it beats Go's selected SHA path.
+1. Multi-lane or batched risk processing, only if it can preserve accelerated
+   SHA and improve complete-kernel throughput at Level 0.
 2. Small HTTP/response-path reductions, only if profiles show they affect score
    rather than merely microbenchmarks.
 3. C or Rust kernel integration only after Go-level options are exhausted; the
@@ -81,8 +87,9 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** compact hex unrolling remains champion; Go PGO was rejected at Level
-0 and the AWS stack remains destroyed. Next, prototype a portable fixed-shape or
-multi-lane SHA path against the existing Go implementation, beginning with
-independent vectors and focused microbenchmarks. Re-provision AWS only after
-local Level 0 and bracketed screening earn an exact x86 comparison.
+**Status:** compact hex unrolling remains champion; Go PGO and portable
+fixed-shape SHA were rejected at Level 0, and the AWS stack remains destroyed.
+Next, evaluate whether a multi-lane or batched risk kernel has a credible
+accelerated implementation; otherwise move to small profiled HTTP-path changes.
+Re-provision AWS only after local Level 0 and bracketed screening earn an exact
+x86 comparison.

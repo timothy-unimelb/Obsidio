@@ -54,8 +54,8 @@ const checkpoints = [
     tone: "acid",
   },
   { number: "05", name: "Go PGO", status: "Rejected · Level 0", detail: "A representative Go 1.26.6 profile made the risk kernel 19.67% slower and reintroduced 50,000 allocations per request, so it was stopped before load testing.", score: null, requests: null, tone: "pending" },
-  { number: "06", name: "Fixed-shape SHA path", status: "Next experiment", detail: "Prototype the fixed 64-byte rounds and verify every digest against independent reference vectors before any load test.", score: null, requests: null, tone: "pending" },
-  { number: "07", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
+  { number: "06", name: "Fixed-shape SHA path", status: "Rejected · Level 0", detail: "The portable two-block implementation was correct and allocation-free, but 5.86× slower than Go's processor-accelerated SHA path over the complete kernel.", score: null, requests: null, tone: "pending" },
+  { number: "07", name: "Multi-lane risk kernel", status: "Under consideration", detail: "Proceed only if multiple independent messages can retain accelerated SHA and improve complete-kernel throughput before batching reaches the server.", score: null, requests: null, tone: "pending" },
   { number: "08", name: "Native kernel, if justified", status: "Conditional", detail: "Only add a row if profiling still points to the kernel and a C or Rust prototype passes the same tests.", score: null, requests: null, tone: "pending" },
 ];
 
@@ -82,6 +82,7 @@ const evidenceLinks = [
   ["Recorded protocol", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/protocol.json"],
   ["Latest x86 comparison report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-packed-champion-profile.md"],
   ["Rejected PGO experiment", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-go-pgo.md"],
+  ["Rejected fixed-shape SHA experiment", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-fixed-shape-sha.md"],
 ];
 
 export default function PerformancePage() {
