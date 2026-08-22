@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/sha256"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -19,7 +21,6 @@ import (
 const (
 	riskIterations   = 50_000
 	defaultRiskJobs  = 2
-	defaultRiskQueue = 32
 	defaultRiskLanes = 4
 	maxRiskLanes     = 4
 	// defaultYieldRounds bounds how long a worker stays inside the assembly
@@ -30,8 +31,17 @@ const (
 type priceSeries [500]float64
 
 type market struct {
-	priceResponse string
-	data          priceSeries
+	symbol string
+	latest atomic.Pointer[string] // pre-serialized GET /price body
+	data   priceSeries
+}
+
+func (m *market) priceBody() string { return *m.latest.Load() }
+
+func (m *market) setPrice(price float64) {
+	body := `{"symbol":` + strconv.Quote(m.symbol) + `,"price":` +
+		strconv.FormatFloat(price, 'f', -1, 64) + `}`
+	m.latest.Store(&body)
 }
 
 type responseBuffer struct {
@@ -41,11 +51,13 @@ type responseBuffer struct {
 type riskJob struct {
 	seed     string
 	queuedAt time.Time
+	ctx      context.Context
 	result   chan<- riskResult
 }
 
 type riskResult struct {
 	hash      [sha256.Size * 2]byte
+	rejected  bool
 	queueWait time.Duration
 	hashTime  time.Duration
 }
@@ -55,7 +67,6 @@ var lowercaseHexPairs = buildLowercaseHexPairs()
 
 var (
 	riskWorkerCount = envInt("RISK_WORKERS", defaultRiskJobs, 1, 2)
-	riskQueue       = make(chan riskJob, envInt("RISK_QUEUE", defaultRiskQueue, 1, 200))
 	riskLaneLimit   = envInt("RISK_LANES", defaultRiskLanes, 1, maxRiskLanes)
 	riskYieldRounds = envInt("RISK_YIELD_ROUNDS", defaultYieldRounds, 0, riskIterations)
 	riskWorkersOnce sync.Once
@@ -72,6 +83,9 @@ func main() {
 	// Docker CPU quotas are not guaranteed to change the processor count seen by
 	// every Go release. Pinning it avoids overscheduling on the grading host.
 	runtime.GOMAXPROCS(2)
+	gate.calibratePatience()
+	priceWAL.open()
+	defer priceWAL.close()
 	startRiskWorkers()
 
 	port := os.Getenv("PORT")
@@ -87,14 +101,20 @@ func main() {
 		MaxHeaderBytes:    8 << 10,
 	}
 
-	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, and queue capacity %d", port, riskWorkerCount, riskLaneLimit, cap(riskQueue))
+	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, park capacity %d, patience %s",
+		port, riskWorkerCount, riskLaneLimit, gate.parkMax, gate.patience)
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }
 
 func route(w http.ResponseWriter, r *http.Request) {
+	gate.countRequest()
 	if r.Method != http.MethodGet {
+		if r.Method == http.MethodPost && r.URL.Path == "/price" {
+			handlePriceUpdate(w, r)
+			return
+		}
 		writeJSON(w, http.StatusMethodNotAllowed, `{"error":"method not allowed"}`)
 		return
 	}
@@ -124,7 +144,7 @@ func handlePrice(w http.ResponseWriter, symbol string) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, m.priceResponse)
+	writeJSON(w, http.StatusOK, m.priceBody())
 }
 
 func handleStats(w http.ResponseWriter, symbol string) {
@@ -175,14 +195,10 @@ func handleStats(w http.ResponseWriter, symbol string) {
 func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 	startRiskWorkers()
 	resultChannel := make(chan riskResult, 1)
-	job := riskJob{seed: seed, result: resultChannel}
-	if emitRiskTiming {
-		job.queuedAt = time.Now()
-	}
+	job := riskJob{seed: seed, queuedAt: time.Now(), ctx: r.Context(), result: resultChannel}
 
-	select {
-	case riskQueue <- job:
-	case <-r.Context().Done():
+	if !gate.admit(job) {
+		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}
 
@@ -190,6 +206,10 @@ func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 	select {
 	case result = <-resultChannel:
 	case <-r.Context().Done():
+		return
+	}
+	if result.rejected {
+		writeJSON(w, http.StatusServiceUnavailable, `{"error":"overloaded"}`)
 		return
 	}
 
@@ -214,8 +234,8 @@ func handleRisk(w http.ResponseWriter, r *http.Request, seed string) {
 }
 
 // startRiskWorkers creates the only goroutines allowed to execute the expensive
-// hash loop. HTTP handlers enqueue jobs and wait for their own buffered result
-// channel, while price and stats requests bypass this queue completely.
+// hash loop. HTTP handlers park jobs at the admission gate and wait for their
+// own buffered result channel, while price and stats requests bypass it.
 func startRiskWorkers() {
 	riskWorkersOnce.Do(func() {
 		for range riskWorkerCount {
@@ -224,25 +244,13 @@ func startRiskWorkers() {
 	})
 }
 
-// riskWorker takes one job, then opportunistically drains up to riskLaneLimit-1
-// more without waiting. Independent chains are hashed as interleaved lanes on
-// this worker's core so the processor can overlap one chain's SHA latency with
-// another's work. With an empty queue a job still runs alone immediately.
+// riskWorker takes up to riskLaneLimit live jobs from the gate, newest first,
+// and hashes them as interleaved lanes on this worker's core. With nothing else
+// parked a job still runs alone immediately.
 func riskWorker() {
 	var batch [maxRiskLanes]riskJob
-	for job := range riskQueue {
-		batch[0] = job
-		count := 1
-	fill:
-		for count < riskLaneLimit {
-			select {
-			case next := <-riskQueue:
-				batch[count] = next
-				count++
-			default:
-				break fill
-			}
-		}
+	for {
+		count := gate.take(riskLaneLimit, batch[:])
 		runRiskBatch(batch[:count])
 	}
 }
@@ -450,10 +458,8 @@ func buildMarkets() map[string]*market {
 
 	result := make(map[string]*market, len(prices))
 	for symbol, price := range prices {
-		entry := &market{
-			priceResponse: `{"symbol":` + strconv.Quote(symbol) + `,"price":` +
-				strconv.FormatFloat(price, 'f', -1, 64) + `}`,
-		}
+		entry := &market{symbol: symbol}
+		entry.setPrice(price)
 		for index := range entry.data {
 			entry.data[index] = price * (1 + math.Sin(float64(index))/50)
 		}

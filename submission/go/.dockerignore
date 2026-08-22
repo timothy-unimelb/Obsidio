@@ -1,6 +1,8 @@
 *
 !go.mod
 !main.go
+!admission.go
+!persistence.go
 !profile.go
 !risk_amd64.go
 !risk_amd64.s
