@@ -5,6 +5,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -85,6 +86,19 @@ func main() {
 		port = "8080"
 	}
 
+	if os.Getenv("RISK_HTTP") != "std" {
+		listener, err := net.Listen("tcp", ":"+port)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("obsidio listening on :%s (raw HTTP/1.1) with %d risk workers, %d lanes each, shedding %v at %dbp, patience %s",
+			port, riskWorkerCount, riskLaneLimit, gate.shed, gate.budgetBP, gate.patience())
+		if err := rawServe(listener); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	server := &http.Server{
 		Addr:              ":" + port,
 		Handler:           http.HandlerFunc(route),
@@ -93,7 +107,7 @@ func main() {
 		MaxHeaderBytes:    8 << 10,
 	}
 
-	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, shedding %v at %dbp, patience %s",
+	log.Printf("obsidio listening on :%s (net/http) with %d risk workers, %d lanes each, shedding %v at %dbp, patience %s",
 		port, riskWorkerCount, riskLaneLimit, gate.shed, gate.budgetBP, gate.patience())
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
@@ -508,12 +522,20 @@ func putResponseBuffer(buffer *responseBuffer) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, body string) {
+	if raw, ok := w.(*rawResponse); ok {
+		raw.writeResponse(status, unsafe.Slice(unsafe.StringData(body), len(body)))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = io.WriteString(w, body)
 }
 
 func writeJSONBytes(w http.ResponseWriter, status int, body []byte) {
+	if raw, ok := w.(*rawResponse); ok {
+		raw.writeResponse(status, body)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
