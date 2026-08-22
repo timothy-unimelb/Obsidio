@@ -47,6 +47,19 @@ the small amount of general-purpose setup that specialization removes. The
 portable scalar rounds therefore have no plausible route through screening on
 this toolchain and host.
 
+Because the judge does not guarantee SHA extensions, the same benchmarks were
+also repeated as a separate portability set with `GODEBUG=cpu.all=off`:
+
+| Portable measurement | Standard library | Fixed-shape Go | Result |
+| --- | ---: | ---: | ---: |
+| One 64-byte SHA-256, median | 292.00 ns | 361.95 ns | 23.96% slower |
+| Complete risk kernel, median | 15.676 ms | 19.268 ms | 22.92% slower |
+| Complete kernel allocations | 0 | 0 | equal |
+
+The fixed-shape candidate therefore loses even when the standard library's
+optional acceleration is disabled. This removes CPU-extension availability as
+a reason to retain it.
+
 ## Verdict
 
 **Reject the portable scalar fixed-shape SHA path at Level 0.** Do not spend a

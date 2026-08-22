@@ -1,0 +1,30 @@
+{
+  "recorded_at": "2026-08-22T02:05:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "fixed-shape-sha-portable-level0-20260822",
+  "candidate": "portable-go-fixed-64-byte-sha256",
+  "verdict": "reverted",
+  "basis": {
+    "stage_reached": "level-0-portability-microbenchmark",
+    "cpu_mode": "GODEBUG=cpu.all=off",
+    "sha_standard_median_ns_per_op": 292.0,
+    "sha_candidate_median_ns_per_op": 361.95,
+    "sha_candidate_slowdown_percent": 23.9555,
+    "risk_standard_median_ns_per_op": 15675797,
+    "risk_candidate_median_ns_per_op": 19268005,
+    "risk_candidate_slowdown_percent": 22.9157,
+    "sha_sample_count_per_build": 8,
+    "risk_sample_count_per_build": 5,
+    "control_allocations_per_op": 0,
+    "candidate_allocations_per_op": 0,
+    "screening_run": false
+  },
+  "environment": {
+    "id": "local-arm64-colima-portable",
+    "go_version": "go1.26.6",
+    "target_architecture": "linux-arm64"
+  },
+  "extends_decision": "fixed-shape-sha-level0-20260822",
+  "next_evidence": "The standard library remains faster without optional CPU acceleration. Do not promote or revisit this scalar candidate.",
+  "report": "benchmarks/experiments/2026-08-22-fixed-shape-sha.md"
+}

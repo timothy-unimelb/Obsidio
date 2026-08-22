@@ -58,8 +58,9 @@ reaches a gate, or changes what should happen next.
 8. **Completed: portable fixed-shape SHA Level 0.** A two-block SHA-256 path
    reused the constant padding schedule and passed 10,000 randomized vectors,
    complete risk vectors, and the portability run. It was 8.86x slower for one
-   SHA operation and 5.86x slower over the complete kernel. Verdict: reverted
-   before screening.
+   SHA operation and 5.86x slower over the complete kernel with normal CPU
+   features. With all optional features disabled it remained 23.96% slower per
+   SHA and 22.92% slower over the kernel. Verdict: reverted before screening.
 
 ## Candidate queue after the active sequence
 
