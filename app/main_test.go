@@ -20,6 +20,30 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// TestShedBudgetDerivation: the budget must track the declared error gate
+// (88% of it) and no override may push it past 95% of the gate.
+func TestShedBudgetDerivation(t *testing.T) {
+	saved := riskShedBudgetBP
+	defer func() { riskShedBudgetBP = saved }()
+
+	t.Setenv("RISK_ERR_GATE_BP", "")
+	t.Setenv("RISK_SHED_BUDGET_BP", "")
+	initShedBudget()
+	if riskShedBudgetBP != 88 {
+		t.Fatalf("default gate 100bp should derive 88bp, got %d", riskShedBudgetBP)
+	}
+	t.Setenv("RISK_ERR_GATE_BP", "50") // e.g. locked gate tightened to 0.5%
+	initShedBudget()
+	if riskShedBudgetBP != 44 {
+		t.Fatalf("gate 50bp should derive 44bp, got %d", riskShedBudgetBP)
+	}
+	t.Setenv("RISK_SHED_BUDGET_BP", "80") // override beyond 95% of gate
+	initShedBudget()
+	if riskShedBudgetBP != 47 { // 95% of 50, integer math
+		t.Fatalf("override must clamp to 95%% of gate (47), got %d", riskShedBudgetBP)
+	}
+}
+
 // TestPriceWALDurabilityAndReplay: accepted POSTs must survive a hard kill —
 // replay applies complete lines in order (last write wins) and skips a torn
 // final line, which by construction was never acknowledged with a 200.

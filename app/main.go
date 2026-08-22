@@ -646,22 +646,35 @@ func writeJSON(w http.ResponseWriter, code int, body []byte) {
 // 8.4% errors (DQ); zero shedding parks VUs for k6's 60s timeout and idles the
 // hash slots (−22%). The budget buys the upside the gate allows and parks
 // waiters beyond it — parked VUs shrink offered load without erroring.
-// riskShedBudgetBP: shed budget in BASIS POINTS of total responses (the k6
-// DQ gate is 100bp = 1%). Default set from the budget sweep on the x86
-// testbed; RISK_SHED_BUDGET_BP overrides for A/B and submission-day
-// insurance, hard-clamped to 95bp so no knob can cross the gate. The
-// stale-skip preemptive charge (riskTakeWork) keeps the internal counter a
-// strict overestimate of k6's failure view, which is what makes running
-// closer to the gate defensible.
-var riskShedBudgetBP = int64(60)
+// riskShedBudgetBP: shed budget in BASIS POINTS of total responses. It is
+// DERIVED from the graded error gate, not hardcoded: budget = 88% of the
+// gate (the sweep-validated operating point), never above 95% of it. The
+// gate itself defaults to the published placeholder (100bp = 1%) and is
+// declared via RISK_ERR_GATE_BP — when the locked grading script publishes
+// a different http_req_failed threshold, updating that ONE value re-derives
+// the budget. RISK_SHED_BUDGET_BP still overrides directly for A/Bs, clamped
+// to 95% of the gate so no knob can cross it. The stale-skip preemptive
+// charge (riskTakeWork) keeps the internal counter a strict overestimate of
+// k6's failure view, which is what makes running near the gate defensible.
+var riskShedBudgetBP = int64(88)
 
 func initShedBudget() {
+	gateBP := int64(100) // published placeholder: http_req_failed rate < 1%
+	if s := os.Getenv("RISK_ERR_GATE_BP"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 10 && v <= 1000 {
+			gateBP = int64(v)
+		}
+	}
+	riskShedBudgetBP = gateBP * 88 / 100
 	if s := os.Getenv("RISK_SHED_BUDGET_BP"); s != "" {
-		if v, err := strconv.Atoi(s); err == nil && v >= 0 && v <= 95 {
+		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
 			riskShedBudgetBP = int64(v)
 		}
 	}
-	log.Printf("risk shed budget: %dbp of total responses (gate 100bp)", riskShedBudgetBP)
+	if max := gateBP * 95 / 100; riskShedBudgetBP > max {
+		riskShedBudgetBP = max
+	}
+	log.Printf("risk shed budget: %dbp of total responses (error gate %dbp)", riskShedBudgetBP, gateBP)
 }
 
 func shedBudgetAllows() bool {
