@@ -444,3 +444,24 @@ Entry format (see the /experiment skill):
   1.95M → 4.17M (+113%)**. Gains are now Amdahl-thin everywhere we've
   measured: kernel at silicon throughput, cheap latency not a lever
   (stride sweep), budget at the safe edge. Improvement day CLOSED.
+
+## 2026-08-22 Late-day sweep: 95bp, AVX2 branch, PGO, boot warmup
+
+- **95bp budget (devloop):** 1,209,050 vs 88bp's 1,203,222 (+0.5%, sub-noise)
+  at k6-visible 0.88% — halves the unseen-failure allowance for noise-level
+  gain. REJECTED; 88bp stands.
+- **AVX2 branch (the non-SHA-NI grader path):** was untested (every dev box
+  has SHA-NI, and GODEBUG can't flip OUR /proc/cpuinfo gate). Added forced-
+  branch differential (50k cases, PASS on SPR) + bench: 292ns/iter on the
+  direct AVX2 kernel vs ~339ns stdlib — a non-SHA-NI box still gets ~15%
+  kernel + packed hex + all hardware-independent wins. Pairing/fusion are
+  SHA-NI-only by design; worst case is self-test fallback to stdlib.
+- **PGO (production profile from the final build under 200-VU load):**
+  devloop A/B 1,199,172 (no PGO) vs 1,198,560 (PGO) — FLAT. The hot path is
+  hand-written asm PGO cannot touch. REJECTED; default.pgo not shipped.
+- **Boot warmup (8 untimed chains before calibration):** motivated by the
+  ~2.7% same-code boot-to-boot score spread and ratio jitter. Four boots
+  after: unitCost 4.03-4.10ms (±0.8%, was ±15%) and pairing ratio
+  1.33-1.36× every boot. KEPT — grading-day constants no longer depend on
+  cold-start luck. (Ratio note: the earlier 1.62× compared fused pairs to
+  UNfused singles; vs fused singles the honest steady ratio is 1.35×.)

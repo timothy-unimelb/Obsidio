@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/sha256"
 	"math/rand"
+	"strings"
 	"testing"
 )
 
@@ -98,6 +99,48 @@ func BenchmarkKernelPair(b *testing.B) {
 	inA[0], inB[0] = 1, 2
 	for i := 0; i < b.N; i++ {
 		kernelSum64Pair(&inA, &inB, &outA, &outB)
+	}
+}
+
+// TestKernelAVX2BranchMatchesStdlib: force the AVX2 branch of kernelSum64 —
+// the path a non-SHA-NI grader box would take — and verify it against
+// stdlib. Every SHA-NI machine also has AVX2, so this runs everywhere the
+// SHA-NI tests run.
+func TestKernelAVX2BranchMatchesStdlib(t *testing.T) {
+	if !strings.Contains(cpuinfoFlags(), " avx2 ") {
+		t.Skip("no AVX2 on this machine")
+	}
+	savedS, savedA := kernelUseSHANI, kernelUseAVX2
+	kernelUseSHANI, kernelUseAVX2 = false, true
+	defer func() { kernelUseSHANI, kernelUseAVX2 = savedS, savedA }()
+	rnd := rand.New(rand.NewSource(555))
+	var in [64]byte
+	var got [32]byte
+	for i := 0; i < 50000; i++ {
+		rnd.Read(in[:])
+		kernelSum64(&in, &got)
+		if want := sha256.Sum256(in[:]); got != want {
+			t.Fatalf("AVX2 branch case %d: %x != %x", i, got, want)
+		}
+	}
+}
+
+// BenchmarkSingleComposedAVX2: the per-iteration cost a non-SHA-NI x86
+// grader would see on the direct-kernel path (vs stdlib's own AVX2 path in
+// BenchmarkRiskChain with GODEBUG=cpu.sha=off).
+func BenchmarkSingleComposedAVX2(b *testing.B) {
+	if !strings.Contains(cpuinfoFlags(), " avx2 ") {
+		b.Skip("no AVX2")
+	}
+	savedS, savedA := kernelUseSHANI, kernelUseAVX2
+	kernelUseSHANI, kernelUseAVX2 = false, true
+	defer func() { kernelUseSHANI, kernelUseAVX2 = savedS, savedA }()
+	var in [64]byte
+	var s [32]byte
+	in[0] = 1
+	for i := 0; i < b.N; i++ {
+		kernelSum64(&in, &s)
+		hexEncode64(&in, &s)
 	}
 }
 

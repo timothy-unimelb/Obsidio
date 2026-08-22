@@ -403,6 +403,14 @@ func riskWorker() {
 // one-shot boot measure jitters ±15% under the Docker VM; the live EWMA
 // (observeChainCost) corrects both from real traffic within seconds.
 func calibrateRisk() {
+	// Warmup: cold I-cache/branch predictors and CPU frequency ramp-up made
+	// boot measurements swing (measured: pairing ratio 1.35-1.62× and ±15%
+	// unitCost across boots of identical builds). Burn a few untimed chains
+	// first so the timed samples see a warm machine — grading-day constants
+	// should not depend on cold-start luck.
+	for i := 0; i < 8; i++ {
+		riskChain("obsidio-warmup")
+	}
 	samples := make([]time.Duration, 3)
 	for i := range samples {
 		start := time.Now()
