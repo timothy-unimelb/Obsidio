@@ -24,5 +24,9 @@ ENV GOGC=off
 # the heap to the limit by design). At 512MiB the limit-triggered GC runs about
 # once per couple of minutes — same benefit, 4x the headroom under the 2GiB cap.
 ENV GOMEMLIMIT=512MiB
+# Shed budget 88bp of the 100bp gate (measured k6-visible rate ~80bp: the
+# stale-skip preemptive charge makes the internal counter a strict
+# overestimate). Sweep data: EXPERIMENTS.md 2026-08-22 budget sweep.
+ENV RISK_SHED_BUDGET_BP=88
 EXPOSE 8080
 CMD ["/server"]
