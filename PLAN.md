@@ -142,11 +142,11 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
 - [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed
 - [ ] W3: pairing dispatcher + boot kernel racing
-- [ ] W3: x86 bench matrix, recorded
-- [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; devloop flat, smoke 35/35. Flame graph still owed (x86 pprof run)
-- [ ] W3: (if ahead) kernel v2 hex / micro-trims (RISK_SLOTS done in hardening)
-- [ ] W3: 18:00 persistence go/no-go (user)
-- [ ] W4: freeze + final verification (local + x86 + fresh-clone build)
+- [x] W3: x86 bench matrix — superseded by four bracketed full comparisons (baseline/hex/kernel/pairing sets in benchmarks/history.jsonl) + GODEBUG cpu.sha kill-switch measurements: every layer measured on/off on the same testbed, stronger evidence than the planned grid
+- [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; flame-graph-equivalent = committed posthex pprof profile
+- [~] W3: kernel v2 (fused pair iteration: precomputed constant-block-2 W+K schedule + in-asm BE/hex) — IN PROGRESS session 5, behind same differential-test + boot-self-test + A/B wall
+- [x] W3: persistence go/no-go — **user GO (session 5)**: fsync'd WAL + compose volume built; hard-kill durability verified locally (2 POSTs → docker kill → replayed); graded path bit-identical (smoke 35/35, WAL inactive without env). Bars-under-compose check on testbed still owed
+- [ ] W4: freeze + final verification (local + x86 + fresh-clone build + compose-bars run)
 - [ ] W4: write-up drafted from EXPERIMENTS.md
 - [ ] W4: video script + A/B headline numbers
 - [ ] W4: locked-script diff (when published) + final push + checklist

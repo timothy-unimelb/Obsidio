@@ -170,6 +170,148 @@ emit_state_store("B", out)
 out.append("\tRET")
 out.append("")
 
+
+# ---------------------------------------------------------------------------
+# pairHashHex: one fused iteration of the /risk chain for TWO lanes, in place.
+# Reads 64 hex bytes per lane, computes sha256, writes 64 hex bytes back.
+#   block 1: full schedule (input varies)
+#   block 2: the CONSTANT padding block — its W+K schedule is precomputed
+#            below, so it is 64 rounds of rnds2 + table loads, zero schedule
+#   epilogue: unshuffle -> byte-swap -> PSHUFB nibble-LUT hex, all in-register
+# ---------------------------------------------------------------------------
+
+K = [0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+     0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+     0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+     0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+     0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+     0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+     0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2]
+
+M32 = 0xFFFFFFFF
+def ror(x, n): return ((x >> n) | (x << (32 - n))) & M32
+def s0(x): return ror(x, 7) ^ ror(x, 18) ^ (x >> 3)
+def s1(x): return ror(x, 17) ^ ror(x, 19) ^ (x >> 10)
+
+# Padding block for a 64-byte message: 0x80, zeros, 64-bit BE length (512).
+padW = [0x80000000] + [0] * 14 + [0x00000200]
+for t in range(16, 64):
+    padW.append((s1(padW[t-2]) + padW[t-7] + s0(padW[t-15]) + padW[t-16]) & M32)
+WKPAD = [(padW[t] + K[t]) & M32 for t in range(64)]
+
+IV = [0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19]
+
+def emit_pad_group(lane, gi, out):
+    """Block-2 4-round group: WK straight from the precomputed table."""
+    r = lane_regs(lane)
+    out.append(f"\t// lane {lane} pad-block rounds {gi*4}-{gi*4+3} (precomputed WK)")
+    out.append(f"\tVMOVDQA     {gi*16}(BX), X0")
+    out.append(f"\tSHA256RNDS2 X0, {r['S1']}, {r['S2']}")
+    out.append("\tPSHUFD      $0x0e, X0, X0")
+    out.append(f"\tSHA256RNDS2 X0, {r['S2']}, {r['S1']}")
+
+def emit_hex_epilogue(lane, out):
+    """Unshuffle state, byte-swap, hex-expand via PSHUFB, store 64 bytes."""
+    r = lane_regs(lane)
+    s1r, s2r, data = r["S1"], r["S2"], r["DATA"]
+    out.append(f"\t// lane {lane}: unshuffle to h-order dwords")
+    out.append(f"\tPSHUFD  $0x1b, {s1r}, {s1r}")
+    out.append(f"\tPSHUFD  $0xb1, {s2r}, {s2r}")
+    out.append(f"\tVMOVDQA {s1r}, {r['T']}")
+    out.append(f"\tPBLENDW $0xf0, {s2r}, {s1r}")
+    out.append(f"\tPALIGNR $0x08, {r['T']}, {s2r}")
+    for half, (reg, off) in enumerate([(s1r, 0), (s2r, 32)]):
+        out.append(f"\t// lane {lane}: digest bytes {half*16}-{half*16+15} -> 32 hex chars")
+        out.append(f"\tPSHUFB  X3, {reg}")        # bswap32: digest byte order
+        out.append(f"\tVMOVDQA {reg}, X6")
+        out.append(f"\tPSRLW   $0x04, X6")
+        out.append("\tPAND    X4, X6")            # X6 = hi nibbles
+        out.append(f"\tPAND    X4, {reg}")        # reg = lo nibbles
+        out.append("\tVMOVDQA X5, X7")
+        out.append("\tPSHUFB  X6, X7")            # X7 = ascii(hi)
+        out.append("\tVMOVDQA X5, X6")
+        out.append(f"\tPSHUFB  {reg}, X6")        # X6 = ascii(lo)
+        out.append("\tVMOVDQA X7, X0")
+        out.append("\tPUNPCKLBW X6, X0")          # hi0,lo0,...
+        out.append("\tPUNPCKHBW X6, X7")
+        out.append(f"\tVMOVDQU X0, {off}({data})")
+        out.append(f"\tVMOVDQU X7, {off+16}({data})")
+
+out.append("// func pairHashHex(pa *[64]byte, pb *[64]byte)")
+out.append("// One fused chain iteration for two lanes, in place (hex -> hex).")
+out.append("TEXT ·pairHashHex(SB), NOSPLIT, $96-16")
+out.append("\tMOVQ    pa+0(FP), SI")
+out.append("\tMOVQ    pb+8(FP), R9")
+out.append("\tVMOVDQA flip_mask<>+0(SB), X14")
+out.append("\tLEAQ    K256<>+0(SB), AX")
+out.append("\tLEAQ    wk_pad<>+0(SB), BX")
+out.append("\t// shuffled IV -> both lanes; saved once for the first feedforward")
+out.append("\tVMOVDQU iv_words<>+0(SB), X1")
+out.append("\tVMOVDQU iv_words<>+16(SB), X2")
+out.append("\tPSHUFD  $0xb1, X1, X1")
+out.append("\tPSHUFD  $0x1b, X2, X2")
+out.append("\tVMOVDQA X1, X7")
+out.append("\tPALIGNR $0x08, X2, X1")
+out.append("\tPBLENDW $0xf0, X7, X2")
+out.append("\tVMOVDQU X1, (SP)")
+out.append("\tVMOVDQU X2, 16(SP)")
+out.append("\tVMOVDQA X1, X8")
+out.append("\tVMOVDQA X2, X9")
+for i in range(len(LOAD_GROUPS)):
+    emit_load_group("A", i, out)
+    emit_load_group("B", i, out)
+for g in range(len(MID_GROUPS)):
+    emit_mid_group("A", g, out)
+    emit_mid_group("B", g, out)
+emit_final_group("A", out)
+emit_final_group("B", out)
+out.append("\t// feedforward 1 (H1 = IV + comp), save H1 for feedforward 2")
+for (sreg1, sreg2, o1, o2) in [("X1", "X2", 32, 48), ("X8", "X9", 64, 80)]:
+    out.append("\tVMOVDQU (SP), X7")
+    out.append(f"\tPADDD   X7, {sreg1}")
+    out.append("\tVMOVDQU 16(SP), X7")
+    out.append(f"\tPADDD   X7, {sreg2}")
+    out.append(f"\tVMOVDQU {sreg1}, {o1}(SP)")
+    out.append(f"\tVMOVDQU {sreg2}, {o2}(SP)")
+for gi in range(16):
+    emit_pad_group("A", gi, out)
+    emit_pad_group("B", gi, out)
+out.append("\t// feedforward 2 (final digest state)")
+for (sreg1, sreg2, o1, o2) in [("X1", "X2", 32, 48), ("X8", "X9", 64, 80)]:
+    out.append(f"\tVMOVDQU {o1}(SP), X7")
+    out.append(f"\tPADDD   X7, {sreg1}")
+    out.append(f"\tVMOVDQU {o2}(SP), X7")
+    out.append(f"\tPADDD   X7, {sreg2}")
+out.append("\t// hex-epilogue constants: X3 bswap, X4 0x0f, X5 ascii LUT")
+out.append("\tVMOVDQA bswap32<>+0(SB), X3")
+out.append("\tVMOVDQA mask0f<>+0(SB), X4")
+out.append("\tVMOVDQA hexlut<>+0(SB), X5")
+emit_hex_epilogue("A", out)
+emit_hex_epilogue("B", out)
+out.append("\tRET")
+out.append("")
+
+def emit_dwords(name, words, out):
+    for i, w in enumerate(words):
+        out.append(f"DATA {name}<>+{i*4}(SB)/4, ${'0x%08x' % w}")
+    out.append(f"GLOBL {name}<>(SB), RODATA|NOPTR, ${len(words)*4}")
+    out.append("")
+
+def emit_bytes(name, bs, out):
+    for i in range(0, len(bs), 8):
+        chunk = bs[i:i+8]
+        val = int.from_bytes(bytes(chunk), "little")
+        out.append(f"DATA {name}<>+{i}(SB)/8, ${'0x%016x' % val}")
+    out.append(f"GLOBL {name}<>(SB), RODATA|NOPTR, ${len(bs)}")
+    out.append("")
+
+emit_dwords("wk_pad", WKPAD, out)
+emit_dwords("iv_words", IV, out)
+emit_bytes("bswap32", [3,2,1,0,7,6,5,4,11,10,9,8,15,14,13,12], out)
+emit_bytes("mask0f", [0x0F]*16, out)
+emit_bytes("hexlut", list(b"0123456789abcdef"), out)
+
 # K256<> and flip_mask<> are FILE-LOCAL in Go asm — this file needs its own
 # copies, extracted verbatim from the vendored stdlib file.
 import re

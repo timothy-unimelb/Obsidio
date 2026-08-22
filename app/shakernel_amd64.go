@@ -76,6 +76,15 @@ func kernelSum64(in *[64]byte, out *[32]byte) {
 	}
 }
 
+// pairHashHex performs one FUSED chain iteration for two lanes, in place:
+// reads each lane's 64-byte buffer, hashes it (message block + the constant
+// padding block, whose W+K schedule is precomputed into the binary), and
+// writes the 64 lowercase-hex digest chars back — byte-swap and hex expansion
+// done in-register via PSHUFB. See sha256block2_amd64.s.
+//
+//go:noescape
+func pairHashHex(pa, pb *[64]byte)
+
 // kernelSum64Pair hashes two independent 64-byte inputs on one core via the
 // interleaved 2-lane routine. Caller must ensure kernelUseSHANI.
 func kernelSum64Pair(inA, inB *[64]byte, outA, outB *[32]byte) {
@@ -143,8 +152,32 @@ func initRiskKernel() {
 	}
 	if kernelPairOK {
 		riskSumPair = kernelSum64Pair // final say: raceKernelPairing in main()
+		// Fused iteration (hash + in-asm hex, precomputed pad schedule):
+		// enable only if IT TOO is bit-identical to the composed reference.
+		fusedOK := true
+		var a, b, wantA, wantB [64]byte
+		var sa, sb [32]byte
+		for i := 0; i < 512; i++ {
+			rnd.Read(a[:])
+			rnd.Read(b[:])
+			wantA, wantB = a, b
+			kernelSum64Pair(&wantA, &wantB, &sa, &sb)
+			var ea, eb [64]byte
+			hexEncode64(&ea, &sa)
+			hexEncode64(&eb, &sb)
+			pairHashHex(&a, &b)
+			if a != ea || b != eb {
+				fusedOK = false
+				log.Printf("risk kernel: FUSED-ITER SELF-TEST FAILED on case %d — unfused pair path kept", i)
+				break
+			}
+		}
+		if fusedOK {
+			riskPairIter = pairHashHex
+		}
 	}
-	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair available=%v)", path, kernelPairOK)
+	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair=%v fused=%v)",
+		path, kernelPairOK, riskPairIter != nil)
 }
 
 // kernelPairOK: the interleaved 2-lane path passed its boot self-test.

@@ -506,6 +506,12 @@ var riskSum64 = func(in *[64]byte, out *[32]byte) { *out = sha256.Sum256(in[:]) 
 // race in main() if pairing doesn't actually win on this silicon.
 var riskSumPair func(a, b *[64]byte, oa, ob *[32]byte)
 
+// riskPairIter, when non-nil, is the fully fused per-iteration kernel: hash +
+// byte-swap + hex, in place, for both lanes in one call — with the constant
+// padding block's schedule precomputed into the binary. Set only after its
+// own 512-case boot self-test against the composed reference path.
+var riskPairIter func(a, b *[64]byte)
+
 // riskChainPair advances two chains in lockstep through the pair kernel.
 // Identical math to two riskChain calls (differentially tested); one Gosched
 // yield per iteration covers both lanes.
@@ -516,6 +522,15 @@ func riskChainPair(seedA, seedB string) (string, string) {
 	hexEncode64(&bufA, &sumA)
 	hexEncode64(&bufB, &sumB)
 	mask := riskYieldMask
+	if iter := riskPairIter; iter != nil {
+		for i := uint32(1); i < 50000; i++ {
+			iter(&bufA, &bufB)
+			if i&mask == 0 {
+				runtime.Gosched()
+			}
+		}
+		return string(bufA[:]), string(bufB[:])
+	}
 	pair := riskSumPair
 	for i := uint32(1); i < 50000; i++ {
 		pair(&bufA, &bufB, &sumA, &sumB)

@@ -101,6 +101,67 @@ func BenchmarkKernelPair(b *testing.B) {
 	}
 }
 
+// TestPairHashHexMatchesComposed: the fused iteration must equal
+// hash-then-hex composed from already-verified pieces, for arbitrary 64-byte
+// inputs (not just hex strings) and for equal-lane inputs.
+func TestPairHashHexMatchesComposed(t *testing.T) {
+	if riskPairIter == nil {
+		t.Skip("fused pair path inactive on this machine")
+	}
+	rnd := rand.New(rand.NewSource(99))
+	var a, b [64]byte
+	var sa, sb [32]byte
+	var ea, eb [64]byte
+	for i := 0; i < 50000; i++ {
+		rnd.Read(a[:])
+		rnd.Read(b[:])
+		ca, cb := a, b
+		kernelSum64Pair(&ca, &cb, &sa, &sb)
+		hexEncode64(&ea, &sa)
+		hexEncode64(&eb, &sb)
+		pairHashHex(&a, &b)
+		if a != ea {
+			t.Fatalf("case %d lane A: fused %s != composed %s", i, a, ea)
+		}
+		if b != eb {
+			t.Fatalf("case %d lane B: fused %s != composed %s", i, b, eb)
+		}
+	}
+	for i := 0; i < 1000; i++ {
+		rnd.Read(a[:])
+		b = a
+		pairHashHex(&a, &b)
+		if a != b {
+			t.Fatalf("case %d: equal-lane divergence", i)
+		}
+	}
+}
+
+func BenchmarkPairComposed(b *testing.B) {
+	if !kernelPairOK {
+		b.Skip("pair path inactive")
+	}
+	var inA, inB [64]byte
+	var sa, sb [32]byte
+	inA[0], inB[0] = 1, 2
+	for i := 0; i < b.N; i++ {
+		kernelSum64Pair(&inA, &inB, &sa, &sb)
+		hexEncode64(&inA, &sa)
+		hexEncode64(&inB, &sb)
+	}
+}
+
+func BenchmarkPairFused(b *testing.B) {
+	if riskPairIter == nil {
+		b.Skip("fused path inactive")
+	}
+	var inA, inB [64]byte
+	inA[0], inB[0] = 1, 2
+	for i := 0; i < b.N; i++ {
+		pairHashHex(&inA, &inB)
+	}
+}
+
 // TestRiskChainPairMatchesSingle: full 50k-iteration paired chains must equal
 // the single-lane chains digest-for-digest (this is the shipped combination).
 func TestRiskChainPairMatchesSingle(t *testing.T) {
