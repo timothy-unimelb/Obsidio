@@ -222,6 +222,208 @@
     .flowdot{transform:translateX(150px)} .timer.drain{transform:scaleX(.5)}
     .lightsout{opacity:0} .pre-val{opacity:0} .pre-q{opacity:1} .post-val{opacity:1} .post-tag{opacity:1}
   }
+
+  /* 00 · the line: stage-setting loop (12 s, CSS only) */
+  .stage { margin-top:1.1rem; }
+  .stage .viz { grid-template-columns:1fr; }
+  .stage .sc { animation:12s linear infinite; }
+  .stage .sc rect { stroke:var(--bad); stroke-width:2.2; stroke-opacity:0; animation:12s linear infinite; }
+  .stage .stove { fill:#0c1319; stroke:var(--flame-hot); stroke-width:1.6; }
+  .stage .track { fill:var(--viz-line); }
+  .stage .bar { fill:var(--braise); transform-box:fill-box; transform-origin:left center; animation:12s linear infinite; }
+  .stage .cap { font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.04em; fill:var(--viz-muted); animation:12s linear infinite; opacity:0; }
+  .stage .cap.hot { fill:var(--bad); }
+  .stage .cap.ok { fill:var(--good); }
+  .stage .lbl.big { font-size:10px; fill:var(--viz-ink); }
+  .stage .tick { animation:12s linear infinite; opacity:0; }
+  .stage .tick.ok { fill:var(--good); }
+  .stage .tick.late { fill:none; stroke:var(--bad); stroke-width:2; }
+  .stage .tick.t1 { animation-name:st-t1; } .stage .tick.t2 { animation-name:st-t2; } .stage .tick.t3 { animation-name:st-t3; } .stage .tick.t4 { animation-name:st-t4; } .stage .tick.t5 { animation-name:st-t5; } .stage .tick.t6 { animation-name:st-t6; } .stage .tick.t7 { animation-name:st-t7; } .stage .tick.t8 { animation-name:st-t8; } .stage .tick.t9 { animation-name:st-t9; } .stage .tick.t10 { animation-name:st-t10; } 
+  .stage .legend { display:flex; flex-wrap:wrap; gap:.35rem 1.1rem; font-family:"IBM Plex Mono",monospace; font-size:.66rem; color:var(--muted); }
+  .stage .legend i { display:inline-block; width:11px; height:9px; border-radius:2px; vertical-align:-1px; margin-right:.35rem; }
+  .stage .legend i.late { background:transparent; border:2px solid var(--bad); width:9px; height:7px; }
+  .stage .sc.f1 { animation-name:st-f1; } .stage .sc.f2 { animation-name:st-f2; } .stage .sc.f3 { animation-name:st-f3; } 
+  .stage .sc.b1 { animation-name:st-b1; } .stage .sc.b2 { animation-name:st-b2; } 
+  .stage .sc.q1 { animation-name:st-q1; } .stage .sc.q1 rect { animation-name:st-q1-late; } .stage .sc.q2 { animation-name:st-q2; } .stage .sc.q2 rect { animation-name:st-q2-late; } .stage .sc.q3 { animation-name:st-q3; } .stage .sc.q3 rect { animation-name:st-q3-late; } .stage .sc.q4 { animation-name:st-q4; } .stage .sc.q4 rect { animation-name:st-q4-late; } .stage .sc.q5 { animation-name:st-q5; } .stage .sc.q5 rect { animation-name:st-q5-late; } .stage .sc.q6 { animation-name:st-q6; } .stage .sc.q6 rect { animation-name:st-q6-late; } .stage .sc.q7 { animation-name:st-q7; } .stage .sc.q7 rect { animation-name:st-q7-late; } 
+  .stage .bar.one { animation-name:st-bar1; } .stage .bar.two { animation-name:st-bar2; }
+  .stage .cap.one { animation-name:st-barlbl1; } .stage .cap.two { animation-name:st-barlbl2; }
+  .stage .cap.calm { animation-name:st-calm; } .stage .cap.both { animation-name:st-both; } .stage .cap.late { animation-name:st-late; } .stage .cap.drain { animation-name:st-drain; }
+@keyframes st-f1 {
+  0%,1.67% { opacity:0; transform:translate(30px,62px); }
+  2.50% { opacity:1; }
+  6.25% { opacity:1; transform:translate(350px,62px); }
+  7.92% { opacity:1; transform:translate(428px,62px); }
+  10.00%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-f2 {
+  0%,6.67% { opacity:0; transform:translate(30px,62px); }
+  7.50% { opacity:1; }
+  11.25% { opacity:1; transform:translate(350px,62px); }
+  12.92% { opacity:1; transform:translate(428px,126px); }
+  15.00%,100% { opacity:0; transform:translate(428px,126px); }
+}
+@keyframes st-f3 {
+  0%,11.67% { opacity:0; transform:translate(30px,62px); }
+  12.50% { opacity:1; }
+  16.25% { opacity:1; transform:translate(350px,62px); }
+  17.92% { opacity:1; transform:translate(428px,62px); }
+  20.00%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-b1 {
+  0%,15.83% { opacity:0; transform:translate(30px,62px); }
+  16.67% { opacity:1; }
+  18.75% { opacity:1; transform:translate(350px,62px); }
+  20.00% { opacity:1; transform:translate(428px,62px); }
+  75.00% { opacity:1; transform:translate(428px,62px); }
+  77.50%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-b2 {
+  0%,20.83% { opacity:0; transform:translate(30px,62px); }
+  21.67% { opacity:1; }
+  23.75% { opacity:1; transform:translate(350px,62px); }
+  25.00% { opacity:1; transform:translate(428px,126px); }
+  83.33% { opacity:1; transform:translate(428px,126px); }
+  85.83%,100% { opacity:0; transform:translate(428px,126px); }
+}
+@keyframes st-bar1 {
+  0%,20.00% { transform:scaleX(0); opacity:0; }
+  20.42% { opacity:1; }
+  75.00% { transform:scaleX(1); opacity:1; }
+  77.08%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes st-barlbl1 {
+  0%,20.00% { opacity:0; }
+  22.50%,75.00% { opacity:1; }
+  77.08%,100% { opacity:0; }
+}
+@keyframes st-bar2 {
+  0%,25.00% { transform:scaleX(0); opacity:0; }
+  25.42% { opacity:1; }
+  83.33% { transform:scaleX(1); opacity:1; }
+  85.42%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes st-barlbl2 {
+  0%,25.00% { opacity:0; }
+  27.50%,83.33% { opacity:1; }
+  85.42%,100% { opacity:0; }
+}
+@keyframes st-q1 {
+  0%,26.67% { opacity:0; transform:translate(30px,62px); }
+  27.50% { opacity:1; }
+  30.83% { opacity:1; transform:translate(320px,62px); }
+  75.00% { opacity:1; transform:translate(320px,62px); }
+  78.33% { opacity:1; transform:translate(428px,62px); }
+  80.83%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-q1-late {
+  0%,44.17% { stroke-opacity:0; }
+  45.83%,79.17% { stroke-opacity:1; }
+  80.83%,100% { stroke-opacity:0; }
+}
+@keyframes st-q2 {
+  0%,32.50% { opacity:0; transform:translate(30px,62px); }
+  33.33% { opacity:1; }
+  36.67% { opacity:1; transform:translate(296px,62px); }
+  78.33% { opacity:1; transform:translate(296px,62px); }
+  81.67% { opacity:1; transform:translate(428px,62px); }
+  84.17%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-q2-late {
+  0%,50.00% { stroke-opacity:0; }
+  51.67%,82.50% { stroke-opacity:1; }
+  84.17%,100% { stroke-opacity:0; }
+}
+@keyframes st-q3 {
+  0%,38.33% { opacity:0; transform:translate(30px,62px); }
+  39.17% { opacity:1; }
+  42.50% { opacity:1; transform:translate(272px,62px); }
+  81.67% { opacity:1; transform:translate(272px,62px); }
+  85.00% { opacity:1; transform:translate(428px,62px); }
+  87.50%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-q3-late {
+  0%,55.83% { stroke-opacity:0; }
+  57.50%,85.83% { stroke-opacity:1; }
+  87.50%,100% { stroke-opacity:0; }
+}
+@keyframes st-q4 {
+  0%,44.17% { opacity:0; transform:translate(30px,62px); }
+  45.00% { opacity:1; }
+  48.33% { opacity:1; transform:translate(248px,62px); }
+  83.33% { opacity:1; transform:translate(248px,62px); }
+  86.67% { opacity:1; transform:translate(428px,126px); }
+  89.17%,100% { opacity:0; transform:translate(428px,126px); }
+}
+@keyframes st-q4-late {
+  0%,61.67% { stroke-opacity:0; }
+  63.33%,87.50% { stroke-opacity:1; }
+  89.17%,100% { stroke-opacity:0; }
+}
+@keyframes st-q5 {
+  0%,50.00% { opacity:0; transform:translate(30px,62px); }
+  50.83% { opacity:1; }
+  54.17% { opacity:1; transform:translate(224px,62px); }
+  85.00% { opacity:1; transform:translate(224px,62px); }
+  88.33% { opacity:1; transform:translate(428px,62px); }
+  90.83%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-q5-late {
+  0%,67.50% { stroke-opacity:0; }
+  69.17%,89.17% { stroke-opacity:1; }
+  90.83%,100% { stroke-opacity:0; }
+}
+@keyframes st-q6 {
+  0%,55.83% { opacity:0; transform:translate(30px,62px); }
+  56.67% { opacity:1; }
+  60.00% { opacity:1; transform:translate(200px,62px); }
+  86.67% { opacity:1; transform:translate(200px,62px); }
+  90.00% { opacity:1; transform:translate(428px,126px); }
+  92.50%,100% { opacity:0; transform:translate(428px,126px); }
+}
+@keyframes st-q6-late {
+  0%,73.33% { stroke-opacity:0; }
+  75.00%,90.83% { stroke-opacity:1; }
+  92.50%,100% { stroke-opacity:0; }
+}
+@keyframes st-q7 {
+  0%,61.67% { opacity:0; transform:translate(30px,62px); }
+  62.50% { opacity:1; }
+  65.83% { opacity:1; transform:translate(176px,62px); }
+  88.33% { opacity:1; transform:translate(176px,62px); }
+  91.67% { opacity:1; transform:translate(428px,62px); }
+  94.17%,100% { opacity:0; transform:translate(428px,62px); }
+}
+@keyframes st-q7-late {
+  0%,79.17% { stroke-opacity:0; }
+  80.83%,92.50% { stroke-opacity:1; }
+  94.17%,100% { stroke-opacity:0; }
+}
+@keyframes st-t1 { 0%,7.50% {opacity:0} 9.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t2 { 0%,12.50% {opacity:0} 14.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t3 { 0%,17.50% {opacity:0} 19.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t4 { 0%,79.17% {opacity:0} 80.83%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t5 { 0%,82.50% {opacity:0} 84.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t6 { 0%,85.83% {opacity:0} 87.50%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t7 { 0%,87.50% {opacity:0} 89.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t8 { 0%,89.17% {opacity:0} 90.83%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t9 { 0%,90.83% {opacity:0} 92.50%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-t10 { 0%,92.50% {opacity:0} 94.17%,97.50% {opacity:1} 99.58%,100% {opacity:0} }
+@keyframes st-calm { 0%,0.83% {opacity:0} 3.33%,18.33% {opacity:1} 21.67%,100% {opacity:0} }
+@keyframes st-both { 0%,25.00% {opacity:0} 28.33%,73.33% {opacity:1} 76.67%,100% {opacity:0} }
+@keyframes st-late { 0%,44.17% {opacity:0} 47.50%,86.67% {opacity:1} 90.00%,100% {opacity:0} }
+@keyframes st-drain { 0%,75.00% {opacity:0} 77.50%,93.33% {opacity:1} 96.67%,100% {opacity:0} }
+  @media (prefers-reduced-motion: reduce) {
+    /* frozen frame: both pizzas baking, the cheap orders waiting and late */
+    .stage .sc, .stage .sc rect, .stage .bar, .stage .cap { animation:none !important; }
+    .stage .sc { opacity:0; }
+    .stage .sc.q1 { opacity:1; transform:translate(320px,62px); } .stage .sc.q2 { opacity:1; transform:translate(296px,62px); } .stage .sc.q3 { opacity:1; transform:translate(272px,62px); } .stage .sc.q4 { opacity:1; transform:translate(248px,62px); } .stage .sc.q5 { opacity:1; transform:translate(224px,62px); } .stage .sc.q6 { opacity:1; transform:translate(200px,62px); } .stage .sc.q7 { opacity:1; transform:translate(176px,62px); }
+    .stage .sc.q1 rect { stroke-opacity:1; } .stage .sc.q2 rect { stroke-opacity:1; } .stage .sc.q3 rect { stroke-opacity:1; } .stage .sc.q4 rect { stroke-opacity:1; }
+    .stage .sc.b1 { opacity:1; transform:translate(428px,62px); }
+    .stage .sc.b2 { opacity:1; transform:translate(428px,126px); }
+    .stage .bar { transform:scaleX(.7); opacity:1; }
+    .stage .cap.one, .stage .cap.two, .stage .cap.both, .stage .cap.late, .stage .tick { opacity:1; }
+    .stage .tick { animation:none !important; }
+  }
 </style>
 
 <div class="wrap">
@@ -241,9 +443,9 @@
           <svg class="dishic" viewBox="0 0 44 44" aria-hidden="true">
             <path d="M13 9 H31 L28 33 Q27.5 38 23 38 H21 Q16.5 38 16 33 Z" fill="none" stroke="var(--dish)" stroke-width="2" stroke-linejoin="round"/>
             <path d="M15 23 H29 L27.7 33.5 Q27.3 37 23.5 37 H20.5 Q16.7 37 16.3 33.5 Z" fill="var(--dish)"/>
-            <line x1="27" y1="6" x2="30" y2="18" stroke="var(--dish)" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 11 q2 -6 7 -4 q3 -5 8 -2 q5 -1 5 5 Z" fill="var(--dish)" opacity=".55"/>
           </svg>
-          <div><div class="name">The drink</div><span class="ep">GET /price</span></div>
+          <div><div class="name">The beer</div><span class="ep">GET /price</span></div>
         </div>
         <p class="desc">Pre-poured: look up a symbol's latest price and hand it back. An in-memory lookup — almost no work.</p>
         <div class="meta"><span>60% of orders</span>·<span class="w">worth 1</span></div>
@@ -263,19 +465,53 @@
       <article class="dish b">
         <div class="top">
           <svg class="dishic" viewBox="0 0 44 44" aria-hidden="true">
-            <rect x="10" y="19" width="24" height="17" rx="3" fill="var(--dish)"/>
-            <rect x="7" y="15" width="30" height="5" rx="2.5" fill="var(--dish)"/>
-            <rect x="20" y="11" width="4" height="4" rx="1" fill="var(--dish)"/>
-            <path d="M17 11 q3 -4 0 -7" fill="none" stroke="var(--dish)" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
-            <path d="M24 11 q3 -4 0 -7" fill="none" stroke="var(--dish)" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+            <circle cx="22" cy="23" r="15" fill="none" stroke="var(--dish)" stroke-width="2.4"/>
+            <circle cx="22" cy="23" r="11.5" fill="var(--dish)" opacity=".28"/>
+            <path d="M22 23 L22 8 M22 23 L35 30.5 M22 23 L9 30.5" stroke="var(--dish)" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>
+            <circle cx="17" cy="18" r="2.4" fill="var(--dish)"/><circle cx="27.5" cy="19.5" r="2.4" fill="var(--dish)"/><circle cx="21" cy="28.5" r="2.4" fill="var(--dish)"/><circle cx="28" cy="28" r="1.8" fill="var(--dish)"/>
           </svg>
-          <div><div class="name">The braise</div><span class="ep">GET /risk</span></div>
+          <div><div class="name">The pizza</div><span class="ep">GET /risk</span></div>
         </div>
-        <p class="desc">A 50,000-step slow cook: hash a seed with SHA-256, feed the result back in, repeat 50,000 times. Deliberately expensive.</p>
+        <p class="desc">A 50,000-step bake: hash a seed with SHA-256, feed the result back in, repeat 50,000 times. Deliberately expensive.</p>
         <div class="meta"><span>10% of orders</span>·<span class="w">worth 10</span></div>
       </article>
     </div>
-    <p class="tension">Here's the trap: the braise is so slow it can <b>clog the whole line</b> — so even a drink that needs no work ends up stuck behind it. Your score is the weighted count of orders served correctly <em>and on time</em>. So the goal is easy to say and hard to do: <b>keep the fast dishes flying while the braise simmers — on two chefs.</b> Every card below is one move toward that.</p>
+    <p class="tension">Here's the trap: the pizza is so slow it can <b>clog the whole line</b> — so even a beer that needs no work ends up stuck behind it. Your score is the weighted count of orders served correctly <em>and on time</em>. So the goal is easy to say and hard to do: <b>keep the fast dishes flying while the pizza bakes — on two chefs.</b> Every card below is one move toward that.</p>
+
+    <!-- 00 THE LINE: the problem, before any fix -->
+    <article class="card stage" data-accent="twist">
+      <header><span class="num">00</span><span class="kick">The line</span><h3>Why a pizza blocks a beer</h3></header>
+      <div class="viz solo">
+        <figure class="ba">
+          <div class="screen"><svg viewBox="0 0 640 230" role="img" aria-label="Orders arrive on one line and two chefs serve them. Two pizzas occupy both chefs for a long time; beers and salads queue behind them, go past their latency bars, and are only served once the pizzas come out.">
+            <text class="lbl" x="12" y="18">before any fix — one shared line, two chefs, orders in a 6 : 3 : 1 mix</text>
+            <text class="lbl" x="20" y="44">orders in →</text>
+            <line x1="20" y1="62" x2="345" y2="62" stroke="var(--viz-line)" stroke-width="10" stroke-linecap="round"/>
+            <text class="lbl" x="176" y="44">the queue</text>
+            <rect class="stove" x="400" y="40" width="56" height="44" rx="5"/>
+            <rect class="stove" x="400" y="104" width="56" height="44" rx="5"/>
+            <text class="lbl" x="400" y="96">chef 1</text>
+            <text class="lbl" x="400" y="160">chef 2</text>
+            <rect class="track" x="470" y="54" width="152" height="16" rx="4"/>
+            <rect class="track" x="470" y="118" width="152" height="16" rx="4"/>
+            <rect class="bar one" x="470" y="54" width="152" height="16" rx="4"/>
+            <rect class="bar two" x="470" y="118" width="152" height="16" rx="4"/>
+            <text class="cap one" x="470" y="46">pizza · a 50,000-step bake…</text>
+            <text class="cap two" x="470" y="110">pizza · a 50,000-step bake…</text>
+            <text class="cap ok calm" x="20" y="200">calm: a beer is poured the moment it's ordered</text>
+            <text class="cap hot both" x="20" y="200">both chefs are at the ovens — nothing else moves</text>
+            <text class="cap hot late" x="176" y="90">waiting… past their bars · late</text>
+            <text class="cap drain" x="20" y="200">the pizzas come out — the pile clears, too late to count</text>
+            <text class="lbl" x="400" y="184">what the grader counts</text><text class="lbl" x="400" y="218">on time · scored</text><text class="lbl" x="500" y="218">late · not counted</text><rect class="tick ok t1" x="400" y="192" width="10" height="10" rx="2"/><rect class="tick ok t2" x="414" y="192" width="10" height="10" rx="2"/><rect class="tick ok t3" x="428" y="192" width="10" height="10" rx="2"/><rect class="tick late t4" x="500" y="192" width="10" height="10" rx="2"/><rect class="tick late t5" x="514" y="192" width="10" height="10" rx="2"/><rect class="tick late t6" x="528" y="192" width="10" height="10" rx="2"/><rect class="tick late t7" x="542" y="192" width="10" height="10" rx="2"/><rect class="tick late t8" x="556" y="192" width="10" height="10" rx="2"/><rect class="tick late t9" x="570" y="192" width="10" height="10" rx="2"/><rect class="tick late t10" x="584" y="192" width="10" height="10" rx="2"/>
+            <g class="sc f1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f2"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f3"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b1"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b2"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q2"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q3"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q4"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q5"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q6"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q7"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g>
+          </svg></div>
+          <figcaption class="balabel"><span class="badge b">Before</span> one queue, two chefs: a pizza at the front stalls every beer behind it</figcaption>
+        </figure>
+      </div>
+      <div class="legend"><span><i style="background:var(--drink)"></i>beer · /price</span><span><i style="background:var(--salad)"></i>salad · /stats</span><span><i style="background:var(--braise)"></i>pizza · /risk</span><span><i class="late"></i>past its latency bar</span></div>
+      <p class="say">A beer takes microseconds to pour; a pizza takes a chef for the whole of a 50,000-step bake. With one line and two chefs, the moment both are at the ovens, <em>every</em> cheap order behind them stops — not because it needs work, but because nobody is free to hand it over. The beers go past their 200 ms bar waiting on work that isn't theirs. Served late, they score nothing — and each of the nine moves below is a way of keeping that from happening.</p>
+    </article>
+
     <p class="rule">the nine moves</p>
   </section>
 
@@ -330,7 +566,7 @@
             <g class="jamchip" style="animation-delay:.6s"><rect class="chip d" x="20" y="63" width="16" height="14" rx="2.5"/></g>
             <g class="jamchip" style="animation-delay:1.2s"><rect class="chip s" x="20" y="63" width="16" height="14" rx="2.5"/></g>
             <rect class="chip b" x="118" y="63" width="16" height="14" rx="2.5"/>
-            <text class="lbl" x="10" y="24">one queue: drinks stuck behind a braise</text>
+            <text class="lbl" x="10" y="24">one queue: beers stuck behind a pizza</text>
           </svg></div>
           <figcaption class="balabel"><span class="badge b">Before</span> everyone waits on /risk</figcaption>
         </figure>
@@ -343,18 +579,18 @@
             <g class="flow" style="animation-delay:1.6s"><rect class="chip d" x="14" y="33" width="15" height="14" rx="2.5"/></g>
             <g class="simmer"><rect class="chip b" x="90" y="85" width="15" height="14" rx="2.5"/></g>
             <text class="txt-g" x="182" y="44" text-anchor="end" style="font-size:11px">✓</text>
-            <text class="lbl" x="10" y="20">fast lane bypasses the stove</text>
+            <text class="lbl" x="10" y="20">fast lane bypasses the oven</text>
           </svg></div>
           <figcaption class="balabel"><span class="badge g">After</span> cheap path is separate</figcaption>
         </figure>
       </div>
-      <p class="say">A price lookup does almost no work, yet in one shared queue it sits behind a 50,000-round braise. Give <span class="code">/price</span> and <span class="code">/stats</span> their own path that never enters the risk queue.</p>
+      <p class="say">A price lookup does almost no work, yet in one shared queue it sits behind a 50,000-round pizza. Give <span class="code">/price</span> and <span class="code">/stats</span> their own path that never enters the risk queue.</p>
       <p class="impact"><span class="k">Result</span><span><b>Structural win.</b> The fast path stops waiting on the slow one — its p95 collapses.</span></p>
     </article>
 
     <!-- 03 ALLOC-FREE -->
     <article class="card" data-accent="win">
-      <header><span class="num">03</span><span class="kick">Technique</span><h3>Braise without the mess</h3></header>
+      <header><span class="num">03</span><span class="kick">Technique</span><h3>Pizza without the mess</h3></header>
       <div class="viz">
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
@@ -381,13 +617,13 @@
           <figcaption class="balabel"><span class="badge g">After</span> one buffer, reused</figcaption>
         </figure>
       </div>
-      <p class="say">The naive braise built a fresh string and byte slice on every one of its 50,000 rounds — a mountain of garbage that kept the collector busy. Reuse a single fixed buffer instead.</p>
+      <p class="say">The naive pizza built a fresh string and byte slice on every one of its 50,000 rounds — a mountain of garbage that kept the collector busy. Reuse a single fixed buffer instead.</p>
       <p class="impact"><span class="k">Result</span><span><b>~150,000 → 0</b> allocations per request. Keeps the garbage collector off the hot path.</span></p>
     </article>
 
     <!-- 04 MULTI-LANE -->
     <article class="card" data-accent="win">
-      <header><span class="num">04</span><span class="kick">Batching</span><h3>One stir, many pots</h3></header>
+      <header><span class="num">04</span><span class="kick">Batching</span><h3>One oven, many pizzas</h3></header>
       <div class="viz">
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
@@ -420,7 +656,7 @@
 
     <!-- 05 SHA-NI (fork) -->
     <article class="card" data-accent="big">
-      <header><span class="num">05</span><span class="kick">The equipment</span><h3>The pro range — used only where the kitchen has one</h3></header>
+      <header><span class="num">05</span><span class="kick">The equipment</span><h3>The pro oven — used only where the kitchen has one</h3></header>
       <div class="viz solo">
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 400 130">
@@ -435,7 +671,7 @@
             <g class="prorange"><circle cx="318" cy="44" r="14" fill="#0c1319" stroke="var(--flame-hot)" stroke-width="2"/></g>
             <text class="txt-f" x="318" y="24" text-anchor="middle" style="font-size:9px">SHA-NI · 2×</text>
             <ellipse cx="318" cy="96" rx="14" ry="7" fill="#2c3945" stroke="#0a0f14"/>
-            <text class="lbl" x="318" y="118" text-anchor="middle" style="font-size:9px">pan · 1× · fallback</text>
+            <text class="lbl" x="318" y="118" text-anchor="middle" style="font-size:9px">home oven · 1× · fallback</text>
             <g class="forktok up"><rect class="paperchip" x="-7" y="-6" width="14" height="12" rx="2"/><rect x="-7" y="-6" width="14" height="3" rx="1.5" fill="var(--braise)"/></g>
             <g class="forktok up" style="animation-delay:-.85s"><rect class="paperchip" x="-7" y="-6" width="14" height="12" rx="2"/><rect x="-7" y="-6" width="14" height="3" rx="1.5" fill="var(--braise)"/></g>
             <g class="forktok dn"><rect class="paperchip" x="-7" y="-6" width="14" height="12" rx="2"/><rect x="-7" y="-6" width="14" height="3" rx="1.5" fill="var(--braise)"/></g>
@@ -443,7 +679,7 @@
           <figcaption class="balabel"><span class="badge g">Detect &amp; branch</span> fast where present, correct everywhere</figcaption>
         </figure>
       </div>
-      <p class="say">Most server CPUs have a built-in SHA-256 instruction — a commercial range that cooks two pots at once. But not every grading machine will. So detect it at startup, take the fast branch where it exists, and fall back to plain code where it doesn't. You never assume the equipment is there.</p>
+      <p class="say">Most server CPUs have a built-in SHA-256 instruction — a commercial oven that bakes two pizzas at once. But not every grading machine will. So detect it at startup, take the fast branch where it exists, and fall back to plain code where it doesn't. You never assume the equipment is there.</p>
       <p class="impact"><span class="k">Result</span><span><b>+22% — separated x86.</b> Per-chain cost −52%. The first big structural win, with zero portability risk.</span></p>
     </article>
 
@@ -473,7 +709,7 @@
           <figcaption class="balabel"><span class="badge b">The twist</span> widen the kernel all you like — the pass still caps the flow</figcaption>
         </figure>
       </div>
-      <p class="say">Moving the hex formatting into the kernel removed a per-round hand-off and cut hash cost 10%… yet the score didn't move. The braise was no longer the bottleneck — the fast path was. Optimizing a part that isn't the constraint changes nothing.</p>
+      <p class="say">Moving the hex formatting into the kernel removed a per-round hand-off and cut hash cost 10%… yet the score didn't move. The pizza was no longer the bottleneck — the fast path was. Optimizing a part that isn't the constraint changes nothing.</p>
       <p class="impact"><span class="k">The lesson</span><span><b>Measure the whole system, not the part you changed.</b> This flat result is what pointed straight to the next fix.</span></p>
     </article>
 
@@ -489,9 +725,9 @@
               <rect class="glass" x="120" y="60" width="10" height="48"/><rect class="glass" x="134" y="60" width="10" height="48"/>
               <rect class="glass" x="148" y="60" width="10" height="48"/><rect class="glass" x="162" y="60" width="10" height="48"/><rect class="glass" x="176" y="60" width="10" height="48"/>
             </g>
-            <text class="lbl" x="118" y="52">drinks pile up</text>
+            <text class="lbl" x="118" y="52">beers pile up</text>
           </svg></div>
-          <figcaption class="balabel"><span class="badge b">Before</span> frozen mid-braise</figcaption>
+          <figcaption class="balabel"><span class="badge b">Before</span> frozen mid-bake</figcaption>
         </figure>
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
@@ -500,13 +736,13 @@
             <text class="txt-f" x="70" y="58" style="font-size:8px">glance</text>
             <g class="servedchip"><rect class="glass" x="120" y="70" width="10" height="22" rx="2"/></g>
             <g class="servedchip" style="animation-delay:.8s"><rect class="glass" x="120" y="70" width="10" height="22" rx="2"/></g>
-            <text class="txt-g" x="120" y="104" style="font-size:9px">drinks fly out</text>
+            <text class="txt-g" x="120" y="104" style="font-size:9px">beers fly out</text>
           </svg></div>
           <figcaption class="balabel"><span class="badge g">After</span> glance &amp; serve</figcaption>
         </figure>
       </div>
-      <p class="say">The hashing loop couldn't be interrupted, so quick requests waited behind a whole braise. Pause it briefly between chunks to hand out whatever is waiting, then resume — the braise loses nothing.</p>
-      <p class="impact"><span class="k">Result</span><span><b>+54% — separated x86.</b> Drink p95 43 ms → 10 ms. The single biggest win.</span></p>
+      <p class="say">The hashing loop couldn't be interrupted, so quick requests waited behind a whole pizza. Pause it briefly between chunks to hand out whatever is waiting, then resume — the pizza loses nothing.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+54% — separated x86.</b> Beer p95 43 ms → 10 ms. The single biggest win.</span></p>
     </article>
 
     <!-- 08 GATE (countdown timers) -->
@@ -539,8 +775,8 @@
           <figcaption class="balabel"><span class="badge g">After</span> serve who can finish</figcaption>
         </figure>
       </div>
-      <p class="say">In a rush you can't clear, the oldest order will blow its deadline even if you serve it now — and a customer parked at the stove orders nothing. So serve the newest who can still make it, and turn the overflow away at the door in a millisecond, spending a small error budget to do it. A customer waved off comes straight back and orders drinks; one left waiting earns you nothing. The budget is charged in the same breath as the decision, so a crowd of waiters can't all slip through at once. And the rare order that ages past its patience while the budget is spent is simply held: we tried serving those late, and at four times the published load it pushed the slow-dish p95 past its bar — so it was measured, and reverted.</p>
-      <p class="impact"><span class="k">Result</span><span><b>+17% — separated x86.</b> 4.14M → 4.85M at 0.85% errors (gate: 1%); risk p95 215 → 80 ms. At 4× the published peak it still passes every bar at 0.88% errors and a risk p95 of 167 ms. Same design as Advait's governor; head-to-head on one box, ours serves +12% at the same error budget because the drink counter answers in 3.4 ms rather than 7.</span></p>
+      <p class="say">In a rush you can't clear, the oldest order will blow its deadline even if you serve it now — and a customer parked at the oven orders nothing. So serve the newest who can still make it, and turn the overflow away at the door in a millisecond, spending a small error budget to do it. A customer waved off comes straight back and orders beers; one left waiting earns you nothing. The budget is charged in the same breath as the decision, so a crowd of waiters can't all slip through at once. And the rare order that ages past its patience while the budget is spent is simply held: we tried serving those late, and at four times the published load it pushed the slow-dish p95 past its bar — so it was measured, and reverted.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+17% — separated x86.</b> 4.14M → 4.85M at 0.85% errors (gate: 1%); risk p95 215 → 80 ms. At 4× the published peak it still passes every bar at 0.88% errors and a risk p95 of 167 ms. On a second reference pair the same switch was worth +5% (4.19M → 4.40M, six-run milestone): the governor earns what the plain build leaves idle, and that box had less to give. Same design as Advait's governor; head-to-head on one box, ours serves +12% at the same error budget because the beer tap answers in 3.4 ms rather than 7.</span></p>
     </article>
 
     <!-- 09 WAL -->
@@ -598,7 +834,7 @@
 
   <footer>
     <div>Every percentage is a real measured delta from the project's benchmark trail — bracketed champion → candidate → champion runs on a separated x86-64 reference (a <span class="mono">c7i.xlarge</span> target with a separate load host), unless marked otherwise. Each card's gain is versus its own control, not a running total.</div>
-    <div>Where it stands: the current build (<span class="mono">6808e7d</span>) scores <b>4.85M</b> on the reference pair at 0.85% errors, with a price median of 3.4 ms and a risk p95 of 80 ms while the braise runs flat out. Bracketed against Advait's frozen build on the same box: 4.84M vs 4.32M / 4.29M. Absolute scores move ~15% between instances; every delta here is within one bracket. <span class="mono">RISK_SHED=0</span> gives the zero-error variant at about 17% less score.</div>
+    <div>Where it stands: the submitted build (<span class="mono">8cc47de</span>) is the governor build plus a raw HTTP/1.1 server (+1.6% on pooled medians, three runs against three) and a sixteen-lane AVX-512 fallback for graders without SHA extensions (4.3× the plain fallback, off where SHA-NI exists). On the first reference pair the governor build scored <b>4.85M</b> at 0.85% errors (price median 3.4 ms, risk p95 80 ms) and beat Advait's frozen build on the same box, 4.84M vs 4.32M / 4.29M. On a second pair the six-run milestone gave <b>4,397,038</b> (range 4,380,394–4,402,197) against 4,187,402 with the governor off, every bar passed in all six. Absolute scores move ~10–15% between instances; every delta here is within one bracket. <span class="mono">RISK_SHED=0</span> gives the zero-error variant at 5–17% less score, depending on the box.</div>
     <div class="mono">the challenge: keep /price fast while /risk runs 50,000 SHA-256 rounds · qualify: p95 200 / 500 / 1500 ms, errors &lt; 1%</div>
   </footer>
 </div>
