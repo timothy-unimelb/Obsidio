@@ -358,3 +358,16 @@ Entry format (see the /experiment skill):
   all bars pass.
 - **Verdict:** KEPT — champion is now fa6ffbd.
   **Day total: 1.95M → 3.46M (+77%) in four evidence-gated steps.**
+
+## 2026-08-22 Final-build safety validation at 2× overload (x86)
+
+- **SHA:** fa6ffbd (pairing champion), manual side run — 400-VU overdrive.js
+  from the load box against the capped container on the target.
+- **Result:** all four bars pass with wide margins at DOUBLE the grading
+  peak: risk p95 146.2ms (bar 1500), price/stats p95 11.1ms, errors 0.54%
+  (governor on budget), raw work_score 996,955 in 75s. Peak cgroup RSS
+  across the run: 477MiB (GOMEMLIMIT=512MiB, cap 2048MiB). Boot race on this
+  boot: pair ratio 1.37×.
+- **Verdict:** the gate degrades gracefully at 2× with the 1.37×-faster
+  kernel; memory design point holds. Overdrive exhibit (FIFO self-DQ vs
+  governor) plus this run = the resilience story's bookends.

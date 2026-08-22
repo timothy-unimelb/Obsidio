@@ -137,7 +137,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W2A: post-hex pprof (blockSHANI 65% / wrapper ~15% / hex 9.6%) → kernel lane executed in profile order:
 - [x] W2A: direct 2-block kernel (vendored stdlib asm, fixed-64B path) — **+28.6% full A/B, champion 92f6ecf, headline ~2.71M** (Tier-0 −24%/chain)
 - [x] W2A: 2-lane interleaved SHA-NI kernel (generated from stdlib asm by benchmarks/gen2lane.py) — differential-tested on SPR; in-chain ratio **1.35×** (pair 6.84ms vs serial-2 9.24ms)
-- [~] W3: pairing dispatcher (workers pop 1-2 waiters; admission semantics unchanged; boot race gates pairing) — built, race-clean, smoke 35/35 on dev box; **full A/B in flight (pairing-x86-01)**
+- [x] W3: pairing dispatcher — **KEPT: +27.4% full A/B, champion fa6ffbd, headline 3,461,856, risk p95 90.6ms (best yet)**. Day: 1.95M → 3.46M (+77%)
 - [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
 - [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
 - [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed
