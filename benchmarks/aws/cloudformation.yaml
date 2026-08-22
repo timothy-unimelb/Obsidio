@@ -1,0 +1,279 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Reproducible separated x86-64 benchmark environment for Obsidio
+
+Parameters:
+  AdminCidr:
+    Type: String
+    Description: Single trusted IPv4 CIDR allowed to SSH to the hosts
+    AllowedPattern: "^(?:[0-9]{1,3}\\.){3}[0-9]{1,3}/32$"
+  AvailabilityZone:
+    Type: AWS::EC2::AvailabilityZone::Name
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  TargetInstanceType:
+    Type: String
+    Default: c7i.xlarge
+    AllowedValues: [c7i.xlarge]
+  LoadInstanceType:
+    Type: String
+    Default: c7i.large
+    AllowedValues: [c7i.large]
+  ShutdownAfterMinutes:
+    Type: Number
+    Default: 240
+    MinValue: 60
+    MaxValue: 720
+  BudgetEmail:
+    Type: String
+    Description: Email recipient for account-wide monthly cost alerts
+    AllowedPattern: "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 20
+    MinValue: 1
+    MaxValue: 1000
+  AmazonLinuxAmi:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64
+
+Resources:
+  BenchmarkHostRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - {Key: Project, Value: ObsidioBench}
+
+  BenchmarkHostInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref BenchmarkHostRole]
+
+  MonthlyCostBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+        BudgetName: !Sub "${AWS::StackName}-monthly"
+        BudgetType: COST
+        TimeUnit: MONTHLY
+      NotificationsWithSubscribers:
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: ACTUAL
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetEmail
+              SubscriptionType: EMAIL
+        - Notification:
+            ComparisonOperator: GREATER_THAN
+            NotificationType: FORECASTED
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - Address: !Ref BudgetEmail
+              SubscriptionType: EMAIL
+      ResourceTags:
+        - {Key: Project, Value: ObsidioBench}
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.27.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-vpc"}
+        - {Key: Project, Value: ObsidioBench}
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-igw"}
+        - {Key: Project, Value: ObsidioBench}
+
+  GatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      CidrBlock: 10.27.1.0/24
+      MapPublicIpOnLaunch: true
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-public"}
+        - {Key: Project, Value: ObsidioBench}
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-public"}
+        - {Key: Project, Value: ObsidioBench}
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachment
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+
+  RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref PublicSubnet
+
+  LoadSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Obsidio load generator access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AdminCidr
+          Description: SSH from the provisioning workstation
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-load"}
+        - {Key: Project, Value: ObsidioBench}
+
+  TargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Obsidio capped target access
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AdminCidr
+          Description: SSH from the provisioning workstation
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref LoadSecurityGroup
+          Description: Grading traffic from the load host only
+      VpcId: !Ref Vpc
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-target"}
+        - {Key: Project, Value: ObsidioBench}
+
+  TargetInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: 16
+            VolumeType: gp3
+      ImageId: !Ref AmazonLinuxAmi
+      IamInstanceProfile: !Ref BenchmarkHostInstanceProfile
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref TargetInstanceType
+      KeyName: !Ref KeyName
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+      SecurityGroupIds: [!Ref TargetSecurityGroup]
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-target"}
+        - {Key: Project, Value: ObsidioBench}
+        - {Key: Role, Value: target}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf install -y docker git jq tar
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+          mkdir -p /opt/obsidio
+          chown ec2-user:ec2-user /opt/obsidio
+          shutdown -h +${ShutdownAfterMinutes}
+
+  LoadInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            DeleteOnTermination: true
+            Encrypted: true
+            VolumeSize: 16
+            VolumeType: gp3
+      ImageId: !Ref AmazonLinuxAmi
+      IamInstanceProfile: !Ref BenchmarkHostInstanceProfile
+      InstanceInitiatedShutdownBehavior: stop
+      InstanceType: !Ref LoadInstanceType
+      KeyName: !Ref KeyName
+      MetadataOptions:
+        HttpEndpoint: enabled
+        HttpTokens: required
+      SecurityGroupIds: [!Ref LoadSecurityGroup]
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - {Key: Name, Value: !Sub "${AWS::StackName}-load"}
+        - {Key: Project, Value: ObsidioBench}
+        - {Key: Role, Value: load}
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf install -y docker git jq tar
+          systemctl enable --now docker
+          usermod -aG docker ec2-user
+          mkdir -p /opt/obsidio
+          chown ec2-user:ec2-user /opt/obsidio
+          shutdown -h +${ShutdownAfterMinutes}
+
+Outputs:
+  AvailabilityZone:
+    Value: !Ref AvailabilityZone
+  EnvironmentId:
+    Value: !Sub "${AWS::StackName}-${AWS::Region}-${AvailabilityZone}"
+  MonthlyBudgetName:
+    Value: !Ref MonthlyCostBudget
+  LoadInstanceId:
+    Value: !Ref LoadInstance
+  LoadPrivateIp:
+    Value: !GetAtt LoadInstance.PrivateIp
+  LoadPublicIp:
+    Value: !GetAtt LoadInstance.PublicIp
+  TargetInstanceId:
+    Value: !Ref TargetInstance
+  TargetPrivateIp:
+    Value: !GetAtt TargetInstance.PrivateIp
+  TargetPublicIp:
+    Value: !GetAtt TargetInstance.PublicIp
