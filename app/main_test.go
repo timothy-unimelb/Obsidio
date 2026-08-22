@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -42,6 +43,54 @@ func TestShedBudgetDerivation(t *testing.T) {
 	initShedBudget()
 	if riskShedBudgetBP != 47 { // 95% of 50, integer math
 		t.Fatalf("override must clamp to 95%% of gate (47), got %d", riskShedBudgetBP)
+	}
+}
+
+// TestShedReserveNoOvershoot: N goroutines hammering the reservation
+// concurrently must never push the error count past the budget — this is the
+// exact burst race the racy check-then-charge form loses (measured 1.49%
+// against an 0.88% budget at 800 VUs on the racy build).
+func TestShedReserveNoOvershoot(t *testing.T) {
+	savedOK := atomic.LoadInt64(&respOK)
+	savedErr := atomic.LoadInt64(&respErr)
+	savedBP := riskShedBudgetBP
+	defer func() {
+		atomic.StoreInt64(&respOK, savedOK)
+		atomic.StoreInt64(&respErr, savedErr)
+		riskShedBudgetBP = savedBP
+	}()
+
+	const total = int64(100000)
+	atomic.StoreInt64(&respOK, total)
+	atomic.StoreInt64(&respErr, 0)
+	riskShedBudgetBP = 88 // budget: 88bp of (ok+err)
+
+	var granted int64
+	var wg sync.WaitGroup
+	for g := 0; g < 64; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 200; i++ {
+				if shedReserveError() {
+					atomic.AddInt64(&granted, 1)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	er := atomic.LoadInt64(&respErr)
+	if er != granted {
+		t.Fatalf("reservations (%d) must equal charged errors (%d)", granted, er)
+	}
+	if er*10000 > (total+er)*riskShedBudgetBP {
+		t.Fatalf("budget overshoot: %d errors on %d responses exceeds %dbp", er, total+er, riskShedBudgetBP)
+	}
+	// And the budget must actually be spendable: 64×200 attempts against an
+	// open budget should land within one reservation of the cap.
+	if (er+1)*10000 <= (total+er+1)*riskShedBudgetBP {
+		t.Fatalf("budget left unspent: %d errors, next reservation would still fit", er)
 	}
 }
 

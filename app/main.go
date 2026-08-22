@@ -254,6 +254,7 @@ func riskSubmit(ctx context.Context, seed string) (string, bool) {
 	riskMu.Lock()
 	if riskStackDepth >= riskStackBackstop {
 		riskMu.Unlock()
+		atomic.AddInt64(&respErr, 1) // backstop shed: count with the decision
 		return "", false
 	}
 	// Genuinely overloaded (no idle worker AND waiters already parked): spend
@@ -264,7 +265,7 @@ func riskSubmit(ctx context.Context, seed string) (string, bool) {
 	// while an at-arrival 503 is a ~1ms sample at the harmless bottom of the
 	// distribution — and it recycles the closed-loop VU into cheap scoring
 	// traffic ~1.2s sooner.
-	if riskStackDepth > 0 && riskIdleWorkers == 0 && shedBudgetAllows() {
+	if riskStackDepth > 0 && riskIdleWorkers == 0 && shedReserveError() {
 		riskMu.Unlock()
 		return "", false
 	}
@@ -283,6 +284,10 @@ func riskSubmit(ctx context.Context, seed string) (string, bool) {
 	default: // wake buffer full — every worker already has a pending wakeup
 	}
 
+	// Every ok=false return from here on must have charged respErr exactly
+	// once (reservation CAS or explicit add) — handleRisk's 503 no longer
+	// counts at write time.
+	reserved := false
 	patience := time.NewTimer(riskPatience())
 	defer patience.Stop()
 wait:
@@ -300,7 +305,8 @@ wait:
 			// (a parked VU reduces offered load without spending an error).
 			// Under sustained load the front-door shed usually consumes the
 			// budget first, which is the cheaper place to spend it.
-			if shedBudgetAllows() {
+			if shedReserveError() {
+				reserved = true
 				break wait
 			}
 			patience.Reset(100 * time.Millisecond)
@@ -312,10 +318,19 @@ wait:
 		// several cases fire, and take/deliver can race the timer). The
 		// digest costs real CPU — wait the few remaining ms and serve it.
 		riskMu.Unlock()
+		if reserved {
+			// The 200 about to be written makes the reservation moot.
+			atomic.AddInt64(&respErr, -1)
+		}
 		return <-w.result, true
 	}
 	w.abandoned = true // skipped (and unlinked) at take time
 	riskMu.Unlock()
+	if !reserved {
+		// Disconnect path: no budget check ran. Count it here so every
+		// ok=false exit has charged exactly once by the time it returns.
+		atomic.AddInt64(&respErr, 1)
+	}
 	return "", false
 }
 
@@ -714,9 +729,21 @@ func raceKernelPairing() {
 var respOK, respErr int64
 
 func writeJSON(w http.ResponseWriter, code int, body []byte) {
+	writeJSONUncounted(w, code, body)
+	if code < 400 {
+		atomic.AddInt64(&respOK, 1)
+	} else {
+		atomic.AddInt64(&respErr, 1)
+	}
+}
+
+// writeJSONUncounted: for responses whose error was already charged at
+// decision time (shed reservations) — writing through writeJSON again would
+// double-count them against the budget.
+func writeJSONUncounted(w http.ResponseWriter, code int, body []byte) {
 	if rw, ok := w.(*rawResponse); ok {
 		// Raw fast path: preassembled header block, one conn.Write, no
-		// header map. Counters below are shared — accounting identical.
+		// header map. Counter semantics are the caller's.
 		rw.writeResponse(code, body)
 	} else {
 		h := w.Header()
@@ -725,15 +752,10 @@ func writeJSON(w http.ResponseWriter, code int, body []byte) {
 		w.WriteHeader(code)
 		w.Write(body)
 	}
-	if code < 400 {
-		atomic.AddInt64(&respOK, 1)
-	} else {
-		atomic.AddInt64(&respErr, 1)
-	}
 }
 
-// shedBudgetAllows: may we emit one more error response and still stay well
-// under the 1% gate? Target 0.6% — margin for accounting skew vs k6's view
+// shedReserveError (below the budget vars): may we emit one more error
+// response and still stay well under the 1% gate? Margin for accounting skew vs k6's view
 // (in-flight requests, connection-level failures we never see). Empirically
 // (devloop A/B trilogy, 2026-08-22): unthrottled shedding scored +139% but at
 // 8.4% errors (DQ); zero shedding parks VUs for k6's 60s timeout and idles the
@@ -770,14 +792,27 @@ func initShedBudget() {
 	log.Printf("risk shed budget: %dbp of total responses (error gate %dbp)", riskShedBudgetBP, gateBP)
 }
 
-func shedBudgetAllows() bool {
+// shedReserveError atomically charges one error iff doing so keeps the run
+// inside the budget. Check-and-charge must be ONE step: with a separate
+// check, a burst of waiters waking together can all pass it before any
+// charge lands (Tim measured 1.49% against an 0.88% budget at 800 VUs with
+// the racy form). The reservation IS the count — the shed 503 is then
+// written without touching the counters again.
+func shedReserveError() bool {
 	ok := atomic.LoadInt64(&respOK)
-	er := atomic.LoadInt64(&respErr)
-	total := ok + er
-	if total < 500 { // early ramp: park rather than shed on tiny denominators
-		return false
+	for {
+		er := atomic.LoadInt64(&respErr)
+		total := ok + er
+		if total < 500 { // early ramp: park rather than shed on tiny denominators
+			return false
+		}
+		if (er+1)*10000 > total*riskShedBudgetBP {
+			return false
+		}
+		if atomic.CompareAndSwapInt64(&respErr, er, er+1) {
+			return true
+		}
 	}
-	return (er+1)*10000 <= total*riskShedBudgetBP
 }
 
 // symbolParam pulls ?symbol=X without url.ParseQuery's allocations for the
@@ -863,7 +898,9 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 	// there is no slot to leak on any panic path.
 	h, ok := riskSubmit(r.Context(), seed)
 	if !ok {
-		writeJSON(w, 503, overloaded)
+		// Every shed path charged respErr at decision time (CAS reservation
+		// or explicit add) — writing through writeJSON would double-count.
+		writeJSONUncounted(w, 503, overloaded)
 		return
 	}
 	// seed is arbitrary user input → JSON-escape it properly.
