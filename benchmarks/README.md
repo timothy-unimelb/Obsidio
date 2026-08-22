@@ -75,11 +75,12 @@ node benchmarks/record-decision.mjs benchmarks/decisions/<comparison-set>.json
 ## Latest accepted local comparison
 
 - Date: 2026-08-22 (Australia/Melbourne)
-- Sequence: permanent-worker champion → packed-hex candidate → champion
-- Exact scores: 2,793,090 → 2,852,984 → 2,588,129
-- Candidate improvement: +2.14% over the stronger champion side; +6.03% over
-  the bracket average
+- Sequence: compact-hex champion `45ce2c7` → multi-lane candidate `b29480e` →
+  champion
+- Exact scores: 3,038,794 → 3,316,347 → 3,039,407
+- Candidate improvement: +9.11% over the stronger champion side; +0.02%
+  champion drift
 - Errors: 0.00%; every published p95 gate passed
-- Verdict: current local champion, pending an interleaved six-run milestone
+- Verdict: current local champion, pending separated x86 confirmation
 - Detailed evidence:
-  [`experiments/2026-08-22-packed-hex.md`](experiments/2026-08-22-packed-hex.md)
+  [`experiments/2026-08-22-risk-lanes.md`](experiments/2026-08-22-risk-lanes.md)

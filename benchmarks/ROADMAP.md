@@ -6,61 +6,42 @@ reaches a gate, or changes what should happen next.
 
 ## Current position
 
-- **Champion:** compact four-at-a-time hex unrolling from implementation commit
-  `5bb6824` (evaluated source `c18b148`), on top of the Go server with two permanent risk workers,
-  bounded FIFO queue, cheap-path bypass, allocation-free risk loop, and packed
-  lowercase-hex feedback.
-- **Latest accepted evidence:** `hex-unroll-x86-full-20260822`; candidate scored
-  1,987,151, 1.70% above the stronger bracket champion and 2.10% above the
-  bracket average, with zero errors. Control drift was only -0.79%.
-- **Architecture phase:** the major concurrency and allocation improvements are
-  complete. Work has moved into evidence-led compute-kernel and compiler
-  optimization.
-- **Latest rejected candidates:** Go 1.26.6 PGO regressed the risk kernel by
-  19.67% and reintroduced 50,000 allocations per request. Portable fixed-shape
-  SHA was then 5.86x slower than Go's accelerated standard-library path. Both
-  were stopped at Level 0 without spending screening or AWS time.
-- **Outstanding finalist evidence:** interleaved six-run milestone,
-  optional-instruction portability run, and rerun after the organizers lock the
-  grader.
-- **Separated environment:** reproducible AWS CloudFormation and lifecycle
-  scripts live under `benchmarks/aws/`. The first x86 comparison was validated
-  successfully; all paid resources were destroyed afterward.
+- **Local champion:** interleaved multi-lane risk batching, commit `b29480e`
+  (workers drain up to four queued jobs and hash them as interleaved
+  independent chains). Built on the compact hex-unrolling server with two
+  permanent risk workers, bounded FIFO queue, cheap-path bypass, and
+  allocation-free packed-hex kernel.
+- **Accepted (separated x86) champion:** compact hex unrolling, evaluated at
+  `c18b148`, now carried at `45ce2c7` with only documentation changes.
+- **Latest local evidence:** `risk-lanes-full-20260822`; candidate 3,316,347
+  versus controls 3,038,794 / 3,039,407 (+9.11% vs stronger, +0.02% drift,
+  zero errors, `/risk` p95 −88 ms, `/price` p95 +4.5 ms).
+- **Mechanism:** the previous profile's 58% `encodeDigest` attribution was a
+  stall waiting on hardware SHA results; interleaving independent chains lets
+  the core overlap that latency. Neutral with `GODEBUG=cpu.all=off`.
+- **Rejected this session:** Go PGO (−19.7% kernel, 50k allocs) and
+  fixed-shape scalar SHA-256 (5.9× slower than Go's hardware path). Both stopped
+  at Level 0.
+- **Outstanding finalist evidence:** separated x86 confirmation of multi-lane,
+  interleaved six-run milestone, optional-instruction portability run, and a
+  rerun after the organizers lock the grader.
+- **Separated environment:** AWS stack under `benchmarks/aws/` is destroyed;
+  re-provision only for the x86 confirmation below.
 
 ## Active sequence
 
-1. **Completed: re-profile the packed-hex champion.** `encodeDigest` remains the
-   largest flat CPU cost at 57.84%; SHA accounts for 24.18%. See
-   `experiments/2026-08-22-packed-champion-profile.md` and the raw profiles.
-2. **Active candidate: compact fixed-size hex unrolling.** A fully expanded
-   32-store version accelerated the isolated encoder but not the complete risk
-   kernel, likely because it stopped inlining. The smaller four-at-a-time form
-   improved the complete kernel by 2.50%. PGO remains next if later rejected.
-3. **Completed: validate the active candidate at level 0.** Independent endpoint
-   and risk tests pass with optional CPU acceleration disabled; focused
-   microbenchmarks show a material kernel gain.
-4. **Completed: bracketed 90-second screen.** Candidate scored 1,007,901 versus
-   controls at 992,877 and 980,888: +1.51% versus the stronger side and +2.13%
-   versus the bracket average, with zero errors. It is promoted using the
-   protocol's bracketed-evidence path for small changes.
-5. **Completed: exact full bracket.** Candidate scored 2,919,075 versus controls
-   at 2,892,463 and 2,783,480. It was +0.92% versus the stronger side and +2.86%
-   versus the bracket average, but control drift was -3.77%. Verdict: unresolved;
-   `64e38e0` remains champion and `5bb6824` preserves the candidate.
-6. **Completed: separated x86 resolution.** The x86 screen showed +2.91% versus
-   the stronger control with -0.85% control drift. The exact full bracket showed
-   +1.70% versus the stronger control with -0.79% drift. The candidate is kept
-   as the current champion.
-7. **Completed: Go PGO Level 0.** A 95-second representative profile was applied
-   with the pinned Go 1.26.6 toolchain. The candidate remained correct but made
-   `BenchmarkRisk` 19.67% slower and changed it from zero allocations to 50,000
-   allocations and 6.4 MB per operation. Verdict: reverted before screening.
-8. **Completed: portable fixed-shape SHA Level 0.** A two-block SHA-256 path
-   reused the constant padding schedule and passed 10,000 randomized vectors,
-   complete risk vectors, and the portability run. It was 8.86x slower for one
-   SHA operation and 5.86x slower over the complete kernel with normal CPU
-   features. With all optional features disabled it remained 23.96% slower per
-   SHA and 22.92% slower over the kernel. Verdict: reverted before screening.
+1. **Completed: Level 0 multi-lane prototype.** Per-chain kernel −14.7% (pair)
+   and −24.6% (quad) on arm64; neutral on the scalar path; correct for batch
+   sizes 1–4 in both CPU modes. See `experiments/2026-08-22-risk-lanes.md`.
+2. **Completed: bracketed screen.** +7.57% vs stronger control, +0.08% drift.
+3. **Completed: exact full bracket.** +9.11% vs stronger control, +0.02% drift.
+   Verdict: kept as local champion.
+4. **Next: separated x86 confirmation.** Provision AWS, run the bracketed screen
+   then exact full bracket, candidate `b29480e` against champion `45ce2c7`. If
+   the x86 gain is materially smaller, run `RISK_LANES=2` vs `4` as a secondary
+   set. Destroy the stack afterwards.
+5. **Then:** update `submission/go/README.md` and `RESILIENCE.md` from the x86
+   result, and schedule the six-run milestone for the finalist.
 
 ## Candidate queue after the active sequence
 
@@ -88,9 +69,9 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** compact hex unrolling remains champion; Go PGO and portable
-fixed-shape SHA were rejected at Level 0, and the AWS stack remains destroyed.
-Next, evaluate whether a multi-lane or batched risk kernel has a credible
-accelerated implementation; otherwise move to small profiled HTTP-path changes.
-Re-provision AWS only after local Level 0 and bracketed screening earn an exact
-x86 comparison.
+**Status:** multi-lane batching (`b29480e`) is the local champion after a clean
++9.11% full bracket; it is not yet the accepted submission champion because the
+gain depends on hardware SHA latency behaviour and needs separated x86
+confirmation. Next action: provision AWS (paid; requires `AWS_CONFIRM`), run
+screen then full bracket of `b29480e` vs `45ce2c7`, record the decision, and
+destroy the stack.

@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-08-22T02:00:19Z",
+  "type": "comparison_decision",
+  "comparison_set": "risk-lanes-full-20260822",
+  "candidate": "interleaved-multi-lane-risk-batching",
+  "candidate_commit": "b29480e",
+  "champion_commit": "45ce2c7",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [3038794, 3039407],
+    "candidate_score": 3316347,
+    "candidate_vs_stronger_champion_percent": 9.1117,
+    "candidate_vs_champion_average_percent": 9.1226,
+    "champion_drift_percent": 0.0202,
+    "error_rate": 0,
+    "all_latency_gates_passed": true,
+    "price_p95_change_ms": 4.45,
+    "risk_p95_change_ms": -87.94,
+    "focused_kernel_gain_percent_pair": 14.7,
+    "focused_kernel_gain_percent_quad": 24.6,
+    "portable_kernel_change_percent_quad": -0.3,
+    "screen_candidate_vs_stronger_champion_percent": 7.5723,
+    "screen_champion_drift_percent": 0.0753
+  },
+  "environment": {
+    "id": "local-arm64-colima",
+    "target": "Linux arm64 Docker on Colima capped to 2 CPUs and 2 GiB",
+    "load_generator": "k6 v2.2.0 on the same Apple Silicon host",
+    "target_architecture": "arm64"
+  },
+  "limitations": [
+    "same physical Apple Silicon host; the gain depends on hardware SHA latency behaviour and must be confirmed on separated x86-64 (SHA-NI) before the champion claim extends beyond local evidence",
+    "/price p95 rose about 5 ms; still within 15% of the 200 ms bar's budget",
+    "not an interleaved six-run milestone"
+  ],
+  "next_evidence": "Separated x86 bracketed screen and exact full comparison against 45ce2c7 on the AWS reference shape; record RISK_LANES=2 as a secondary configuration if the x86 gain is smaller.",
+  "report": "benchmarks/experiments/2026-08-22-risk-lanes.md"
+}

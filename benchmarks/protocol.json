@@ -35,32 +35,65 @@
       "script": "benchmarks/screening.js",
       "duration_seconds": 90,
       "stages": [
-        { "duration_seconds": 20, "target_vus": 50 },
-        { "duration_seconds": 40, "target_vus": 100 },
-        { "duration_seconds": 20, "target_vus": 200 },
-        { "duration_seconds": 10, "target_vus": 0 }
+        {
+          "duration_seconds": 20,
+          "target_vus": 50
+        },
+        {
+          "duration_seconds": 40,
+          "target_vus": 100
+        },
+        {
+          "duration_seconds": 20,
+          "target_vus": 200
+        },
+        {
+          "duration_seconds": 10,
+          "target_vus": 0
+        }
       ],
-      "default_sequence": ["champion", "candidate", "champion"],
+      "default_sequence": [
+        "champion",
+        "candidate",
+        "champion"
+      ],
       "publishable": false
     },
     "full": {
       "script": "k6/grading.js",
       "duration_seconds": 270,
-      "default_sequence": ["champion", "candidate"],
-      "small_change_sequence": ["champion", "candidate", "champion"],
+      "default_sequence": [
+        "champion",
+        "candidate"
+      ],
+      "small_change_sequence": [
+        "champion",
+        "candidate",
+        "champion"
+      ],
       "publishable": true
     },
     "milestone": {
       "script": "k6/grading.js",
       "duration_seconds_per_run": 270,
       "repetitions_per_implementation": 3,
-      "sequence": ["A", "B", "B", "A", "A", "B"],
+      "sequence": [
+        "A",
+        "B",
+        "B",
+        "A",
+        "A",
+        "B"
+      ],
       "reported_statistic": "median-and-range"
     }
   },
   "promotion_rules": {
     "screen_promote_percent_above": 2.0,
-    "paired_evidence_percent_range": [0.5, 2.0],
+    "paired_evidence_percent_range": [
+      0.5,
+      2.0
+    ],
     "unresolved_below_percent": 0.5,
     "accept_only_above_observed_noise": true,
     "prefer_simpler_when_intervals_overlap": true,
@@ -98,7 +131,14 @@
     "history_file": "benchmarks/history.jsonl",
     "require_unique_run_id": true,
     "overwrite_raw_results_by_default": false,
-    "verdicts": ["pending", "kept", "reverted", "unresolved", "invalid", "superseded"],
+    "verdicts": [
+      "pending",
+      "kept",
+      "reverted",
+      "unresolved",
+      "invalid",
+      "superseded"
+    ],
     "required_metrics": [
       "work_score",
       "http_reqs",
@@ -109,7 +149,7 @@
     ]
   },
   "recorded_evidence": {
-    "latest_set": "hex-unroll-x86-full-20260822",
+    "latest_set": "risk-lanes-full-20260822",
     "sets": [
       {
         "id": "local-2026-08-21",
@@ -156,7 +196,11 @@
         "recorded_at": "2026-08-22T08:28:15+10:00",
         "status": "accepted-local-full-comparison",
         "environment_id": "local-arm64-colima",
-        "execution_order": ["champion-a1", "candidate-b1", "champion-a2"],
+        "execution_order": [
+          "champion-a1",
+          "candidate-b1",
+          "champion-a2"
+        ],
         "protocol_interpretation": "current-champion-pending-six-run-milestone",
         "candidate": {
           "name": "packed-lowercase-hex",
@@ -168,7 +212,10 @@
           "risk_p95_ms": 320.85585,
           "raw_summary": "benchmarks/results/candidate-hex-packed-full-b1-summary.json"
         },
-        "champion_scores": [2793090, 2588129],
+        "champion_scores": [
+          2793090,
+          2588129
+        ],
         "candidate_vs_stronger_champion_percent": 2.1444,
         "candidate_vs_champion_average_percent": 6.0349,
         "limitations": [
@@ -183,7 +230,11 @@
         "recorded_at": "2026-08-22T00:50:00Z",
         "status": "accepted-separated-x86-full-comparison",
         "environment_id": "obsidio-bench-us-east-1-us-east-1a",
-        "execution_order": ["champion-a1", "candidate-b1", "champion-a2"],
+        "execution_order": [
+          "champion-a1",
+          "candidate-b1",
+          "champion-a2"
+        ],
         "protocol_interpretation": "current-champion-pending-six-run-milestone-and-portability-set",
         "candidate": {
           "name": "compact-four-at-a-time-hex-unrolling",
@@ -195,7 +246,10 @@
           "risk_p95_ms": 442.781735,
           "raw_summary": "benchmarks/results/candidate-hex-unroll-x86-full-b1-summary.json"
         },
-        "champion_scores": [1953954, 1938551],
+        "champion_scores": [
+          1953954,
+          1938551
+        ],
         "candidate_vs_stronger_champion_percent": 1.699,
         "candidate_vs_champion_average_percent": 2.1014,
         "champion_drift_percent": -0.7883,
@@ -205,6 +259,41 @@
           "optional-instruction portability set remains outstanding"
         ],
         "report": "benchmarks/experiments/2026-08-22-packed-champion-profile.md"
+      },
+      {
+        "id": "risk-lanes-full-20260822",
+        "recorded_at": "2026-08-22T13:10:00+10:00",
+        "status": "accepted-local-full-comparison",
+        "environment_id": "local-arm64-colima",
+        "execution_order": [
+          "champion-a1",
+          "candidate-b1",
+          "champion-a2"
+        ],
+        "protocol_interpretation": "local-champion-pending-separated-x86-confirmation",
+        "candidate": {
+          "name": "interleaved-multi-lane-risk-batching",
+          "work_score": 3316347,
+          "requests": 1327206,
+          "error_rate": 0,
+          "price_p95_ms": 29.76,
+          "stats_p95_ms": 29.78,
+          "risk_p95_ms": 173.08,
+          "raw_summary": "benchmarks/results/candidate-risk-lanes-full-b1-summary.json"
+        },
+        "champion_scores": [
+          3038794,
+          3039407
+        ],
+        "candidate_vs_stronger_champion_percent": 9.1117,
+        "candidate_vs_champion_average_percent": 9.1226,
+        "champion_drift_percent": 0.0202,
+        "limitations": [
+          "same physical Apple Silicon host",
+          "gain depends on hardware SHA latency; x86 magnitude unconfirmed",
+          "not an interleaved six-run milestone"
+        ],
+        "report": "benchmarks/experiments/2026-08-22-risk-lanes.md"
       }
     ]
   }
