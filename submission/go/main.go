@@ -20,6 +20,8 @@ const (
 	riskIterations   = 50_000
 	defaultRiskJobs  = 2
 	defaultRiskQueue = 32
+	defaultRiskLanes = 4
+	maxRiskLanes     = 4
 )
 
 type priceSeries [500]float64
@@ -51,6 +53,7 @@ var lowercaseHexPairs = buildLowercaseHexPairs()
 var (
 	riskWorkerCount = envInt("RISK_WORKERS", defaultRiskJobs, 1, 2)
 	riskQueue       = make(chan riskJob, envInt("RISK_QUEUE", defaultRiskQueue, 1, 200))
+	riskLaneLimit   = envInt("RISK_LANES", defaultRiskLanes, 1, maxRiskLanes)
 	riskWorkersOnce sync.Once
 	emitRiskTiming  = os.Getenv("RISK_TIMING") == "1"
 )
@@ -80,7 +83,7 @@ func main() {
 		MaxHeaderBytes:    8 << 10,
 	}
 
-	log.Printf("obsidio listening on :%s with %d risk workers and queue capacity %d", port, riskWorkerCount, cap(riskQueue))
+	log.Printf("obsidio listening on :%s with %d risk workers, %d lanes each, and queue capacity %d", port, riskWorkerCount, riskLaneLimit, cap(riskQueue))
 	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
@@ -217,19 +220,61 @@ func startRiskWorkers() {
 	})
 }
 
+// riskWorker takes one job, then opportunistically drains up to riskLaneLimit-1
+// more without waiting. Independent chains are hashed as interleaved lanes on
+// this worker's core so the processor can overlap one chain's SHA latency with
+// another's work. With an empty queue a job still runs alone immediately.
 func riskWorker() {
+	var batch [maxRiskLanes]riskJob
 	for job := range riskQueue {
-		if !emitRiskTiming {
-			job.result <- riskResult{hash: calculateRisk(job.seed)}
-			continue
+		batch[0] = job
+		count := 1
+	fill:
+		for count < riskLaneLimit {
+			select {
+			case next := <-riskQueue:
+				batch[count] = next
+				count++
+			default:
+				break fill
+			}
 		}
+		runRiskBatch(batch[:count])
+	}
+}
 
-		hashStarted := time.Now()
-		hash := calculateRisk(job.seed)
-		finished := time.Now()
-		job.result <- riskResult{
-			hash:      hash,
-			queueWait: hashStarted.Sub(job.queuedAt),
+func runRiskBatch(batch []riskJob) {
+	var hashes [maxRiskLanes][sha256.Size * 2]byte
+	var hashStarted time.Time
+	if emitRiskTiming {
+		hashStarted = time.Now()
+	}
+
+	switch len(batch) {
+	case 1:
+		hashes[0] = calculateRisk(batch[0].seed)
+	case 2:
+		hashes[0], hashes[1] = calculateRiskPair(batch[0].seed, batch[1].seed)
+	case 3:
+		hashes[0], hashes[1] = calculateRiskPair(batch[0].seed, batch[1].seed)
+		hashes[2] = calculateRisk(batch[2].seed)
+	default:
+		hashes = calculateRiskQuad([maxRiskLanes]string{batch[0].seed, batch[1].seed, batch[2].seed, batch[3].seed})
+	}
+
+	if !emitRiskTiming {
+		for index := range batch {
+			batch[index].result <- riskResult{hash: hashes[index]}
+		}
+		return
+	}
+
+	// Diagnostic only: hash time is the shared wall time of the whole batch.
+	finished := time.Now()
+	for index := range batch {
+		batch[index].result <- riskResult{
+			hash:      hashes[index],
+			queueWait: hashStarted.Sub(batch[index].queuedAt),
 			hashTime:  finished.Sub(hashStarted),
 		}
 	}
@@ -252,6 +297,64 @@ func calculateRisk(seed string) [sha256.Size * 2]byte {
 	var result [sha256.Size * 2]byte
 	copy(result[:], encoded)
 	return result
+}
+
+// calculateRiskPair runs two independent chains in one loop. Each chain still
+// performs every one of its own 50,000 rounds in order; only the instruction
+// stream is interleaved so the core can overlap the two chains' SHA latency.
+func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]byte) {
+	digestA := sha256.Sum256([]byte(seedA))
+	digestB := sha256.Sum256([]byte(seedB))
+	var wordsA, wordsB [sha256.Size]uint16
+	encodeDigest(&wordsA, &digestA)
+	encodeDigest(&wordsB, &digestB)
+	encodedA := unsafe.Slice((*byte)(unsafe.Pointer(&wordsA[0])), sha256.Size*2)
+	encodedB := unsafe.Slice((*byte)(unsafe.Pointer(&wordsB[0])), sha256.Size*2)
+
+	for iteration := 1; iteration < riskIterations; iteration++ {
+		digestA = sha256.Sum256(encodedA)
+		digestB = sha256.Sum256(encodedB)
+		encodeDigest(&wordsA, &digestA)
+		encodeDigest(&wordsB, &digestB)
+	}
+
+	copy(resultA[:], encodedA)
+	copy(resultB[:], encodedB)
+	return resultA, resultB
+}
+
+// calculateRiskQuad is the four-lane form of calculateRiskPair.
+func calculateRiskQuad(seeds [maxRiskLanes]string) (results [maxRiskLanes][sha256.Size * 2]byte) {
+	digest0 := sha256.Sum256([]byte(seeds[0]))
+	digest1 := sha256.Sum256([]byte(seeds[1]))
+	digest2 := sha256.Sum256([]byte(seeds[2]))
+	digest3 := sha256.Sum256([]byte(seeds[3]))
+	var words0, words1, words2, words3 [sha256.Size]uint16
+	encodeDigest(&words0, &digest0)
+	encodeDigest(&words1, &digest1)
+	encodeDigest(&words2, &digest2)
+	encodeDigest(&words3, &digest3)
+	encoded0 := unsafe.Slice((*byte)(unsafe.Pointer(&words0[0])), sha256.Size*2)
+	encoded1 := unsafe.Slice((*byte)(unsafe.Pointer(&words1[0])), sha256.Size*2)
+	encoded2 := unsafe.Slice((*byte)(unsafe.Pointer(&words2[0])), sha256.Size*2)
+	encoded3 := unsafe.Slice((*byte)(unsafe.Pointer(&words3[0])), sha256.Size*2)
+
+	for iteration := 1; iteration < riskIterations; iteration++ {
+		digest0 = sha256.Sum256(encoded0)
+		digest1 = sha256.Sum256(encoded1)
+		digest2 = sha256.Sum256(encoded2)
+		digest3 = sha256.Sum256(encoded3)
+		encodeDigest(&words0, &digest0)
+		encodeDigest(&words1, &digest1)
+		encodeDigest(&words2, &digest2)
+		encodeDigest(&words3, &digest3)
+	}
+
+	copy(results[0][:], encoded0)
+	copy(results[1][:], encoded1)
+	copy(results[2][:], encoded2)
+	copy(results[3][:], encoded3)
+	return results
 }
 
 // encodeDigest writes two lowercase hexadecimal bytes with one native-width
