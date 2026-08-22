@@ -1,0 +1,1286 @@
+<meta charset="utf-8" />
+<title>The Obsidio Line Animations</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Hanken+Grotesk:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" />
+<style>
+  /* Projection deck: one deliberate dark world, painted explicitly (no theme switch). */
+  :root {
+    --bg:#0f151b; --panel:#1a2632; --line:#263542; --ink:#e9f0f4; --muted:#8ba0ad;
+    --beer:#59a8dd; --salad:#5cc082; --pizza:#f2764e; --flame:#f2b04a; --good:#5cc082; --bad:#ef6152;
+    --viz:#0f151b; --viz-2:#1a2632; --viz-line:#263542; --viz-ink:#e9f0f4; --viz-muted:#8ba0ad;
+    --drink:var(--beer); --braise:var(--pizza); --flame-hot:#ff8a3d;
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:"Hanken Grotesk",system-ui,sans-serif; line-height:1.45; -webkit-font-smoothing:antialiased; overflow:hidden; }
+  .deck { position:fixed; inset:0; display:grid; place-items:center; }
+  .scene { display:none; width:100vw; height:100vh; padding:clamp(1rem,3vmin,2.4rem) clamp(1rem,4vmin,3rem); flex-direction:column; gap:clamp(.6rem,2vmin,1.2rem); position:relative; }
+  .scene.active { display:flex; }
+  .scene > header { display:flex; flex-direction:column; gap:.2rem; }
+  .kick { font-family:"IBM Plex Mono",monospace; font-size:clamp(.6rem,1.3vmin,.8rem); letter-spacing:.22em; text-transform:uppercase; color:var(--pizza); display:flex; align-items:center; gap:.6rem; }
+  .kick::before { content:""; width:26px; height:2px; background:var(--pizza); }
+  h1 { font-family:"Fraunces",Georgia,serif; font-optical-sizing:auto; font-weight:600; font-size:clamp(1.4rem,4.2vmin,2.8rem); line-height:1.02; letter-spacing:-.015em; margin:.2rem 0 0; text-wrap:balance; max-width:28ch; }
+  h1 .em { font-style:italic; color:var(--pizza); }
+  body.notitle .scene:not(.indexscene) h1 { display:none; }
+  .body { flex:1; min-height:0; display:flex; flex-direction:column; gap:clamp(.6rem,2vmin,1.2rem); justify-content:center; align-items:center; }
+  .body > * { width:min(96vw, 260vh); }
+  .index { margin:0; padding:0; list-style:none; display:grid; gap:.55rem; font-size:clamp(1rem,2.8vmin,1.6rem); max-width:44ch !important; }
+  .index b { display:inline-block; width:2.2ch; color:var(--pizza); font-family:"IBM Plex Mono",monospace; }
+  .lead { font-size:clamp(1rem,2.6vmin,1.5rem); color:var(--muted); margin:0; max-width:40ch; }
+  .hint { max-width:60ch !important; font-family:"IBM Plex Mono",monospace; font-size:clamp(.65rem,1.5vmin,.85rem); color:var(--muted); margin:0; }
+  .hint b { color:var(--ink); }
+  .mono { font-family:"IBM Plex Mono",monospace; }
+  .under { font-size:clamp(.85rem,2vmin,1.1rem); color:var(--muted); margin:0; }
+  .viz { background:radial-gradient(120% 120% at 30% 15%, var(--viz-2), var(--viz)); border:1px solid #05090d; border-radius:12px; overflow:hidden; }
+  .viz svg { display:block; width:100%; height:auto; max-height:80vh; }
+  .lbl { font-family:"IBM Plex Mono",monospace; font-size:9px; fill:var(--viz-muted); letter-spacing:.04em; }
+  .mono.sm { font-size:9px; fill:var(--viz-ink); }
+  .cook { fill:#e7edf1; }
+  .chip.d { fill:var(--beer); } .chip.s { fill:var(--salad); } .chip.b { fill:var(--pizza); }
+  .stove { fill:#0c1319; stroke:var(--flame-hot); stroke-width:1.6; }
+  .cap { font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.04em; fill:var(--viz-muted); opacity:0; }
+  .cap.late { fill:var(--bad); } .cap.ok { fill:var(--good); } .cap.on { opacity:1; }
+  .legend { justify-content:center; display:flex; flex-wrap:wrap; gap:.35rem 1.2rem; font-family:"IBM Plex Mono",monospace; font-size:clamp(.65rem,1.5vmin,.85rem); color:var(--muted); }
+  .sw { display:inline-block; width:12px; height:10px; border-radius:2px; vertical-align:-1px; margin-right:.4rem; }
+  .sw.beer { background:var(--beer); } .sw.salad { background:var(--salad); } .sw.pizza { background:var(--pizza); }
+  .sw.late { background:transparent; border:2px solid var(--bad); width:10px; height:8px; }
+  .sw.shed { background:transparent; border:2px solid var(--flame); width:10px; height:8px; }
+
+  /* footer: counter + notes */
+  .foot { position:fixed; left:0; right:0; bottom:0; display:flex; justify-content:space-between; align-items:center; padding:.5rem 1rem; font-family:"IBM Plex Mono",monospace; font-size:.7rem; color:var(--muted); pointer-events:none; }
+  .note { position:fixed; left:50%; bottom:2.2rem; transform:translateX(-50%); width:min(90vw,70ch); background:#141c23; border:1px solid var(--line); border-radius:12px; padding:.9rem 1.1rem; font-size:clamp(.9rem,2vmin,1.05rem); color:var(--ink); box-shadow:0 20px 46px -26px rgba(0,0,0,.9); z-index:5; }
+  .note[hidden] { display:none; }
+  .progress { position:fixed; left:0; bottom:0; height:3px; background:var(--pizza); width:0; transition:width .3s ease; }
+
+  /* scene-specific layout */
+  .two { display:grid; grid-template-columns:1.1fr 1fr; gap:clamp(.8rem,3vmin,2rem); align-items:center; }
+  .two.even { grid-template-columns:1fr 1fr; align-items:start; }
+  .three { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(.6rem,2vmin,1.2rem); align-items:stretch; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:.8rem .9rem; display:flex; flex-direction:column; gap:.6rem; }
+  .panel.win { border-color:var(--good); }
+  .ph { font-size:clamp(.85rem,2vmin,1.05rem); } .ph .mono { color:var(--flame); margin-right:.4rem; }
+  .pv { font-size:clamp(.78rem,1.8vmin,.95rem); color:var(--muted); margin-top:auto; }
+  .pv.bad { color:var(--bad); } .pv.warn { color:var(--flame); } .pv.good { color:var(--good); }
+  .clip { aspect-ratio:16/9; background:var(--panel); border:1px dashed var(--line); border-radius:12px; display:grid; place-items:center; }
+  .clipin { color:var(--muted); font-size:clamp(.8rem,2vmin,1rem); }
+  .bullets { margin:0; padding-left:1.2rem; font-size:clamp(1rem,2.6vmin,1.45rem); display:flex; flex-direction:column; gap:.6rem; }
+  .bullets b { color:var(--ink); font-weight:600; } .bullets .dim { color:var(--muted); }
+  .menu { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(.8rem,2.5vmin,1.6rem); }
+  .dish { background:var(--panel); border:1px solid var(--line); border-top:4px solid var(--c); border-radius:14px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.7rem; }
+  .dish.d { --c:var(--beer); } .dish.s { --c:var(--salad); } .dish.b { --c:var(--pizza); }
+  .dish .nm { font-family:"Fraunces",serif; font-weight:600; font-size:clamp(1.3rem,3.6vmin,2.2rem); line-height:1; }
+  .dish .bar { height:12px; border-radius:6px; background:var(--line); overflow:hidden; }
+  .dish .f { display:block; height:100%; width:0; border-radius:6px; background:var(--c); animation:fill 6s linear infinite; }
+  .dish .f.beer { animation-name:fill-beer; } .dish .f.salad { animation-name:fill-salad; } .dish .f.pizza { animation-name:fill-pizza; }
+  .dish .meta { font-family:"IBM Plex Mono",monospace; font-size:clamp(.7rem,1.6vmin,.9rem); color:var(--muted); } .dish .meta b { color:var(--c); }
+  @keyframes fill-beer  { 0%{width:0} 2%{width:100%} 90%{width:100%} 100%{width:0} }
+  @keyframes fill-salad { 0%{width:0} 4%{width:100%} 90%{width:100%} 100%{width:0} }
+  @keyframes fill-pizza { 0%{width:0} 70%{width:100%} 90%{width:100%} 100%{width:0} }
+  .map { border-collapse:collapse; font-size:clamp(.95rem,2.4vmin,1.35rem); width:100%; }
+  .map th { text-align:left; font-family:"IBM Plex Mono",monospace; font-size:clamp(.6rem,1.3vmin,.75rem); letter-spacing:.15em; text-transform:uppercase; color:var(--muted); font-weight:500; padding:.3rem .6rem; border-bottom:1px solid var(--line); }
+  .map td { padding:.55rem .6rem; border-bottom:1px solid var(--line); font-variant-numeric:tabular-nums; }
+  .map td .mono { color:var(--flame); font-size:.9em; }
+  .map tr.r1, .map tr.r2, .map tr.r3 { animation:rowin .6s ease-out both; } .map tr.r2 { animation-delay:.4s; } .map tr.r3 { animation-delay:.8s; }
+  @keyframes rowin { from{opacity:0; transform:translateX(-10px)} to{opacity:1; transform:none} }
+  .formula { margin:0; font-size:clamp(1rem,2.8vmin,1.6rem); color:var(--ink); animation:rowin .6s 1.3s ease-out both; }
+  .result { display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap; background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--good); border-radius:12px; padding:.8rem 1rem; }
+  .result .k, .numbers .k { font-family:"IBM Plex Mono",monospace; font-size:clamp(.62rem,1.4vmin,.8rem); letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .big { font-family:"Fraunces",serif; font-weight:600; font-size:clamp(1.8rem,6vmin,3.6rem); line-height:1; color:var(--ink); font-variant-numeric:tabular-nums; }
+  .result .big { color:var(--good); }
+  .numbers { display:grid; grid-template-columns:repeat(2,1fr); gap:clamp(.8rem,2.5vmin,1.6rem); }
+  .numbers > div { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:1rem 1.1rem; display:flex; flex-direction:column; gap:.5rem; animation:rowin .6s ease-out both; }
+  .numbers > div:nth-child(2) { animation-delay:.3s; } .numbers > div:nth-child(3) { animation-delay:.6s; } .numbers > div:nth-child(4) { animation-delay:.9s; }
+
+  /* scene animations (all loop; they restart each time a scene is shown) */
+  .slowtrain { animation:slowtrain 10s linear infinite; }
+  @keyframes slowtrain { 0%{transform:translateX(0)} 100%{transform:translateX(720px)} }
+  .fasttrain { animation:10s linear infinite; opacity:0; }
+  .fasttrain.t1 { animation-name:ft1; } .fasttrain.t2 { animation-name:ft2; } .fasttrain.t3 { animation-name:ft3; }
+  /* each fast train enters behind the slow one, catches it at 200 px/s, then crawls at its 72 px/s */
+  @keyframes ft1 { 0%,18%{opacity:0; transform:translateX(0)} 18.5%{opacity:1} 20.3%{transform:translateX(46px)} 100%{opacity:1; transform:translateX(620px)} }
+  @keyframes ft2 { 0%,26%{opacity:0; transform:translateX(0)} 26.5%{opacity:1} 28.6%{transform:translateX(52px)} 100%{opacity:1; transform:translateX(566px)} }
+  @keyframes ft3 { 0%,34%{opacity:0; transform:translateX(0)} 34.5%{opacity:1} 36.9%{transform:translateX(58px)} 100%{opacity:1; transform:translateX(512px)} }
+  .crowd circle { fill:#8ba0ad; opacity:0; animation:crowd 10s linear infinite; }
+  .crowd .c2{animation-delay:.6s} .crowd .c3{animation-delay:1.2s} .crowd .c4{animation-delay:1.8s} .crowd .c5{animation-delay:2.4s} .crowd .c6{animation-delay:3s} .crowd .c7{animation-delay:3.6s} .crowd .c8{animation-delay:4.2s}
+  @keyframes crowd { 0%,10%{opacity:0} 14%,70%{opacity:1} 76%,100%{opacity:0} }
+  .scene[data-i="1"] .cap.late { animation:capon 10s linear infinite; }
+  @keyframes capon { 0%,35%{opacity:0} 40%,72%{opacity:1} 78%,100%{opacity:0} }
+
+  .pz { transform-box:fill-box; transform-origin:center; animation:pzbake 6s ease-in-out infinite; } .pz.two { animation-delay:.7s; }
+  @keyframes pzbake { 0%,100%{transform:scale(.92); opacity:.75} 50%{transform:scale(1); opacity:1} }
+  .patience { transform-box:fill-box; transform-origin:left center; animation:patience 6s linear infinite; }
+  @keyframes patience { 0%{transform:scaleX(1); fill:#5cc082} 55%{transform:scaleX(.3); fill:#f2b04a} 70%,100%{transform:scaleX(0); fill:#ef6152} }
+  .stars { font-size:22px; fill:#f2b04a; animation:starsoff 6s linear infinite; } .stars.one { fill:#ef6152; animation:starson 6s linear infinite; }
+  @keyframes starsoff { 0%,68%{opacity:1} 72%,100%{opacity:0} }
+  @keyframes starson { 0%,68%{opacity:0} 72%,100%{opacity:1} }
+  .scene[data-i="3"] .cap.left { animation:starson 6s linear infinite; }
+
+  .waitq rect { stroke:var(--bad); stroke-width:2; stroke-opacity:0; animation:wlate 6s linear infinite; }
+  .waitq .w2{animation-delay:.2s} .waitq .w3{animation-delay:.4s} .waitq .w4{animation-delay:.6s} .waitq .w5{animation-delay:.8s}
+  @keyframes wlate { 0%,30%{stroke-opacity:0} 34%,92%{stroke-opacity:1} 96%,100%{stroke-opacity:0} }
+  .scene[data-i="5"] .cap.y1 { animation:capon 6s linear infinite; }
+  .cursor { animation:cursor 6s linear infinite; }
+  @keyframes cursor { 0%{transform:translateX(0)} 100%{transform:translateX(608px)} }
+  .pops rect { transform-box:fill-box; transform-origin:center; opacity:0; animation:pop 6s linear infinite; }
+  .pops .p1{animation-delay:0s} .pops .p2{animation-delay:.75s} .pops .p3{animation-delay:1.5s} .pops .p4{animation-delay:2.25s} .pops .p5{animation-delay:3s} .pops .p6{animation-delay:3.75s} .pops .p7{animation-delay:4.5s}
+  @keyframes pop { 0%,11%{opacity:0; transform:translateY(0)} 13%{opacity:1; transform:translateY(0)} 22%{opacity:1; transform:translateY(-28px)} 24%,100%{opacity:0; transform:translateY(-30px)} }
+
+  .fq rect { animation:fqserve 4s linear infinite; transform-box:fill-box; }
+  .fq .a2{animation-delay:1s} .fq .a3{animation-delay:2s} .fq .a4{animation-delay:3s}
+  @keyframes fqserve { 0%,70%{opacity:1; transform:translateX(0)} 90%{opacity:1; transform:translateX(60px)} 92%,100%{opacity:0} }
+  .lq rect { animation:lqserve 4s linear infinite; transform-box:fill-box; }
+  .lq .b1{animation-delay:3s} .lq .b2{animation-delay:2s} .lq .b3{animation-delay:1s}
+  @keyframes lqserve { 0%,70%{opacity:1; transform:translateX(0)} 90%{opacity:1; transform:translateX(60px)} 92%,100%{opacity:0} }
+  .bounce { animation:bounce 2s ease-out infinite; }
+  @keyframes bounce { 0%{transform:translateX(-60px); opacity:0} 30%{transform:translateX(0); opacity:1} 45%{transform:translateX(-14px)} 60%,100%{transform:translateX(-40px); opacity:0} }
+
+  .spark { animation:spark 4s linear infinite; }
+  @keyframes spark { 0%,24%{transform:translateX(0)} 25%,49%{transform:translateX(96px)} 50%,74%{transform:translateX(192px)} 75%,100%{transform:translateX(288px)} }
+  .padblk { animation:padglow 2.4s ease-in-out infinite; }
+  @keyframes padglow { 0%,100%{filter:none} 50%{filter:drop-shadow(0 0 6px #f2b04a)} }
+  .sweep1 { animation:sweep1 3s linear infinite; }
+  @keyframes sweep1 { 0%{transform:translateX(0)} 100%{transform:translateX(240px)} }
+  .lbl.lane { fill:var(--viz-ink); font-weight:600; }
+
+  .step, .arr, .crash, .replay { opacity:0; animation:stepin 9s linear infinite; }
+  .step.s1{animation-delay:0s} .arr.a1{animation-delay:.9s} .step.s2{animation-delay:1.2s} .arr.a2{animation-delay:2.6s} .step.s3{animation-delay:2.9s} .crash{animation-name:crashin} .replay{animation-name:replayin}
+  @keyframes stepin { 0%{opacity:0} 6%,100%{opacity:1} }
+  @keyframes crashin { 0%,44%{opacity:0} 48%,62%{opacity:1} 66%,100%{opacity:0} }
+  @keyframes replayin { 0%,64%{opacity:0} 70%,100%{opacity:1} }
+
+  @media (prefers-reduced-motion: reduce) { * { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+  
+  .stage .stove { fill:#0c1319; stroke:var(--flame-hot); stroke-width:1.6; }
+  .stage .pass { fill:var(--viz-line); }
+  .stage .track { fill:var(--viz-line); }
+  .stage .bar { fill:var(--braise); transform-box:fill-box; transform-origin:left center; opacity:0; }
+  .stage .cap { font-family:"IBM Plex Mono",monospace; font-size:9px; letter-spacing:.04em; fill:var(--viz-muted); opacity:0; }
+  .stage .cap.hot { fill:var(--bad); } .stage .cap.ok { fill:var(--good); } .stage .cap.hold { fill:var(--flame); }
+  .stage .tick { opacity:0; } .stage .tick.ok { fill:var(--good); }
+  .stage .tick.late { fill:none; stroke:var(--bad); stroke-width:2; } .stage .tick.shed { fill:none; stroke:var(--flame); stroke-width:2; }
+  .stage .chip.d { fill:var(--drink); } .stage .chip.s { fill:var(--salad); } .stage .chip.b { fill:var(--braise); }
+  .stage .cook { fill:#e7edf1; stroke:#0f151b; stroke-width:1.5; }
+  .stage .lbl.tiny { font-size:7px; fill:var(--bad); font-weight:600; } .stage .lbl.tiny.ink { fill:var(--viz-ink); font-weight:500; }
+  @media (prefers-reduced-motion: reduce) { .stage * { animation-duration:.001s !important; animation-iteration-count:1 !important; } }
+.stage.v-before .sc, .stage.v-before .chef, .stage.v-before .bar, .stage.v-before .cap, .stage.v-before .tick { animation:12s linear infinite; }
+.stage.v-before .sc rect { stroke:var(--bad); stroke-width:2.2; stroke-opacity:0; }
+.stage.v-before .chef.c1 { animation-name:st-chef1; } .stage.v-before .chef.c2 { animation-name:st-chef2; }
+.stage.v-before .sc.f1 { animation-name:st-f1; }
+.stage.v-before .sc.f2 { animation-name:st-f2; }
+.stage.v-before .sc.f3 { animation-name:st-f3; }
+.stage.v-before .sc.b1 { animation-name:st-b1; }
+.stage.v-before .sc.b2 { animation-name:st-b2; }
+.stage.v-before .sc.q1 { animation-name:st-q1; }
+.stage.v-before .sc.q2 { animation-name:st-q2; }
+.stage.v-before .sc.q3 { animation-name:st-q3; }
+.stage.v-before .sc.q4 { animation-name:st-q4; }
+.stage.v-before .sc.q5 { animation-name:st-q5; }
+.stage.v-before .sc.q6 { animation-name:st-q6; }
+.stage.v-before .sc.q7 { animation-name:st-q7; }
+.stage.v-before .sc.q1 rect { animation:12s linear infinite st-q1-late; }
+.stage.v-before .sc.q2 rect { animation:12s linear infinite st-q2-late; }
+.stage.v-before .sc.q3 rect { animation:12s linear infinite st-q3-late; }
+.stage.v-before .sc.q4 rect { animation:12s linear infinite st-q4-late; }
+.stage.v-before .sc.q5 rect { animation:12s linear infinite st-q5-late; }
+.stage.v-before .sc.q6 rect { animation:12s linear infinite st-q6-late; }
+.stage.v-before .sc.q7 rect { animation:12s linear infinite st-q7-late; }
+.stage.v-before .bar.b1 { animation-name:st-bar1; } .stage.v-before .cap.bl1 { animation-name:st-barlbl1; }
+.stage.v-before .bar.b2 { animation-name:st-bar2; } .stage.v-before .cap.bl2 { animation-name:st-barlbl2; }
+.stage.v-before .cap.calm { animation-name:st-cap-calm; }
+.stage.v-before .cap.both { animation-name:st-cap-both; }
+.stage.v-before .cap.late { animation-name:st-cap-late; }
+.stage.v-before .cap.drain { animation-name:st-cap-drain; }
+.stage.v-before .tick.t1 { animation-name:st-t1; }
+.stage.v-before .tick.t2 { animation-name:st-t2; }
+.stage.v-before .tick.t3 { animation-name:st-t3; }
+.stage.v-before .tick.t4 { animation-name:st-t4; }
+.stage.v-before .tick.t5 { animation-name:st-t5; }
+.stage.v-before .tick.t6 { animation-name:st-t6; }
+.stage.v-before .tick.t7 { animation-name:st-t7; }
+.stage.v-before .tick.t8 { animation-name:st-t8; }
+.stage.v-before .tick.t9 { animation-name:st-t9; }
+.stage.v-before .tick.t10 { animation-name:st-t10; }
+@keyframes st-f1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  1.67% { opacity:0; transform:translate(30px,62px); }
+  2.50% { opacity:1; }
+  7.50% { opacity:1; transform:translate(372px,62px); }
+  10.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-t1 {
+  0%,8.33% {opacity:0} 10.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-f2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  6.67% { opacity:0; transform:translate(30px,62px); }
+  7.50% { opacity:1; }
+  11.25% { opacity:1; transform:translate(350px,62px); }
+  12.50% { opacity:1; transform:translate(372px,126px); }
+  15.00% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes st-t2 {
+  0%,13.33% {opacity:0} 15.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-f3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  11.67% { opacity:0; transform:translate(30px,62px); }
+  12.50% { opacity:1; }
+  17.50% { opacity:1; transform:translate(372px,62px); }
+  20.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-t3 {
+  0%,18.33% {opacity:0} 20.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-b1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  15.83% { opacity:0; transform:translate(30px,62px); }
+  16.67% { opacity:1; }
+  20.00% { opacity:1; transform:translate(447px,62px); }
+  75.00% { opacity:1; transform:translate(447px,62px); }
+  77.50% { opacity:0; transform:translate(447px,62px); }
+  100% { opacity:0; transform:translate(447px,62px); }
+}
+@keyframes st-b2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  20.83% { opacity:0; transform:translate(30px,62px); }
+  21.67% { opacity:1; }
+  23.75% { opacity:1; transform:translate(350px,62px); }
+  25.00% { opacity:1; transform:translate(447px,126px); }
+  83.33% { opacity:1; transform:translate(447px,126px); }
+  85.83% { opacity:0; transform:translate(447px,126px); }
+  100% { opacity:0; transform:translate(447px,126px); }
+}
+@keyframes st-chef1 {
+  0.00% { transform:translate(372px,62px); }
+  19.17% { transform:translate(372px,62px); }
+  20.17% { transform:translate(418px,62px); }
+  75.00% { transform:translate(418px,62px); }
+  76.00% { transform:translate(372px,62px); }
+  100% { transform:translate(372px,62px); }
+}
+@keyframes st-chef2 {
+  0.00% { transform:translate(372px,126px); }
+  24.17% { transform:translate(372px,126px); }
+  25.17% { transform:translate(418px,126px); }
+  83.33% { transform:translate(418px,126px); }
+  84.33% { transform:translate(372px,126px); }
+  100% { transform:translate(372px,126px); }
+}
+@keyframes st-bar1 {
+  0%,20.00% { transform:scaleX(0); opacity:0; }
+  20.42% { opacity:1; }
+  75.00% { transform:scaleX(1); opacity:1; }
+  77.08%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes st-barlbl1 {
+  0%,20.00% { opacity:0; }
+  22.50%,75.00% { opacity:1; }
+  77.08%,100% { opacity:0; }
+}
+@keyframes st-bar2 {
+  0%,25.00% { transform:scaleX(0); opacity:0; }
+  25.42% { opacity:1; }
+  83.33% { transform:scaleX(1); opacity:1; }
+  85.42%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes st-barlbl2 {
+  0%,25.00% { opacity:0; }
+  27.50%,83.33% { opacity:1; }
+  85.42%,100% { opacity:0; }
+}
+@keyframes st-q1 {
+  0%,26.67% { opacity:0; transform:translate(30px,62px); }
+  27.50% { opacity:1; }
+  30.83% { opacity:1; transform:translate(320px,62px); }
+  76.25% { opacity:1; transform:translate(320px,62px); }
+  79.17% { opacity:1; transform:translate(372px,62px); }
+  81.25%,100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-q1-late {
+  0%,44.17% { stroke-opacity:0; }
+  45.83%,80.00% { stroke-opacity:1; }
+  81.25%,100% { stroke-opacity:0; }
+}
+@keyframes st-t4 {
+  0%,80.00% {opacity:0} 81.67%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q2 {
+  0%,32.50% { opacity:0; transform:translate(30px,62px); }
+  33.33% { opacity:1; }
+  36.67% { opacity:1; transform:translate(296px,62px); }
+  79.17% { opacity:1; transform:translate(296px,62px); }
+  82.08% { opacity:1; transform:translate(372px,62px); }
+  84.17%,100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-q2-late {
+  0%,50.00% { stroke-opacity:0; }
+  51.67%,82.92% { stroke-opacity:1; }
+  84.17%,100% { stroke-opacity:0; }
+}
+@keyframes st-t5 {
+  0%,82.92% {opacity:0} 84.58%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q3 {
+  0%,38.33% { opacity:0; transform:translate(30px,62px); }
+  39.17% { opacity:1; }
+  42.50% { opacity:1; transform:translate(272px,62px); }
+  82.08% { opacity:1; transform:translate(272px,62px); }
+  85.00% { opacity:1; transform:translate(372px,62px); }
+  87.08%,100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-q3-late {
+  0%,55.83% { stroke-opacity:0; }
+  57.50%,85.83% { stroke-opacity:1; }
+  87.08%,100% { stroke-opacity:0; }
+}
+@keyframes st-t6 {
+  0%,85.83% {opacity:0} 87.50%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q4 {
+  0%,44.17% { opacity:0; transform:translate(30px,62px); }
+  45.00% { opacity:1; }
+  48.33% { opacity:1; transform:translate(248px,62px); }
+  84.58% { opacity:1; transform:translate(248px,62px); }
+  87.50% { opacity:1; transform:translate(372px,126px); }
+  89.58%,100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes st-q4-late {
+  0%,61.67% { stroke-opacity:0; }
+  63.33%,88.33% { stroke-opacity:1; }
+  89.58%,100% { stroke-opacity:0; }
+}
+@keyframes st-t7 {
+  0%,88.33% {opacity:0} 90.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q5 {
+  0%,50.00% { opacity:0; transform:translate(30px,62px); }
+  50.83% { opacity:1; }
+  54.17% { opacity:1; transform:translate(224px,62px); }
+  85.00% { opacity:1; transform:translate(224px,62px); }
+  87.92% { opacity:1; transform:translate(372px,62px); }
+  90.00%,100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-q5-late {
+  0%,67.50% { stroke-opacity:0; }
+  69.17%,88.75% { stroke-opacity:1; }
+  90.00%,100% { stroke-opacity:0; }
+}
+@keyframes st-t8 {
+  0%,88.75% {opacity:0} 90.42%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q6 {
+  0%,55.83% { opacity:0; transform:translate(30px,62px); }
+  56.67% { opacity:1; }
+  60.00% { opacity:1; transform:translate(200px,62px); }
+  87.50% { opacity:1; transform:translate(200px,62px); }
+  90.42% { opacity:1; transform:translate(372px,126px); }
+  92.50%,100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes st-q6-late {
+  0%,73.33% { stroke-opacity:0; }
+  75.00%,91.25% { stroke-opacity:1; }
+  92.50%,100% { stroke-opacity:0; }
+}
+@keyframes st-t9 {
+  0%,91.25% {opacity:0} 92.92%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-q7 {
+  0%,61.67% { opacity:0; transform:translate(30px,62px); }
+  62.50% { opacity:1; }
+  65.83% { opacity:1; transform:translate(176px,62px); }
+  87.92% { opacity:1; transform:translate(176px,62px); }
+  90.83% { opacity:1; transform:translate(372px,62px); }
+  92.92%,100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes st-q7-late {
+  0%,79.17% { stroke-opacity:0; }
+  80.83%,91.67% { stroke-opacity:1; }
+  92.92%,100% { stroke-opacity:0; }
+}
+@keyframes st-t10 {
+  0%,91.67% {opacity:0} 93.33%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes st-cap-calm {
+  0%,0.83% {opacity:0} 3.33%,18.33% {opacity:1} 20.83%,100% {opacity:0}
+}
+@keyframes st-cap-both {
+  0%,25.00% {opacity:0} 27.50%,73.33% {opacity:1} 75.83%,100% {opacity:0}
+}
+@keyframes st-cap-late {
+  0%,44.17% {opacity:0} 46.67%,86.67% {opacity:1} 89.17%,100% {opacity:0}
+}
+@keyframes st-cap-drain {
+  0%,75.83% {opacity:0} 78.33%,94.17% {opacity:1} 96.67%,100% {opacity:0}
+}.stage.v-yield .sc, .stage.v-yield .chef, .stage.v-yield .bar, .stage.v-yield .cap, .stage.v-yield .tick { animation:12s linear infinite; }
+.stage.v-yield .sc rect { stroke:var(--bad); stroke-width:2.2; stroke-opacity:0; }
+.stage.v-yield .chef.c1 { animation-name:yl-chef1; } .stage.v-yield .chef.c2 { animation-name:yl-chef2; }
+.stage.v-yield .sc.f1 { animation-name:yl-f1; }
+.stage.v-yield .sc.f2 { animation-name:yl-f2; }
+.stage.v-yield .sc.f3 { animation-name:yl-f3; }
+.stage.v-yield .sc.b1 { animation-name:yl-b1; }
+.stage.v-yield .sc.b2 { animation-name:yl-b2; }
+.stage.v-yield .sc.q1 { animation-name:yl-q1; }
+.stage.v-yield .sc.q2 { animation-name:yl-q2; }
+.stage.v-yield .sc.q3 { animation-name:yl-q3; }
+.stage.v-yield .sc.q4 { animation-name:yl-q4; }
+.stage.v-yield .sc.q5 { animation-name:yl-q5; }
+.stage.v-yield .sc.q6 { animation-name:yl-q6; }
+.stage.v-yield .sc.q7 { animation-name:yl-q7; }
+.stage.v-yield .bar.b1 { animation-name:yl-bar1; } .stage.v-yield .cap.bl1 { animation-name:yl-barlbl1; }
+.stage.v-yield .bar.b2 { animation-name:yl-bar2; } .stage.v-yield .cap.bl2 { animation-name:yl-barlbl2; }
+.stage.v-yield .cap.h1 { animation-name:yl-hold1; }
+.stage.v-yield .cap.h2 { animation-name:yl-hold2; }
+.stage.v-yield .cap.calm { animation-name:yl-cap-calm; }
+.stage.v-yield .cap.both { animation-name:yl-cap-both; }
+.stage.v-yield .cap.done { animation-name:yl-cap-done; }
+.stage.v-yield .tick.t1 { animation-name:yl-t1; }
+.stage.v-yield .tick.t2 { animation-name:yl-t2; }
+.stage.v-yield .tick.t3 { animation-name:yl-t3; }
+.stage.v-yield .tick.t4 { animation-name:yl-t4; }
+.stage.v-yield .tick.t5 { animation-name:yl-t5; }
+.stage.v-yield .tick.t6 { animation-name:yl-t6; }
+.stage.v-yield .tick.t7 { animation-name:yl-t7; }
+.stage.v-yield .tick.t8 { animation-name:yl-t8; }
+.stage.v-yield .tick.t9 { animation-name:yl-t9; }
+.stage.v-yield .tick.t10 { animation-name:yl-t10; }
+@keyframes yl-f1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  1.67% { opacity:0; transform:translate(30px,62px); }
+  2.50% { opacity:1; }
+  7.50% { opacity:1; transform:translate(372px,62px); }
+  10.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t1 {
+  0%,8.33% {opacity:0} 10.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-f2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  6.67% { opacity:0; transform:translate(30px,62px); }
+  7.50% { opacity:1; }
+  11.25% { opacity:1; transform:translate(350px,62px); }
+  12.50% { opacity:1; transform:translate(372px,126px); }
+  15.00% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes yl-t2 {
+  0%,13.33% {opacity:0} 15.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-f3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  11.67% { opacity:0; transform:translate(30px,62px); }
+  12.50% { opacity:1; }
+  17.50% { opacity:1; transform:translate(372px,62px); }
+  20.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t3 {
+  0%,18.33% {opacity:0} 20.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-b1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  15.83% { opacity:0; transform:translate(30px,62px); }
+  16.67% { opacity:1; }
+  20.00% { opacity:1; transform:translate(447px,62px); }
+  30.67% { opacity:1; transform:translate(447px,62px); }
+  31.08% { opacity:.35; transform:translate(447px,62px); }
+  34.75% { opacity:.35; transform:translate(447px,62px); }
+  35.17% { opacity:1; transform:translate(447px,62px); }
+  42.33% { opacity:1; transform:translate(447px,62px); }
+  42.75% { opacity:.35; transform:translate(447px,62px); }
+  46.42% { opacity:.35; transform:translate(447px,62px); }
+  46.83% { opacity:1; transform:translate(447px,62px); }
+  55.67% { opacity:1; transform:translate(447px,62px); }
+  56.08% { opacity:.35; transform:translate(447px,62px); }
+  59.75% { opacity:.35; transform:translate(447px,62px); }
+  60.17% { opacity:1; transform:translate(447px,62px); }
+  69.00% { opacity:1; transform:translate(447px,62px); }
+  69.42% { opacity:.35; transform:translate(447px,62px); }
+  73.08% { opacity:.35; transform:translate(447px,62px); }
+  73.50% { opacity:1; transform:translate(447px,62px); }
+  93.00% { opacity:1; transform:translate(447px,62px); }
+  95.50% { opacity:0; transform:translate(447px,62px); }
+  100% { opacity:0; transform:translate(447px,62px); }
+}
+@keyframes yl-b2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  20.83% { opacity:0; transform:translate(30px,62px); }
+  21.67% { opacity:1; }
+  23.75% { opacity:1; transform:translate(350px,62px); }
+  25.00% { opacity:1; transform:translate(447px,126px); }
+  36.50% { opacity:1; transform:translate(447px,126px); }
+  36.92% { opacity:.35; transform:translate(447px,126px); }
+  40.58% { opacity:.35; transform:translate(447px,126px); }
+  41.00% { opacity:1; transform:translate(447px,126px); }
+  49.00% { opacity:1; transform:translate(447px,126px); }
+  49.42% { opacity:.35; transform:translate(447px,126px); }
+  53.08% { opacity:.35; transform:translate(447px,126px); }
+  53.50% { opacity:1; transform:translate(447px,126px); }
+  62.33% { opacity:1; transform:translate(447px,126px); }
+  62.75% { opacity:.35; transform:translate(447px,126px); }
+  66.42% { opacity:.35; transform:translate(447px,126px); }
+  66.83% { opacity:1; transform:translate(447px,126px); }
+  96.83% { opacity:1; transform:translate(447px,126px); }
+  99.33% { opacity:0; transform:translate(447px,126px); }
+  100% { opacity:0; transform:translate(447px,126px); }
+}
+@keyframes yl-bar1 {
+  0%,20.00% { transform:scaleX(0); opacity:0; }
+  20.42% { opacity:1; }
+  30.67% { transform:scaleX(0.194); opacity:1; }
+  35.17% { transform:scaleX(0.194); opacity:1; }
+  42.33% { transform:scaleX(0.324); opacity:1; }
+  46.83% { transform:scaleX(0.324); opacity:1; }
+  55.67% { transform:scaleX(0.485); opacity:1; }
+  60.17% { transform:scaleX(0.485); opacity:1; }
+  69.00% { transform:scaleX(0.645); opacity:1; }
+  73.50% { transform:scaleX(0.645); opacity:1; }
+  93.00% { transform:scaleX(1); opacity:1; }
+  95.08%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes yl-barlbl1 {
+  0%,20.00% { opacity:0; }
+  22.50%,93.00% { opacity:1; }
+  95.08%,100% { opacity:0; }
+}
+@keyframes yl-hold1 {
+  0%{opacity:0}
+  30.67%{opacity:0} 31.08%,34.75%{opacity:1} 35.17%{opacity:0}
+  42.33%{opacity:0} 42.75%,46.42%{opacity:1} 46.83%{opacity:0}
+  55.67%{opacity:0} 56.08%,59.75%{opacity:1} 60.17%{opacity:0}
+  69.00%{opacity:0} 69.42%,73.08%{opacity:1} 73.50%{opacity:0}
+  100%{opacity:0}
+}
+@keyframes yl-bar2 {
+  0%,25.00% { transform:scaleX(0); opacity:0; }
+  25.42% { opacity:1; }
+  36.50% { transform:scaleX(0.197); opacity:1; }
+  41.00% { transform:scaleX(0.197); opacity:1; }
+  49.00% { transform:scaleX(0.334); opacity:1; }
+  53.50% { transform:scaleX(0.334); opacity:1; }
+  62.33% { transform:scaleX(0.486); opacity:1; }
+  66.83% { transform:scaleX(0.486); opacity:1; }
+  96.83% { transform:scaleX(1); opacity:1; }
+  98.92%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes yl-barlbl2 {
+  0%,25.00% { opacity:0; }
+  27.50%,96.83% { opacity:1; }
+  98.92%,100% { opacity:0; }
+}
+@keyframes yl-hold2 {
+  0%{opacity:0}
+  36.50%{opacity:0} 36.92%,40.58%{opacity:1} 41.00%{opacity:0}
+  49.00%{opacity:0} 49.42%,53.08%{opacity:1} 53.50%{opacity:0}
+  62.33%{opacity:0} 62.75%,66.42%{opacity:1} 66.83%{opacity:0}
+  100%{opacity:0}
+}
+@keyframes yl-q1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  26.67% { opacity:0; transform:translate(30px,62px); }
+  27.50% { opacity:1; }
+  31.83% { opacity:1; transform:translate(372px,62px); }
+  34.33% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t4 {
+  0%,33.08% {opacity:0} 34.75%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  32.50% { opacity:0; transform:translate(30px,62px); }
+  33.33% { opacity:1; }
+  36.42% { opacity:1; transform:translate(350px,62px); }
+  37.67% { opacity:1; transform:translate(372px,126px); }
+  40.17% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes yl-t5 {
+  0%,38.92% {opacity:0} 40.58%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  38.33% { opacity:0; transform:translate(30px,62px); }
+  39.17% { opacity:1; }
+  43.50% { opacity:1; transform:translate(372px,62px); }
+  46.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t6 {
+  0%,44.75% {opacity:0} 46.42%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q4 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  45.00% { opacity:0; transform:translate(30px,62px); }
+  45.83% { opacity:1; }
+  48.92% { opacity:1; transform:translate(350px,62px); }
+  50.17% { opacity:1; transform:translate(372px,126px); }
+  52.67% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes yl-t7 {
+  0%,51.42% {opacity:0} 53.08%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q5 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  51.67% { opacity:0; transform:translate(30px,62px); }
+  52.50% { opacity:1; }
+  56.83% { opacity:1; transform:translate(372px,62px); }
+  59.33% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t8 {
+  0%,58.08% {opacity:0} 59.75%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q6 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  58.33% { opacity:0; transform:translate(30px,62px); }
+  59.17% { opacity:1; }
+  62.25% { opacity:1; transform:translate(350px,62px); }
+  63.50% { opacity:1; transform:translate(372px,126px); }
+  66.00% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes yl-t9 {
+  0%,64.75% {opacity:0} 66.42%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-q7 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  65.00% { opacity:0; transform:translate(30px,62px); }
+  65.83% { opacity:1; }
+  70.17% { opacity:1; transform:translate(372px,62px); }
+  72.67% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes yl-t10 {
+  0%,71.42% {opacity:0} 73.08%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes yl-chef1 {
+  0.00% { transform:translate(372px,62px); }
+  19.17% { transform:translate(372px,62px); }
+  20.17% { transform:translate(418px,62px); }
+  30.67% { transform:translate(418px,62px); }
+  31.67% { transform:translate(372px,62px); }
+  34.17% { transform:translate(372px,62px); }
+  35.17% { transform:translate(418px,62px); }
+  42.33% { transform:translate(418px,62px); }
+  43.33% { transform:translate(372px,62px); }
+  45.83% { transform:translate(372px,62px); }
+  46.83% { transform:translate(418px,62px); }
+  55.67% { transform:translate(418px,62px); }
+  56.67% { transform:translate(372px,62px); }
+  59.17% { transform:translate(372px,62px); }
+  60.17% { transform:translate(418px,62px); }
+  69.00% { transform:translate(418px,62px); }
+  70.00% { transform:translate(372px,62px); }
+  72.50% { transform:translate(372px,62px); }
+  73.50% { transform:translate(418px,62px); }
+  93.00% { transform:translate(418px,62px); }
+  94.00% { transform:translate(372px,62px); }
+  100% { transform:translate(372px,62px); }
+}
+@keyframes yl-chef2 {
+  0.00% { transform:translate(372px,126px); }
+  24.17% { transform:translate(372px,126px); }
+  25.17% { transform:translate(418px,126px); }
+  36.50% { transform:translate(418px,126px); }
+  37.50% { transform:translate(372px,126px); }
+  40.00% { transform:translate(372px,126px); }
+  41.00% { transform:translate(418px,126px); }
+  49.00% { transform:translate(418px,126px); }
+  50.00% { transform:translate(372px,126px); }
+  52.50% { transform:translate(372px,126px); }
+  53.50% { transform:translate(418px,126px); }
+  62.33% { transform:translate(418px,126px); }
+  63.33% { transform:translate(372px,126px); }
+  65.83% { transform:translate(372px,126px); }
+  66.83% { transform:translate(418px,126px); }
+  96.83% { transform:translate(418px,126px); }
+  97.83% { transform:translate(372px,126px); }
+  100% { transform:translate(372px,126px); }
+}
+@keyframes yl-cap-calm {
+  0%,0.83% {opacity:0} 3.33%,18.33% {opacity:1} 20.83%,100% {opacity:0}
+}
+@keyframes yl-cap-both {
+  0%,25.00% {opacity:0} 27.50%,74.17% {opacity:1} 76.67%,100% {opacity:0}
+}
+@keyframes yl-cap-done {
+  0%,77.50% {opacity:0} 80.00%,95.00% {opacity:1} 97.50%,100% {opacity:0}
+}.stage.v-door .sc, .stage.v-door .chef, .stage.v-door .bar, .stage.v-door .cap, .stage.v-door .tick { animation:12s linear infinite; }
+.stage.v-door .sc rect { stroke:var(--bad); stroke-width:2.2; stroke-opacity:0; }
+.stage.v-door .chef.c1 { animation-name:dr-chef1; } .stage.v-door .chef.c2 { animation-name:dr-chef2; }
+.stage.v-door .sc.f1 { animation-name:dr-f1; }
+.stage.v-door .sc.f2 { animation-name:dr-f2; }
+.stage.v-door .sc.f3 { animation-name:dr-f3; }
+.stage.v-door .sc.b1 { animation-name:dr-b1; }
+.stage.v-door .sc.b2 { animation-name:dr-b2; }
+.stage.v-door .sc.q1 { animation-name:dr-q1; }
+.stage.v-door .sc.q2 { animation-name:dr-q2; }
+.stage.v-door .sc.q3 { animation-name:dr-q3; }
+.stage.v-door .sc.q4 { animation-name:dr-q4; }
+.stage.v-door .sc.q5 { animation-name:dr-q5; }
+.stage.v-door .sc.r1 { animation-name:dr-r1; }
+.stage.v-door .sc.r1b { animation-name:dr-r1b; }
+.stage.v-door .sc.r2 { animation-name:dr-r2; }
+.stage.v-door .sc.r2b { animation-name:dr-r2b; }
+.stage.v-door .sc.r3 { animation-name:dr-r3; }
+.stage.v-door .sc.r3b { animation-name:dr-r3b; }
+.stage.v-door .sc.r4 { animation-name:dr-r4; }
+.stage.v-door .sc.r4b { animation-name:dr-r4b; }
+.stage.v-door .sc.b3 { animation-name:dr-b3; }
+.stage.v-door .bar.b1 { animation-name:dr-bar1; } .stage.v-door .cap.bl1 { animation-name:dr-barlbl1; }
+.stage.v-door .bar.b2 { animation-name:dr-bar2; } .stage.v-door .cap.bl2 { animation-name:dr-barlbl2; }
+.stage.v-door .bar.b3 { animation-name:dr-bar3; } .stage.v-door .cap.bl3 { animation-name:dr-barlbl3; }
+.stage.v-door .cap.h1 { animation-name:dr-hold1; }
+.stage.v-door .cap.h2 { animation-name:dr-hold2; }
+.stage.v-door .cap.calm { animation-name:dr-cap-calm; }
+.stage.v-door .cap.rush { animation-name:dr-cap-rush; }
+.stage.v-door .cap.door { animation-name:dr-cap-door; }
+.stage.v-door .cap.free { animation-name:dr-cap-free; }
+.stage.v-door .tick.t1 { animation-name:dr-t1; }
+.stage.v-door .tick.t2 { animation-name:dr-t2; }
+.stage.v-door .tick.t3 { animation-name:dr-t3; }
+.stage.v-door .tick.t4 { animation-name:dr-t4; }
+.stage.v-door .tick.t5 { animation-name:dr-t5; }
+.stage.v-door .tick.t6 { animation-name:dr-t6; }
+.stage.v-door .tick.t7 { animation-name:dr-t7; }
+.stage.v-door .tick.t8 { animation-name:dr-t8; }
+.stage.v-door .tick.t9 { animation-name:dr-t9; }
+.stage.v-door .tick.t10 { animation-name:dr-t10; }
+.stage.v-door .tick.t11 { animation-name:dr-t11; }
+.stage.v-door .tick.t12 { animation-name:dr-t12; }
+.stage.v-door .tick.t13 { animation-name:dr-t13; }
+.stage.v-door .tick.t14 { animation-name:dr-t14; }
+.stage.v-door .tick.t15 { animation-name:dr-t15; }
+.stage.v-door .tick.t16 { animation-name:dr-t16; }
+@keyframes dr-f1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  1.67% { opacity:0; transform:translate(30px,62px); }
+  2.50% { opacity:1; }
+  7.50% { opacity:1; transform:translate(372px,62px); }
+  10.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t1 {
+  0%,8.33% {opacity:0} 10.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-f2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  6.67% { opacity:0; transform:translate(30px,62px); }
+  7.50% { opacity:1; }
+  11.25% { opacity:1; transform:translate(350px,62px); }
+  12.50% { opacity:1; transform:translate(372px,126px); }
+  15.00% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes dr-t2 {
+  0%,13.33% {opacity:0} 15.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-f3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  11.67% { opacity:0; transform:translate(30px,62px); }
+  12.50% { opacity:1; }
+  17.50% { opacity:1; transform:translate(372px,62px); }
+  20.00% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t3 {
+  0%,18.33% {opacity:0} 20.00%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-b1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  15.83% { opacity:0; transform:translate(30px,62px); }
+  16.67% { opacity:1; }
+  20.00% { opacity:1; transform:translate(447px,62px); }
+  29.83% { opacity:1; transform:translate(447px,62px); }
+  30.25% { opacity:.35; transform:translate(447px,62px); }
+  33.92% { opacity:.35; transform:translate(447px,62px); }
+  34.33% { opacity:1; transform:translate(447px,62px); }
+  50.67% { opacity:1; transform:translate(447px,62px); }
+  51.08% { opacity:.35; transform:translate(447px,62px); }
+  52.58% { opacity:1; transform:translate(447px,62px); }
+  53.00% { opacity:.35; transform:translate(447px,62px); }
+  54.75% { opacity:.35; transform:translate(447px,62px); }
+  55.17% { opacity:1; transform:translate(447px,62px); }
+  56.67% { opacity:.35; transform:translate(447px,62px); }
+  57.08% { opacity:1; transform:translate(447px,62px); }
+  70.67% { opacity:1; transform:translate(447px,62px); }
+  71.08% { opacity:.35; transform:translate(447px,62px); }
+  73.42% { opacity:1; transform:translate(447px,62px); }
+  73.83% { opacity:.35; transform:translate(447px,62px); }
+  74.75% { opacity:.35; transform:translate(447px,62px); }
+  75.17% { opacity:1; transform:translate(447px,62px); }
+  77.50% { opacity:.35; transform:translate(447px,62px); }
+  77.92% { opacity:1; transform:translate(447px,62px); }
+  97.50% { opacity:1; transform:translate(447px,62px); }
+  100.00% { opacity:0; transform:translate(447px,62px); }
+  100% { opacity:0; transform:translate(447px,62px); }
+}
+@keyframes dr-b2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  20.83% { opacity:0; transform:translate(30px,62px); }
+  21.67% { opacity:1; }
+  23.75% { opacity:1; transform:translate(350px,62px); }
+  25.00% { opacity:1; transform:translate(447px,126px); }
+  39.83% { opacity:1; transform:translate(447px,126px); }
+  40.25% { opacity:.35; transform:translate(447px,126px); }
+  41.75% { opacity:1; transform:translate(447px,126px); }
+  42.17% { opacity:.35; transform:translate(447px,126px); }
+  43.92% { opacity:.35; transform:translate(447px,126px); }
+  44.33% { opacity:1; transform:translate(447px,126px); }
+  45.83% { opacity:.35; transform:translate(447px,126px); }
+  46.25% { opacity:1; transform:translate(447px,126px); }
+  61.50% { opacity:1; transform:translate(447px,126px); }
+  61.92% { opacity:.35; transform:translate(447px,126px); }
+  63.42% { opacity:1; transform:translate(447px,126px); }
+  63.83% { opacity:.35; transform:translate(447px,126px); }
+  65.58% { opacity:.35; transform:translate(447px,126px); }
+  66.00% { opacity:1; transform:translate(447px,126px); }
+  67.50% { opacity:.35; transform:translate(447px,126px); }
+  67.92% { opacity:1; transform:translate(447px,126px); }
+  101.33% { opacity:1; transform:translate(447px,126px); }
+  103.83% { opacity:0; transform:translate(447px,126px); }
+  100% { opacity:0; transform:translate(447px,126px); }
+}
+@keyframes dr-bar1 {
+  0%,20.00% { transform:scaleX(0); opacity:0; }
+  20.42% { opacity:1; }
+  29.83% { transform:scaleX(0.179); opacity:1; }
+  34.33% { transform:scaleX(0.179); opacity:1; }
+  50.67% { transform:scaleX(0.476); opacity:1; }
+  55.17% { transform:scaleX(0.476); opacity:1; }
+  52.58% { transform:scaleX(0.429); opacity:1; }
+  57.08% { transform:scaleX(0.429); opacity:1; }
+  70.67% { transform:scaleX(0.676); opacity:1; }
+  75.17% { transform:scaleX(0.676); opacity:1; }
+  73.42% { transform:scaleX(0.644); opacity:1; }
+  77.92% { transform:scaleX(0.644); opacity:1; }
+  97.50% { transform:scaleX(1); opacity:1; }
+  99.58%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes dr-barlbl1 {
+  0%,20.00% { opacity:0; }
+  22.50%,97.50% { opacity:1; }
+  99.58%,100% { opacity:0; }
+}
+@keyframes dr-hold1 {
+  0%{opacity:0}
+  29.83%{opacity:0} 30.25%,33.92%{opacity:1} 34.33%{opacity:0}
+  50.67%{opacity:0} 51.08%,54.75%{opacity:1} 55.17%{opacity:0}
+  52.58%{opacity:0} 53.00%,56.67%{opacity:1} 57.08%{opacity:0}
+  70.67%{opacity:0} 71.08%,74.75%{opacity:1} 75.17%{opacity:0}
+  73.42%{opacity:0} 73.83%,77.50%{opacity:1} 77.92%{opacity:0}
+  100%{opacity:0}
+}
+@keyframes dr-bar2 {
+  0%,25.00% { transform:scaleX(0); opacity:0; }
+  25.42% { opacity:1; }
+  39.83% { transform:scaleX(0.254); opacity:1; }
+  44.33% { transform:scaleX(0.254); opacity:1; }
+  41.75% { transform:scaleX(0.210); opacity:1; }
+  46.25% { transform:scaleX(0.210); opacity:1; }
+  61.50% { transform:scaleX(0.471); opacity:1; }
+  66.00% { transform:scaleX(0.471); opacity:1; }
+  63.42% { transform:scaleX(0.427); opacity:1; }
+  67.92% { transform:scaleX(0.427); opacity:1; }
+  101.33% { transform:scaleX(1); opacity:1; }
+  103.42%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes dr-barlbl2 {
+  0%,25.00% { opacity:0; }
+  27.50%,101.33% { opacity:1; }
+  103.42%,100% { opacity:0; }
+}
+@keyframes dr-hold2 {
+  0%{opacity:0}
+  39.83%{opacity:0} 40.25%,43.92%{opacity:1} 44.33%{opacity:0}
+  41.75%{opacity:0} 42.17%,45.83%{opacity:1} 46.25%{opacity:0}
+  61.50%{opacity:0} 61.92%,65.58%{opacity:1} 66.00%{opacity:0}
+  63.42%{opacity:0} 63.83%,67.50%{opacity:1} 67.92%{opacity:0}
+  100%{opacity:0}
+}
+@keyframes dr-q1 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  25.83% { opacity:0; transform:translate(30px,62px); }
+  26.67% { opacity:1; }
+  31.00% { opacity:1; transform:translate(372px,62px); }
+  33.50% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t4 {
+  0%,32.25% {opacity:0} 33.92%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-q2 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  35.83% { opacity:0; transform:translate(30px,62px); }
+  36.67% { opacity:1; }
+  39.75% { opacity:1; transform:translate(350px,62px); }
+  41.00% { opacity:1; transform:translate(372px,126px); }
+  43.50% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes dr-t5 {
+  0%,42.25% {opacity:0} 43.92%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-q3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  46.67% { opacity:0; transform:translate(30px,62px); }
+  47.50% { opacity:1; }
+  51.83% { opacity:1; transform:translate(372px,62px); }
+  54.33% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t6 {
+  0%,53.08% {opacity:0} 54.75%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-q4 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  57.50% { opacity:0; transform:translate(30px,62px); }
+  58.33% { opacity:1; }
+  61.42% { opacity:1; transform:translate(350px,62px); }
+  62.67% { opacity:1; transform:translate(372px,126px); }
+  65.17% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes dr-t7 {
+  0%,63.92% {opacity:0} 65.58%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-q5 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  66.67% { opacity:0; transform:translate(30px,62px); }
+  67.50% { opacity:1; }
+  71.83% { opacity:1; transform:translate(372px,62px); }
+  74.33% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t8 {
+  0%,73.08% {opacity:0} 74.75%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r1 {
+  0%,30.00% { opacity:0; transform:translate(30px,62px); }
+  30.83% { opacity:1; }
+  34.17% { opacity:1; transform:translate(338px,62px); }
+  35.17% { opacity:1; transform:translate(318px,64px); }
+  37.50%,100% { opacity:0; transform:translate(292px,72px); }
+}
+@keyframes dr-t9 {
+  0%,35.00% {opacity:0} 36.67%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r1b {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  37.75% { opacity:0; transform:translate(30px,62px); }
+  38.58% { opacity:1; }
+  41.67% { opacity:1; transform:translate(350px,62px); }
+  42.92% { opacity:1; transform:translate(372px,126px); }
+  45.42% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes dr-t10 {
+  0%,44.17% {opacity:0} 45.83%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r2 {
+  0%,40.83% { opacity:0; transform:translate(30px,62px); }
+  41.67% { opacity:1; }
+  45.00% { opacity:1; transform:translate(338px,62px); }
+  46.00% { opacity:1; transform:translate(318px,64px); }
+  48.33%,100% { opacity:0; transform:translate(292px,72px); }
+}
+@keyframes dr-t11 {
+  0%,45.83% {opacity:0} 47.50%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r2b {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  48.58% { opacity:0; transform:translate(30px,62px); }
+  49.42% { opacity:1; }
+  53.75% { opacity:1; transform:translate(372px,62px); }
+  56.25% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t12 {
+  0%,55.00% {opacity:0} 56.67%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r3 {
+  0%,51.67% { opacity:0; transform:translate(30px,62px); }
+  52.50% { opacity:1; }
+  55.83% { opacity:1; transform:translate(338px,62px); }
+  56.83% { opacity:1; transform:translate(318px,64px); }
+  59.17%,100% { opacity:0; transform:translate(292px,72px); }
+}
+@keyframes dr-t13 {
+  0%,56.67% {opacity:0} 58.33%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r3b {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  59.42% { opacity:0; transform:translate(30px,62px); }
+  60.25% { opacity:1; }
+  63.33% { opacity:1; transform:translate(350px,62px); }
+  64.58% { opacity:1; transform:translate(372px,126px); }
+  67.08% { opacity:0; transform:translate(372px,126px); }
+  100% { opacity:0; transform:translate(372px,126px); }
+}
+@keyframes dr-t14 {
+  0%,65.83% {opacity:0} 67.50%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r4 {
+  0%,61.67% { opacity:0; transform:translate(30px,62px); }
+  62.50% { opacity:1; }
+  65.83% { opacity:1; transform:translate(338px,62px); }
+  66.83% { opacity:1; transform:translate(318px,64px); }
+  69.17%,100% { opacity:0; transform:translate(292px,72px); }
+}
+@keyframes dr-t15 {
+  0%,66.67% {opacity:0} 68.33%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-r4b {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  69.42% { opacity:0; transform:translate(30px,62px); }
+  70.25% { opacity:1; }
+  74.58% { opacity:1; transform:translate(372px,62px); }
+  77.08% { opacity:0; transform:translate(372px,62px); }
+  100% { opacity:0; transform:translate(372px,62px); }
+}
+@keyframes dr-t16 {
+  0%,75.83% {opacity:0} 77.50%,97.50% {opacity:1} 99.58%,100% {opacity:0}
+}
+@keyframes dr-b3 {
+  0.00% { opacity:0; transform:translate(30px,62px); }
+  75.42% { opacity:0; transform:translate(30px,62px); }
+  76.25% { opacity:1; }
+  79.58% { opacity:1; transform:translate(447px,62px); }
+  95.83% { opacity:1; transform:translate(447px,62px); }
+  98.33% { opacity:0; transform:translate(447px,62px); }
+  100% { opacity:0; transform:translate(447px,62px); }
+}
+@keyframes dr-bar3 {
+  0%,79.58% { transform:scaleX(0); opacity:0; }
+  80.00% { opacity:1; }
+  95.83% { transform:scaleX(1); opacity:1; }
+  97.92%,100% { transform:scaleX(1); opacity:0; }
+}
+@keyframes dr-barlbl3 {
+  0%,79.58% { opacity:0; }
+  82.08%,95.83% { opacity:1; }
+  97.92%,100% { opacity:0; }
+}
+@keyframes dr-chef1 {
+  0.00% { transform:translate(372px,62px); }
+  19.17% { transform:translate(372px,62px); }
+  20.17% { transform:translate(418px,62px); }
+  29.83% { transform:translate(418px,62px); }
+  30.83% { transform:translate(372px,62px); }
+  33.33% { transform:translate(372px,62px); }
+  34.33% { transform:translate(418px,62px); }
+  50.67% { transform:translate(418px,62px); }
+  51.67% { transform:translate(372px,62px); }
+  54.17% { transform:translate(372px,62px); }
+  55.17% { transform:translate(418px,62px); }
+  52.58% { transform:translate(418px,62px); }
+  53.58% { transform:translate(372px,62px); }
+  56.08% { transform:translate(372px,62px); }
+  57.08% { transform:translate(418px,62px); }
+  70.67% { transform:translate(418px,62px); }
+  71.67% { transform:translate(372px,62px); }
+  74.17% { transform:translate(372px,62px); }
+  75.17% { transform:translate(418px,62px); }
+  73.42% { transform:translate(418px,62px); }
+  74.42% { transform:translate(372px,62px); }
+  76.92% { transform:translate(372px,62px); }
+  77.92% { transform:translate(418px,62px); }
+  97.50% { transform:translate(418px,62px); }
+  98.50% { transform:translate(372px,62px); }
+  79.17% { transform:translate(372px,62px); }
+  80.17% { transform:translate(418px,62px); }
+  100% { transform:translate(418px,62px); }
+}
+@keyframes dr-chef2 {
+  0.00% { transform:translate(372px,126px); }
+  24.17% { transform:translate(372px,126px); }
+  25.17% { transform:translate(418px,126px); }
+  39.83% { transform:translate(418px,126px); }
+  40.83% { transform:translate(372px,126px); }
+  43.33% { transform:translate(372px,126px); }
+  44.33% { transform:translate(418px,126px); }
+  41.75% { transform:translate(418px,126px); }
+  42.75% { transform:translate(372px,126px); }
+  45.25% { transform:translate(372px,126px); }
+  46.25% { transform:translate(418px,126px); }
+  61.50% { transform:translate(418px,126px); }
+  62.50% { transform:translate(372px,126px); }
+  65.00% { transform:translate(372px,126px); }
+  66.00% { transform:translate(418px,126px); }
+  63.42% { transform:translate(418px,126px); }
+  64.42% { transform:translate(372px,126px); }
+  66.92% { transform:translate(372px,126px); }
+  67.92% { transform:translate(418px,126px); }
+  101.33% { transform:translate(418px,126px); }
+  102.33% { transform:translate(372px,126px); }
+  100% { transform:translate(372px,126px); }
+}
+@keyframes dr-cap-calm {
+  0%,0.83% {opacity:0} 3.33%,18.33% {opacity:1} 20.83%,100% {opacity:0}
+}
+@keyframes dr-cap-rush {
+  0%,26.67% {opacity:0} 29.17%,74.17% {opacity:1} 76.67%,100% {opacity:0}
+}
+@keyframes dr-cap-door {
+  0%,31.67% {opacity:0} 34.17%,75.00% {opacity:1} 77.50%,100% {opacity:0}
+}
+@keyframes dr-cap-free {
+  0%,77.50% {opacity:0} 80.00%,95.00% {opacity:1} 97.50%,100% {opacity:0}
+}
+  .stagescene .stage { padding:0; }
+  .stage .lbl { font-family:"IBM Plex Mono",monospace; font-size:9px; fill:var(--viz-muted); letter-spacing:.04em; }
+</style>
+
+<div class="deck">
+
+<section class="scene indexscene" data-i="0">
+  <header><span class="kick">index</span><h1>The Obsidio <span class="em">Line</span> · animations</h1></header>
+  <div class="body"><ol class="index">
+<li><b>1</b> the line — why a pizza blocks a beer</li>
+<li><b>2</b> yielding — the chef steps to the pass, the bake holds, the beer is poured</li>
+<li><b>3</b> the door — a rush, and a quick no at the door</li>
+<li><b>4</b> interleaving — four chains fill each other's waits</li>
+</ol>
+<p class="hint">press a number to cut to it · <b>0</b> or <b>Esc</b> back here · → ← step · <b>T</b> title on/off · <b>F</b> fullscreen</p></div>
+  <aside class="note" hidden>Cut-away reel: keep your slides up, switch to this window for the animation, then back.</aside>
+</section>
+<section class="scene stagescene" data-i="1">
+  <header><span class="kick">1 · the line</span><h1>Why a pizza blocks a beer</h1></header>
+  <div class="body"><div class="stage v-before viz"><svg viewBox="0 0 640 230" role="img" aria-label="before any fix — one line, two chefs, orders in a 6 : 3 : 1 mix">
+<text class="lbl" x="12" y="18">before any fix — one line, two chefs, orders in a 6 : 3 : 1 mix</text>
+<text class="lbl" x="20" y="44">orders in →</text>
+<line x1="20" y1="62" x2="345" y2="62" stroke="var(--viz-line)" stroke-width="10" stroke-linecap="round"/>
+<text class="lbl" x="176" y="44">the queue</text>
+<rect class="pass" x="368" y="44" width="8" height="36" rx="2"/><rect class="pass" x="368" y="108" width="8" height="36" rx="2"/>
+<text class="lbl" x="372" y="96" text-anchor="middle">pass</text><text class="lbl" x="372" y="160" text-anchor="middle">pass</text>
+<rect class="stove" x="400" y="36" width="64" height="48" rx="5"/><rect class="stove" x="400" y="100" width="64" height="48" rx="5"/>
+<text class="lbl" x="432" y="96" text-anchor="middle">oven 1</text><text class="lbl" x="432" y="160" text-anchor="middle">oven 2</text>
+<rect class="track" x="470" y="54" width="152" height="16" rx="4"/><rect class="track" x="470" y="118" width="152" height="16" rx="4"/>
+<rect class="bar b1" x="470" y="54" width="152" height="16" rx="4"/><text class="cap bl1" x="470" y="46">pizza · 50,000-step bake…</text><rect class="bar b2" x="470" y="118" width="152" height="16" rx="4"/><text class="cap bl2" x="470" y="110">pizza · 50,000-step bake…</text>
+<text class="lbl" x="400" y="184">what the grader counts</text>
+<text class="lbl" x="400" y="218">on time · scored</text><text class="lbl" x="500" y="218">late · not counted</text>
+<rect class="tick ok t1" x="400" y="192" width="10" height="10" rx="2"/><rect class="tick ok t2" x="414" y="192" width="10" height="10" rx="2"/><rect class="tick ok t3" x="428" y="192" width="10" height="10" rx="2"/><rect class="tick late t4" x="500" y="192" width="10" height="10" rx="2"/><rect class="tick late t5" x="514" y="192" width="10" height="10" rx="2"/><rect class="tick late t6" x="528" y="192" width="10" height="10" rx="2"/><rect class="tick late t7" x="542" y="192" width="10" height="10" rx="2"/><rect class="tick late t8" x="556" y="192" width="10" height="10" rx="2"/><rect class="tick late t9" x="570" y="192" width="10" height="10" rx="2"/><rect class="tick late t10" x="584" y="192" width="10" height="10" rx="2"/>
+<text class="cap ok calm" x="20" y="200">calm: chefs at the pass — every beer poured on arrival</text><text class="cap hot both" x="20" y="200">both chefs are at the ovens — nobody is at the pass</text><text class="cap hot late" x="176" y="90">waiting… past their bars · late</text><text class="cap drain" x="20" y="200">the pizzas come out, the chefs come back — too late to count</text>
+<g class="sc f1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f2"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f3"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b1"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b2"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q2"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q3"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q4"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q5"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q6"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q7"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g>
+<g class="chef c1"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 1</text></g>
+<g class="chef c2"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 2</text></g>
+</svg></div>
+<div class="legend"><span><i class="sw beer"></i>beer · /price</span><span><i class="sw salad"></i>salad · /stats</span><span><i class="sw pizza"></i>pizza · /risk</span><span><i class="sw late"></i>past its latency bar</span></div></div>
+  <aside class="note" hidden>If we hyperfocus on the pizza, everyone who wants a beer gets mad. Watch the line: the moment both chefs are at the ovens, every beer behind them stops — not because it needs work, but because nobody is free to hand it over. Served late, those beers score nothing.</aside>
+</section>
+<section class="scene stagescene" data-i="2">
+  <header><span class="kick">2 · yielding</span><h1>Just because the ovens are full, you don't stop serving beer</h1></header>
+  <div class="body"><div class="stage v-yield viz"><svg viewBox="0 0 640 230" role="img" aria-label="with yielding — the same orders, the same two chefs">
+<text class="lbl" x="12" y="18">with yielding — the same orders, the same two chefs</text>
+<text class="lbl" x="20" y="44">orders in →</text>
+<line x1="20" y1="62" x2="345" y2="62" stroke="var(--viz-line)" stroke-width="10" stroke-linecap="round"/>
+<text class="lbl" x="176" y="44">the queue</text>
+<rect class="pass" x="368" y="44" width="8" height="36" rx="2"/><rect class="pass" x="368" y="108" width="8" height="36" rx="2"/>
+<text class="lbl" x="372" y="96" text-anchor="middle">pass</text><text class="lbl" x="372" y="160" text-anchor="middle">pass</text>
+<rect class="stove" x="400" y="36" width="64" height="48" rx="5"/><rect class="stove" x="400" y="100" width="64" height="48" rx="5"/>
+<text class="lbl" x="432" y="96" text-anchor="middle">oven 1</text><text class="lbl" x="432" y="160" text-anchor="middle">oven 2</text>
+<rect class="track" x="470" y="54" width="152" height="16" rx="4"/><rect class="track" x="470" y="118" width="152" height="16" rx="4"/>
+<rect class="bar b1" x="470" y="54" width="152" height="16" rx="4"/><text class="cap bl1" x="470" y="46">pizza · 50,000-step bake…</text><text class="cap hold h1" x="470" y="84">on hold · chef at the pass</text><rect class="bar b2" x="470" y="118" width="152" height="16" rx="4"/><text class="cap bl2" x="470" y="110">pizza · 50,000-step bake…</text><text class="cap hold h2" x="470" y="148">on hold · chef at the pass</text>
+<text class="lbl" x="400" y="184">what the grader counts</text>
+<text class="lbl" x="400" y="218">on time · scored</text><text class="lbl" x="500" y="218">late · not counted</text>
+<rect class="tick ok t1" x="400" y="192" width="10" height="10" rx="2"/><rect class="tick ok t2" x="414" y="192" width="10" height="10" rx="2"/><rect class="tick ok t3" x="428" y="192" width="10" height="10" rx="2"/><rect class="tick ok t4" x="442" y="192" width="10" height="10" rx="2"/><rect class="tick ok t5" x="456" y="192" width="10" height="10" rx="2"/><rect class="tick ok t6" x="470" y="192" width="10" height="10" rx="2"/><rect class="tick ok t7" x="484" y="192" width="10" height="10" rx="2"/><rect class="tick ok t8" x="400" y="178" width="10" height="10" rx="2"/><rect class="tick ok t9" x="414" y="178" width="10" height="10" rx="2"/><rect class="tick ok t10" x="428" y="178" width="10" height="10" rx="2"/>
+<text class="cap ok calm" x="20" y="200">calm: chefs at the pass — every beer poured on arrival</text><text class="cap ok both" x="20" y="200">a beer arrives: chef to the pass, bake on hold, pour, back</text><text class="cap done" x="20" y="200">pizzas out a little later (really ~2% of the bake) — and every beer on time</text>
+<g class="sc f1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f2"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f3"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b1"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b2"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q2"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q3"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q4"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q5"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q6"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q7"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g>
+<g class="chef c1"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 1</text></g>
+<g class="chef c2"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 2</text></g>
+</svg></div><div class="legend"><span><i class="sw beer"></i>beer · /price</span><span><i class="sw salad"></i>salad · /stats</span><span><i class="sw pizza"></i>pizza · /risk</span><span><i class="sw late"></i>past its latency bar</span><span><i class="sw shed"></i>turned away (503)</span></div></div>
+  <aside class="note" hidden>Same orders, same two chefs. Every 256 hash rounds — about 60 microseconds — the chef glances at the bar and pours whatever is waiting, then goes straight back to the oven. The pizza comes out a moment later; every beer is on time. Beer p95 went from 43 ms to 10 ms, score +54%.</aside>
+</section>
+<section class="scene stagescene" data-i="3">
+  <header><span class="kick">3 · the door</span><h1>A quick no beats a long wait</h1></header>
+  <div class="body"><div class="stage v-door viz"><svg viewBox="0 0 640 230" role="img" aria-label="with the door — a rush, two chefs, an error budget of 0.88%">
+<text class="lbl" x="12" y="18">with the door — a rush, two chefs, an error budget of 0.88%</text>
+<text class="lbl" x="20" y="44">orders in →</text>
+<line x1="20" y1="62" x2="345" y2="62" stroke="var(--viz-line)" stroke-width="10" stroke-linecap="round"/>
+<text class="lbl" x="176" y="44">the queue</text><rect x="352" y="42" width="6" height="40" rx="2" fill="var(--flame)"/><text class="lbl" x="350" y="36">door</text>
+<rect class="pass" x="368" y="44" width="8" height="36" rx="2"/><rect class="pass" x="368" y="108" width="8" height="36" rx="2"/>
+<text class="lbl" x="372" y="96" text-anchor="middle">pass</text><text class="lbl" x="372" y="160" text-anchor="middle">pass</text>
+<rect class="stove" x="400" y="36" width="64" height="48" rx="5"/><rect class="stove" x="400" y="100" width="64" height="48" rx="5"/>
+<text class="lbl" x="432" y="96" text-anchor="middle">oven 1</text><text class="lbl" x="432" y="160" text-anchor="middle">oven 2</text>
+<rect class="track" x="470" y="54" width="152" height="16" rx="4"/><rect class="track" x="470" y="118" width="152" height="16" rx="4"/>
+<rect class="bar b1" x="470" y="54" width="152" height="16" rx="4"/><text class="cap bl1" x="470" y="46">pizza · 50,000-step bake…</text><text class="cap hold h1" x="470" y="84">on hold · chef at the pass</text><rect class="bar b2" x="470" y="118" width="152" height="16" rx="4"/><text class="cap bl2" x="470" y="110">pizza · 50,000-step bake…</text><text class="cap hold h2" x="470" y="148">on hold · chef at the pass</text><rect class="bar b3" x="470" y="54" width="152" height="16" rx="4"/><text class="cap bl3" x="470" y="46">pizza · 50,000-step bake…</text>
+<text class="lbl" x="400" y="184">what the grader counts</text>
+<text class="lbl" x="400" y="218">on time · scored</text><text class="lbl" x="500" y="218">turned away · in budget</text>
+<rect class="tick ok t1" x="400" y="192" width="10" height="10" rx="2"/><rect class="tick ok t2" x="414" y="192" width="10" height="10" rx="2"/><rect class="tick ok t3" x="428" y="192" width="10" height="10" rx="2"/><rect class="tick ok t4" x="442" y="192" width="10" height="10" rx="2"/><rect class="tick ok t5" x="456" y="192" width="10" height="10" rx="2"/><rect class="tick ok t6" x="470" y="192" width="10" height="10" rx="2"/><rect class="tick ok t7" x="484" y="192" width="10" height="10" rx="2"/><rect class="tick ok t8" x="400" y="178" width="10" height="10" rx="2"/><rect class="tick shed t9" x="500" y="192" width="10" height="10" rx="2"/><rect class="tick ok t10" x="414" y="178" width="10" height="10" rx="2"/><rect class="tick shed t11" x="514" y="192" width="10" height="10" rx="2"/><rect class="tick ok t12" x="428" y="178" width="10" height="10" rx="2"/><rect class="tick shed t13" x="528" y="192" width="10" height="10" rx="2"/><rect class="tick ok t14" x="442" y="178" width="10" height="10" rx="2"/><rect class="tick shed t15" x="542" y="192" width="10" height="10" rx="2"/><rect class="tick ok t16" x="456" y="178" width="10" height="10" rx="2"/>
+<text class="cap ok calm" x="20" y="200">calm: chefs at the pass — every beer poured on arrival</text><text class="cap hot rush" x="20" y="200">a rush: more pizzas than the ovens can bake</text><text class="cap hot door" x="168" y="90">ovens full? a quick no — 1 ms</text><text class="cap ok free" x="20" y="214">turned away → back for a beer · next pizza in when an oven frees</text>
+<g class="sc f1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f2"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc f3"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b1"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b2"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q1"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q2"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q3"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q4"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc q5"><rect class="chip s" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc r1"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/><text class="lbl tiny" x="0" y="-11" text-anchor="middle">503</text></g><g class="sc r1b"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc r2"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/><text class="lbl tiny" x="0" y="-11" text-anchor="middle">503</text></g><g class="sc r2b"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc r3"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/><text class="lbl tiny" x="0" y="-11" text-anchor="middle">503</text></g><g class="sc r3b"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc r4"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/><text class="lbl tiny" x="0" y="-11" text-anchor="middle">503</text></g><g class="sc r4b"><rect class="chip d" x="-9" y="-7" width="18" height="14" rx="2.5"/></g><g class="sc b3"><rect class="chip b" x="-9" y="-7" width="18" height="14" rx="2.5"/></g>
+<g class="chef c1"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 1</text></g>
+<g class="chef c2"><circle class="cook" r="7"/><text class="lbl tiny ink" y="-11" text-anchor="middle">chef 2</text></g>
+</svg></div><div class="legend"><span><i class="sw beer"></i>beer · /price</span><span><i class="sw salad"></i>salad · /stats</span><span><i class="sw pizza"></i>pizza · /risk</span><span><i class="sw late"></i>past its latency bar</span><span><i class="sw shed"></i>turned away (503)</span></div></div>
+  <aside class="note" hidden>Now a rush: more pizza orders than two ovens can bake. Parked customers earn nothing, and the oldest order will blow its deadline even if served now. So: newest first, stale ones skipped, and when both ovens are busy and someone is already waiting, a new pizza order is turned away at the door in a millisecond — inside an error budget of 0.88% against the 1% gate. That customer comes straight back and orders beers; the moment an oven frees, the next pizza goes in.</aside>
+</section>
+<section class="scene " data-i="4">
+  <header><span class="kick">4 · interleaving</span><h1>Four chains, interleaved</h1></header>
+  <div class="body"><div class="two even">
+<div class="viz"><svg viewBox="0 0 300 150">
+<text class="lbl" x="10" y="16">one chain at a time</text>
+<text class="lbl lane" x="10" y="75">chain A</text>
+<rect x="50" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="90" y="60" width="40" height="22" rx="4" fill="#263542"/><rect x="130" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="170" y="60" width="40" height="22" rx="4" fill="#263542"/><rect x="210" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="250" y="60" width="40" height="22" rx="4" fill="#263542"/>
+<text class="lbl" x="70" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="110" y="54" text-anchor="middle" style="font-size:7px">wait</text><text class="lbl" x="150" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="190" y="54" text-anchor="middle" style="font-size:7px">wait</text><text class="lbl" x="230" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="270" y="54" text-anchor="middle" style="font-size:7px">wait</text>
+<g class="sweep1"><line x1="50" y1="50" x2="50" y2="92" stroke="#f2b04a" stroke-width="2"/></g>
+<text class="cap" style="opacity:1" x="10" y="112">each step needs the previous result —</text>
+<text class="cap" style="opacity:1" x="10" y="124">half the time the core is just waiting</text>
+<text class="cap hot" style="opacity:1" x="10" y="142">4 chains this way: 4 × the wall time</text>
+</svg></div>
+<div class="viz"><svg viewBox="0 0 300 150">
+<text class="lbl" x="10" y="16">four chains, one core, interleaved</text>
+<text class="lbl lane" x="10" y="41">chain A</text><text class="lbl lane" x="10" y="57">chain B</text><text class="lbl lane" x="10" y="73">chain C</text><text class="lbl lane" x="10" y="89">chain D</text>
+<rect x="50" y="32" width="40" height="12" rx="3" fill="#f2764e"/><rect x="130" y="32" width="40" height="12" rx="3" fill="#f2764e"/><rect x="210" y="32" width="40" height="12" rx="3" fill="#f2764e"/>
+<rect x="70" y="48" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="150" y="48" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="230" y="48" width="40" height="12" rx="3" fill="#f5a36b"/>
+<rect x="90" y="64" width="40" height="12" rx="3" fill="#f2764e"/><rect x="170" y="64" width="40" height="12" rx="3" fill="#f2764e"/><rect x="250" y="64" width="40" height="12" rx="3" fill="#f2764e"/>
+<rect x="110" y="80" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="190" y="80" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="270" y="80" width="20" height="12" rx="3" fill="#f5a36b"/>
+<text class="lbl" x="150" y="104" text-anchor="middle" style="font-size:7px">while A waits, B hashes; while B waits, C hashes …</text>
+<g class="sweep1"><line x1="50" y1="26" x2="50" y2="96" stroke="#f2b04a" stroke-width="2"/></g>
+<text class="cap ok" style="opacity:1" x="10" y="124">the waits overlap — no idle gaps</text>
+<text class="cap ok" style="opacity:1" x="10" y="142">per chain −25% (arm64) / −5% (x86)</text>
+</svg></div>
+</div>
+<div class="result"><span class="k">All hashing work together</span><span class="big">+84%</span><span class="mono">1,953,954 → 3,598,675 on the x86 reference, exact grader</span></div></div>
+  <aside class="note" hidden>A single SHA-256 chain is strictly serial: each step needs the previous result, so the core sits idle waiting. Run four independent chains and interleave their instructions — while chain A waits on its result, chain B hashes, then C, then D — and the waits overlap. Taking all the hashing work together we raised the score by around 80%.</aside>
+</section>
+</div>
+<div class="progress" id="progress"></div>
+<div class="foot"><span id="counter"></span><span>The Obsidio Line · animations · 0 index</span></div>
+
+<script>
+(function () {
+  const scenes = Array.from(document.querySelectorAll('.scene'));
+  let i = Math.max(0, Math.min(scenes.length - 1, parseInt(location.hash.slice(1), 10) || 0));
+  let notes = false;
+  document.body.classList.add('notitle');
+  function show(n) {
+    i = (n + scenes.length) % scenes.length;
+    scenes.forEach((s, k) => { s.classList.toggle('active', k === i); s.querySelector('.note').hidden = !(notes && k === i); });
+    document.getElementById('counter').textContent = i === 0 ? 'index' : i + ' / ' + (scenes.length - 1);
+    document.getElementById('progress').style.width = (i / (scenes.length - 1) * 100) + '%';
+    history.replaceState(null, '', '#' + i);
+  }
+  document.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k >= '1' && k <= '9') { const n = parseInt(k, 10); if (n < scenes.length) show(n); }
+    else if (k === '0' || k === 'Escape' || k === 'Home') show(0);
+    else if (k === 'ArrowRight' || k === ' ' || k === 'PageDown') { e.preventDefault(); show(i + 1); }
+    else if (k === 'ArrowLeft' || k === 'PageUp') { e.preventDefault(); show(i - 1); }
+    else if (k.toLowerCase() === 'n') { notes = !notes; show(i); }
+    else if (k.toLowerCase() === 't') document.body.classList.toggle('notitle');
+    else if (k.toLowerCase() === 'f') { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); }
+  });
+  document.querySelector('.deck').addEventListener('click', (e) => {
+    if (e.target.closest('.note')) return;
+    show(e.clientX < window.innerWidth / 3 ? i - 1 : i + 1);
+  });
+  show(i);
+})();
+</script>
