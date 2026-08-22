@@ -142,7 +142,7 @@
   @keyframes padglow { 0%,100%{filter:none} 50%{filter:drop-shadow(0 0 6px #f2b04a)} }
   .sweep1 { animation:sweep1 3s linear infinite; }
   @keyframes sweep1 { 0%{transform:translateX(0)} 100%{transform:translateX(240px)} }
-  .lbl.lane { fill:var(--viz-ink); font-weight:600; }
+  .lbl.lane { fill:var(--viz-ink); font-weight:600; font-size:8px; }
 
   .step, .arr, .crash, .replay { opacity:0; animation:stepin 9s linear infinite; }
   .step.s1{animation-delay:0s} .arr.a1{animation-delay:.9s} .step.s2{animation-delay:1.2s} .arr.a2{animation-delay:2.6s} .step.s3{animation-delay:2.9s} .crash{animation-name:crashin} .replay{animation-name:replayin}
@@ -1226,7 +1226,7 @@
   <div class="body"><div class="two even">
 <div class="viz"><svg viewBox="0 0 300 150">
 <text class="lbl" x="10" y="16">one chain at a time</text>
-<text class="lbl lane" x="10" y="75">chain A</text>
+<text class="lbl lane" x="6" y="75">chain A</text>
 <rect x="50" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="90" y="60" width="40" height="22" rx="4" fill="#263542"/><rect x="130" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="170" y="60" width="40" height="22" rx="4" fill="#263542"/><rect x="210" y="60" width="40" height="22" rx="4" fill="#f2764e"/><rect x="250" y="60" width="40" height="22" rx="4" fill="#263542"/>
 <text class="lbl" x="70" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="110" y="54" text-anchor="middle" style="font-size:7px">wait</text><text class="lbl" x="150" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="190" y="54" text-anchor="middle" style="font-size:7px">wait</text><text class="lbl" x="230" y="54" text-anchor="middle" style="font-size:7px">hash</text><text class="lbl" x="270" y="54" text-anchor="middle" style="font-size:7px">wait</text>
 <g class="sweep1"><line x1="50" y1="50" x2="50" y2="92" stroke="#f2b04a" stroke-width="2"/></g>
@@ -1236,7 +1236,7 @@
 </svg></div>
 <div class="viz"><svg viewBox="0 0 300 150">
 <text class="lbl" x="10" y="16">four chains, one core, interleaved</text>
-<text class="lbl lane" x="10" y="41">chain A</text><text class="lbl lane" x="10" y="57">chain B</text><text class="lbl lane" x="10" y="73">chain C</text><text class="lbl lane" x="10" y="89">chain D</text>
+<text class="lbl lane" x="6" y="41">chain A</text><text class="lbl lane" x="6" y="57">chain B</text><text class="lbl lane" x="6" y="73">chain C</text><text class="lbl lane" x="6" y="89">chain D</text>
 <rect x="50" y="32" width="40" height="12" rx="3" fill="#f2764e"/><rect x="130" y="32" width="40" height="12" rx="3" fill="#f2764e"/><rect x="210" y="32" width="40" height="12" rx="3" fill="#f2764e"/>
 <rect x="70" y="48" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="150" y="48" width="40" height="12" rx="3" fill="#f5a36b"/><rect x="230" y="48" width="40" height="12" rx="3" fill="#f5a36b"/>
 <rect x="90" y="64" width="40" height="12" rx="3" fill="#f2764e"/><rect x="170" y="64" width="40" height="12" rx="3" fill="#f2764e"/><rect x="250" y="64" width="40" height="12" rx="3" fill="#f2764e"/>
