@@ -337,3 +337,24 @@ Entry format (see the /experiment skill):
   all bars pass. Chains/s +31% — score tracks chain throughput almost 1:1.
 - **Verdict:** KEPT — champion is now the direct-kernel build.
   **x86 headline: ~2.71M work_score** (baseline 1.95M two hours earlier).
+
+## 2026-08-22 Pairing dispatcher + 2-lane SHA-NI kernel (x86 full A/B — KEPT)
+
+- **SHA:** candidate fa6ffbd vs champion f5674e4 (direct kernel), set
+  pairing-x86-01.
+- **Hypothesis:** sha256rnds2 latency-bounds a single chain; interleaving two
+  independent chains per core hides it. Microbench said 1.166×; the in-chain
+  boot race said 1.35× (each lane's hex overlaps the other lane's hashing).
+- **Change:** app/sha256block2_amd64.s (generated 2-lane interleave of the
+  vendored stdlib routine — benchmarks/gen2lane.py), kernelSum64Pair +
+  riskChainPair, and the worker-model gate: riskSlots hash workers pop 1-2
+  live fresh waiters off the LIFO stack (staleness-skip at take, governor
+  and front-door shed unchanged; front door now keyed on idle workers).
+  Boot race keeps pairing only on a ≥5% win. Race hammer, stale-take,
+  50k-pair differential, full-chain pair equivalence, smoke: all green.
+- **Result (bracketed full grading.js):** 2,712,083 / **3,461,856** /
+  2,718,186 — **+27.4% vs the stronger champion side** (drift 0.22%);
+  errors 0.584%; risk p95 90.6ms (best recorded); price/stats p95 11.0ms;
+  all bars pass.
+- **Verdict:** KEPT — champion is now fa6ffbd.
+  **Day total: 1.95M → 3.46M (+77%) in four evidence-gated steps.**

@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T03:20:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "pairing-x86-01",
+  "candidate": "pairing-dispatcher-2lane-kernel (advait app, fa6ffbd)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [2712083, 2718186],
+    "candidate_score": 3461856,
+    "candidate_vs_stronger_champion_percent": 27.36,
+    "champion_drift_percent": 0.22,
+    "error_rate_percent": 0.584,
+    "all_latency_gates_passed": true,
+    "risk_p95_ms_candidate": 90.6
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "champion=f5674e4 (direct kernel), candidate=fa6ffbd (hash workers run two chains per core through generated 2-lane interleaved SHA-NI asm; admission semantics unchanged)",
+    "boot race measured 1.35x in-chain pair ratio; end-to-end +27.4% — carried almost fully through the closed loop",
+    "risk p95 IMPROVED 103->91ms; day total vs morning baseline: 1.95M -> 3.46M (+77%)"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Pairing dispatcher' entry"
+}
