@@ -174,3 +174,38 @@ func TestPatienceTracksChainCost(t *testing.T) {
 		t.Fatalf("patience out of range after a freak sample: %s", got)
 	}
 }
+
+func TestHeldWaiterIsServedLateInsteadOfAbandoned(t *testing.T) {
+	g := newTestGate(true, 88, 10*time.Millisecond)
+	fillBudget(g, 10000)
+	for range 88 {
+		g.countError() // budget exhausted: the waiter cannot shed itself
+	}
+	job := testJob("held")
+	g.admit(job)
+	done := make(chan struct{})
+	var result riskResult
+	var ok bool
+	go func() {
+		result, ok = g.wait(job)
+		close(done)
+	}()
+	// After the hold cap the waiter re-parks as fresh; a worker then serves it.
+	deadline := time.Now().Add(2 * time.Second)
+	var batch [maxRiskLanes]*riskJob
+	for time.Now().Before(deadline) {
+		if job.abandoned {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	count := g.take(4, batch[:])
+	if count != 1 || !batch[0].late || batch[0].seed != "held" {
+		t.Fatalf("expected the re-parked late job, got %d", count)
+	}
+	batch[0].result <- riskResult{hash: [64]byte{'x'}}
+	<-done
+	if !ok || result.hash[0] != 'x' {
+		t.Fatal("late job was not served to the original waiter")
+	}
+}

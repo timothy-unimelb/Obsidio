@@ -29,9 +29,13 @@ import (
 // 3.6M on the separated x86 reference.
 
 const (
-	riskLatencyBar      = 1500 * time.Millisecond
-	riskSafetyMargin    = 300 * time.Millisecond
-	minimumPatience     = 100 * time.Millisecond
+	riskLatencyBar   = 1500 * time.Millisecond
+	riskSafetyMargin = 300 * time.Millisecond
+	minimumPatience  = 100 * time.Millisecond
+	// holdCapMultiple bounds how long a waiter past patience may be held when
+	// the error budget cannot afford to shed it; after that it is re-parked
+	// as fresh and served late rather than left until its client gives up.
+	holdCapMultiple     = 2
 	defaultShedBudgetBP = 88
 	parkBackstop        = 4096 // memory backstop only; ~20x the published peak
 	budgetMinResponses  = 500
@@ -44,6 +48,7 @@ type riskJob struct {
 	result    chan riskResult
 	taken     bool // under gate.mu: a worker owns it and a result will arrive
 	abandoned bool // under gate.mu: the waiter left; skip at take time
+	late      bool // re-parked after the hold cap: serve regardless of age
 }
 
 type riskGate struct {
@@ -146,7 +151,10 @@ func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
 		}
 	}
 
-	timer := time.NewTimer(g.patience())
+	patience := g.patience()
+	holdCap := time.NewTimer(holdCapMultiple * patience)
+	defer holdCap.Stop()
+	timer := time.NewTimer(patience)
 	defer timer.Stop()
 	for {
 		select {
@@ -163,7 +171,44 @@ func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
 				return g.abandon(job)
 			}
 			timer.Reset(100 * time.Millisecond)
+		case <-holdCap.C:
+			// The budget never recovered. Holding the client until it times
+			// out would turn one stale request into a multi-second sample;
+			// re-park it as fresh instead. It was already charged as an error
+			// when skipped, so serving it late only over-counts.
+			if late, ok := g.readmit(job); ok {
+				return g.waitLate(late)
+			}
+			return <-job.result, true // a worker already owns it
 		}
+	}
+}
+
+// readmit replaces a stale waiter with a fresh copy at the top of the stack.
+// It returns ok=false when a worker already owns the original.
+func (g *riskGate) readmit(job *riskJob) (*riskJob, bool) {
+	g.mu.Lock()
+	if job.taken {
+		g.mu.Unlock()
+		return nil, false
+	}
+	job.abandoned = true
+	late := &riskJob{seed: job.seed, queuedAt: time.Now(), ctx: job.ctx, result: job.result, late: true}
+	g.parked = append(g.parked, late)
+	g.mu.Unlock()
+	select {
+	case g.wake <- struct{}{}:
+	default:
+	}
+	return late, true
+}
+
+func (g *riskGate) waitLate(job *riskJob) (riskResult, bool) {
+	select {
+	case result := <-job.result:
+		return result, true
+	case <-job.ctx.Done():
+		return g.abandon(job)
 	}
 }
 
@@ -203,7 +248,7 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 			if job.abandoned || job.ctx.Err() != nil {
 				continue
 			}
-			if g.shed && now.Sub(job.queuedAt) > stale {
+			if g.shed && !job.late && now.Sub(job.queuedAt) > stale {
 				g.errors.Add(1) // counted now; its client will see a timeout or a 503
 				continue
 			}
