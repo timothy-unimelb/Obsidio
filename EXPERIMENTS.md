@@ -490,3 +490,19 @@ Entry format (see the /experiment skill):
   2.5×-slower silicon with zero retuning — the constants derived themselves
   (calibration 16.6ms → stride 2048, patience 1.18s). Bar-safety story
   complete: fast box 4.17M, slow box 812k, both 4/4 bars.
+
+## 2026-08-22 Co-located k6 + local verification (submission build d8d9999)
+
+- **Co-located** (k6 on the SAME box as the container — the possible grader
+  topology we had never tested): 2,879,823 @ 0.80% errors, all bars pass
+  (risk p95 110.1ms, price p95 11.5ms). Score drops vs separate-loadgen
+  (CPU contention, expected) but NO socket-level error storm — the
+  governor's accounting holds without a separate load host.
+- **Local Mac verification** (arm64: all x86 kernels inactive — proves the
+  fallback + gate + derived budget alone): 1,212,105, best local run ever
+  recorded (+5% over the previous local best), 4/4 bars, 0.76% errors,
+  peak RSS 483MiB. Recorded in bench/history.jsonl run 13.
+- **Also:** shed budget now DERIVES from the declared error gate
+  (RISK_ERR_GATE_BP, default 100bp → budget 88bp, override clamped to 95%
+  of gate; unit-tested) — a locked-script threshold change is a one-ENV
+  update, closing the "#1 could-fuck-us" procedural risk.

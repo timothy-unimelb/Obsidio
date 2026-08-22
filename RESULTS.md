@@ -20,6 +20,7 @@ Score = weighted 200s under the 4.5-min k6 grading load (1×/price + 3×/stats +
 | 10 | 2026-08-22 00:30 | [`46894e4`](https://github.com/timothy-unimelb/Obsidio/commit/46894e4)\* | Wave 1 keeper build: GOGC=off+GOMEMLIMIT + calibrated Gosched yield + safety bundle (test-in-build, defer release, go.mod 1.26) | **1,154,625** | +11% | 12.0 | 12.1 | 955.5 | 0.01% | 4/4 |
 | 11 | 2026-08-22 10:21 | [`a8ec6c0`](https://github.com/timothy-unimelb/Obsidio/commit/a8ec6c0)\* | LIFO governor v2: staleness-skip at grant + front-door budgeted shed | **1,097,306** | -5% | 11.9 | 11.9 | 243.6 | 0.55% | 4/4 |
 | 12 | 2026-08-22 10:37 | [`efeec33`](https://github.com/timothy-unimelb/Obsidio/commit/efeec33)\* | Contended boot calibration (c=2) + live chain-cost EWMA driving patience/staleness window | **1,154,460** | +5% | 11.9 | 12.0 | 233.2 | 0.55% | 4/4 |
+| 13 | 2026-08-22 15:34 | [`d8d9999`](https://github.com/timothy-unimelb/Obsidio/commit/d8d9999) | Submission build d8d9999 local verification (Mac, co-located k6, cpuset 0,1) | **1,212,105** | +5% | 11.5 | 11.5 | 272.0 | 0.76% | 4/4 |
 
 \* dirty tree — run included uncommitted changes on top of that commit.
 
