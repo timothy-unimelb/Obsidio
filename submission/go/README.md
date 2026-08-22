@@ -8,6 +8,9 @@ complete scored API while keeping the cheap path independent of the heavy one:
 - `/risk` work runs only on two permanent worker goroutines fed by a bounded
   FIFO queue (`RISK_QUEUE`, default 32). Handlers enqueue a job and wait on
   their own result channel; a cancelled request is dropped without being hashed.
+- Each worker drains up to four queued jobs (`RISK_LANES`) and hashes them as
+  interleaved independent chains, so the core can overlap one chain's SHA
+  latency with another's work. Every chain still performs all 50,000 rounds.
 - `/price` and `/stats` never touch that queue, so they stay schedulable no
   matter how deep the risk backlog is.
 - The risk kernel performs all 50,000 SHA-256 → lowercase-hex rounds in a fixed
@@ -52,20 +55,20 @@ at `--cpus=2 --memory=2g` and the untouched published `k6/grading.js`
 
 | Metric | Result | Bar |
 | --- | ---: | ---: |
-| `work_score` | 1,987,151 | — |
-| completed requests | 796,456 / 796,456 | — |
+| `work_score` | 2,062,911 | — |
+| completed requests | 826,875 / 826,875 | — |
 | error rate | 0.00% | <1% |
-| `/price` p95 | 25.07 ms | <200 ms |
-| `/stats` p95 | 24.90 ms | <500 ms |
-| `/risk` p95 | 442.78 ms | <1,500 ms |
+| `/price` p95 | 22.25 ms | <200 ms |
+| `/stats` p95 | 22.22 ms | <500 ms |
+| `/risk` p95 | 422.60 ms | <1,500 ms |
 
 The grading CPU model is unspecified, so this is reference evidence, not a
 prediction of the judge's absolute score. Every number above is reproducible
 from the raw summaries, append-only history, and decision records under
 `benchmarks/`; see `benchmarks/PROTOCOL.md` for how comparisons are run.
 
-`RISK_WORKERS` accepts `1` or `2` so both configurations can be compared on the
-real grading hardware. The submitted default is `2`.
+`RISK_WORKERS` (1–2) and `RISK_LANES` (1–4) can be varied on the real grading
+hardware. The submitted defaults are `2` and `4`.
 
 See [RESILIENCE.md](RESILIENCE.md) for the bottleneck analysis, design
 rationale, measured progression, and the trade-offs and rejected experiments.

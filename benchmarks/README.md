@@ -72,15 +72,18 @@ node benchmarks/record-decision.mjs benchmarks/decisions/<comparison-set>.json
   `d7b259eb36cd1a13da1366c2d61b3cddcde36354a3604bc78a7a33f56998d20f`
 - Repetitions: 3 full runs per measured checkpoint; report the median
 
-## Latest accepted local comparison
+## Latest accepted comparison
 
-- Date: 2026-08-22 (Australia/Melbourne)
+- Date: 2026-08-22
+- Environment: separated AWS x86-64 (`c7i.xlarge` target capped to 2 CPUs /
+  2 GiB, `c7i.large` load host, same AZ, private network)
 - Sequence: compact-hex champion `45ce2c7` → multi-lane candidate `b29480e` →
   champion
-- Exact scores: 3,038,794 → 3,316,347 → 3,039,407
-- Candidate improvement: +9.11% over the stronger champion side; +0.02%
-  champion drift
+- Exact scores: 2,018,311 → 2,062,911 → 2,003,123
+- Candidate improvement: +2.21% over the stronger champion side; −0.75%
+  champion drift. Local arm64 bracket: 3,038,794 → 3,316,347 → 3,039,407
+  (+9.11%, +0.02% drift)
 - Errors: 0.00%; every published p95 gate passed
-- Verdict: current local champion, pending separated x86 confirmation
+- Verdict: accepted champion, pending six-run milestone and portability set
 - Detailed evidence:
   [`experiments/2026-08-22-risk-lanes.md`](experiments/2026-08-22-risk-lanes.md)

@@ -149,7 +149,7 @@
     ]
   },
   "recorded_evidence": {
-    "latest_set": "risk-lanes-full-20260822",
+    "latest_set": "risk-lanes-x86-full-20260822",
     "sets": [
       {
         "id": "local-2026-08-21",
@@ -292,6 +292,41 @@
           "same physical Apple Silicon host",
           "gain depends on hardware SHA latency; x86 magnitude unconfirmed",
           "not an interleaved six-run milestone"
+        ],
+        "report": "benchmarks/experiments/2026-08-22-risk-lanes.md"
+      },
+      {
+        "id": "risk-lanes-x86-full-20260822",
+        "recorded_at": "2026-08-22T05:30:00Z",
+        "status": "accepted-separated-x86-full-comparison",
+        "environment_id": "obsidio-bench-us-east-1-us-east-1a",
+        "execution_order": [
+          "champion-a1",
+          "candidate-b1",
+          "champion-a2"
+        ],
+        "protocol_interpretation": "current-champion-pending-six-run-milestone-and-portability-set",
+        "candidate": {
+          "name": "interleaved-multi-lane-risk-batching",
+          "work_score": 2062911,
+          "requests": 826875,
+          "error_rate": 0,
+          "price_p95_ms": 22.25,
+          "stats_p95_ms": 22.22,
+          "risk_p95_ms": 422.6,
+          "raw_summary": "benchmarks/results/candidate-risk-lanes-x86-full-b1-summary.json"
+        },
+        "champion_scores": [
+          2018311,
+          2003123
+        ],
+        "candidate_vs_stronger_champion_percent": 2.2098,
+        "candidate_vs_champion_average_percent": 2.5958,
+        "champion_drift_percent": -0.7525,
+        "limitations": [
+          "judge CPU model remains unspecified; gain magnitude is CPU-dependent",
+          "not an interleaved six-run milestone",
+          "optional-instruction portability set remains outstanding"
         ],
         "report": "benchmarks/experiments/2026-08-22-risk-lanes.md"
       }

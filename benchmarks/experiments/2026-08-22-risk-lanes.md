@@ -76,13 +76,41 @@ average. Control drift was +0.02%, so essentially all of the difference is the
 change. Every gate passed with zero errors; `/risk` p95 fell by 88 ms and
 `/price` p95 rose by about 4.5 ms, consistent with the screen.
 
+## Separated x86-64 confirmation
+
+AWS reference shape: `c7i.xlarge` target (Xeon Platinum 8488C with `sha_ni`),
+container capped to 2 CPUs and 2 GiB; separate `c7i.large` load host; same AZ,
+private network; pinned k6 2.2.0. Stack destroyed after the comparison.
+
+Kernel on the x86 target (five-run medians, per chain): single 6.302 ms, pair
+6.003 ms (−4.7%), quad 6.034 ms (−4.3%). SHA-NI leaves far less latency to
+hide than Apple's SHA2 unit, so the gain is real but much smaller than on
+arm64. Pair and quad are equivalent here, and quad is clearly better on
+arm64, so `RISK_LANES=4` stays the default.
+
+Bracketed 90-second screen: 667,278 → 682,365 → 671,805. Candidate +1.57% vs
+the stronger control, +0.68% control drift.
+
+Exact full bracket:
+
+| Run | Work score | Requests | Errors | Price p95 | Stats p95 | Risk p95 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Champion A1 | 2,018,311 | 809,159 | 0.00% | 23.72 ms | 23.46 ms | 423.70 ms |
+| Candidate B1 | 2,062,911 | 826,875 | 0.00% | 22.25 ms | 22.22 ms | 422.60 ms |
+| Champion A2 | 2,003,123 | 801,792 | 0.00% | 22.83 ms | 22.77 ms | 437.77 ms |
+
+Candidate +2.21% vs the stronger control and +2.60% vs the bracket average,
+with −0.75% control drift. The gain exceeds the observed noise by about three
+times, agrees with the x86 screen and kernel benchmark, and the fast path did
+not pay for it on x86.
+
 ## Verdict
 
-**Keep as the current local champion.** The gain is large, reproduced across
-microbenchmark, screen, and exact run, and the control bracket was stable.
+**Accept interleaved multi-lane risk batching (`b29480e`) as the submission
+champion.** Local arm64: +9.11%. Separated x86: +2.21%. Both brackets were
+stable, every gate passed with zero errors, and the scalar-path kernel is
+neutral so no CPU without SHA instructions is penalised. The judge-day
+magnitude depends on the unspecified CPU; the direction does not.
 
-The claim is still local. The mechanism—overlapping hardware SHA latency across
-independent chains—applies in principle to x86 SHA-NI as well as Apple Silicon,
-but the magnitude is CPU-specific, so the separated x86 comparison is required
-before this replaces `45ce2c7` as the accepted submission champion. If the x86
-gain is smaller, compare `RISK_LANES=2` against `4` there as a secondary set.
+Outstanding: interleaved six-run milestone and the optional-instruction
+portability full-run set for the finalist.

@@ -38,6 +38,16 @@ independent reference implementation. Hex encoding uses a 256-entry
 native-endian pair table with aligned 16-bit stores, unrolled four bytes at a
 time — small enough for the compiler to inline into the 50,000-round loop.
 
+**Interleaved lanes.** A profile of the allocation-free kernel attributed most
+CPU to the 32-byte hex encoder, which is implausible as work and was really the
+core stalling on the hardware SHA result it consumes. Each request is a strictly
+serial chain, but under load the queue holds many independent requests, so a
+worker takes up to four and interleaves their rounds in one loop. The
+out-of-order core overlaps the chains' SHA latency. Per-chain kernel cost fell
+about 25% on Apple Silicon and about 5% on SHA-NI x86, and is unchanged with
+hardware SHA disabled, so no CPU is penalised. An empty queue still runs a
+single job immediately.
+
 **Low-noise HTTP path.** Static `/price` bodies are pre-serialized; `/stats`
 and `/risk` bodies are built with `strconv.Append*` into pooled buffers. Header
 size and read-header/idle timeouts are bounded. There is no reflection-based
@@ -76,11 +86,17 @@ champion:
 | Run | `work_score` | Requests | Errors | `/price` p95 | `/stats` p95 | `/risk` p95 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Packed hex (control A1) | 1,953,954 | 779,720 | 0.00% | 23.73 ms | 23.70 ms | 478.81 ms |
-| **+ compact hex unrolling (submitted)** | **1,987,151** | 796,456 | 0.00% | 25.07 ms | 24.90 ms | 442.78 ms |
+| + compact hex unrolling | 1,987,151 | 796,456 | 0.00% | 25.07 ms | 24.90 ms | 442.78 ms |
 | Packed hex (control A2) | 1,938,551 | 774,455 | 0.00% | 21.95 ms | 21.97 ms | 462.88 ms |
+| Compact hex (control A1, later set) | 2,018,311 | 809,159 | 0.00% | 23.72 ms | 23.46 ms | 423.70 ms |
+| **+ interleaved lanes (submitted)** | **2,062,911** | 826,875 | 0.00% | 22.25 ms | 22.22 ms | 422.60 ms |
+| Compact hex (control A2, later set) | 2,003,123 | 801,792 | 0.00% | 22.83 ms | 22.77 ms | 437.77 ms |
 
-The submitted build beat the stronger control by 1.70% with only −0.79% control
-drift, passing every published gate with zero errors. Absolute scores differ
+Each candidate beat the stronger control of its own bracket (hex unrolling
++1.70% with −0.79% drift; lanes +2.21% with −0.75% drift), passing every
+published gate with zero errors. The same lanes change measured +9.11% on the
+local Apple Silicon bracket with +0.02% drift; the judge-day magnitude depends
+on the CPU, the direction does not. Absolute scores differ
 between hosts by design; only within-environment deltas are claimed.
 
 ## What we tried and rejected

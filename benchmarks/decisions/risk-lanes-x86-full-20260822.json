@@ -1,0 +1,43 @@
+{
+  "recorded_at": "2026-08-22T02:34:01Z",
+  "type": "comparison_decision",
+  "comparison_set": "risk-lanes-x86-full-20260822",
+  "candidate": "interleaved-multi-lane-risk-batching",
+  "candidate_commit": "b29480e",
+  "champion_commit": "45ce2c7",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [2018311, 2003123],
+    "candidate_score": 2062911,
+    "candidate_vs_stronger_champion_percent": 2.2098,
+    "candidate_vs_champion_average_percent": 2.5958,
+    "champion_drift_percent": -0.7525,
+    "error_rate": 0,
+    "all_latency_gates_passed": true,
+    "price_p95_change_ms": -1.47,
+    "x86_screen_candidate_vs_stronger_champion_percent": 1.5719,
+    "x86_screen_champion_drift_percent": 0.6785,
+    "x86_kernel_single_ms": 6.302,
+    "x86_kernel_pair_per_chain_ms": 6.003,
+    "x86_kernel_quad_per_chain_ms": 6.034,
+    "x86_kernel_gain_percent_pair": 4.7,
+    "x86_kernel_gain_percent_quad": 4.3,
+    "local_arm64_full_gain_percent": 9.1117
+  },
+  "environment": {
+    "id": "obsidio-bench-us-east-1-us-east-1a",
+    "target": "c7i.xlarge (Xeon Platinum 8488C, sha_ni) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "network": "same-AZ private IPv4",
+    "target_architecture": "x86_64",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "limitations": [
+    "the judge CPU model remains unspecified; the gain is ~5% at the kernel on SHA-NI and ~25% on Apple Silicon, so the judge-day magnitude depends on the CPU",
+    "one bracketed candidate full run, not an interleaved six-run milestone",
+    "optional-instruction portability full-run set remains outstanding (kernel is neutral with GODEBUG=cpu.all=off)"
+  ],
+  "lane_count_decision": "RISK_LANES=4 kept: pair and quad are equivalent on x86 and quad is materially better on arm64",
+  "report": "benchmarks/experiments/2026-08-22-risk-lanes.md"
+}
