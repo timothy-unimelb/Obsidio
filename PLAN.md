@@ -144,7 +144,8 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [ ] W3: pairing dispatcher + boot kernel racing
 - [x] W3: x86 bench matrix — superseded by four bracketed full comparisons (baseline/hex/kernel/pairing sets in benchmarks/history.jsonl) + GODEBUG cpu.sha kill-switch measurements: every layer measured on/off on the same testbed, stronger evidence than the planned grid
 - [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; flame-graph-equivalent = committed posthex pprof profile
-- [~] W3: kernel v2 fused iterations — BUILT + verified (999a87f pair: 143→114ns/pair-iter, in-chain ratio 1.62×; 09a1879 single: 92→77ns/iter for ramp chains); **pair-fused full A/B in flight (fused-x86-01)**, then single+stride bracket; yield-stride sweep queued (cheap path now ~60% of score, med 7ms = scheduler wait knob)
+- [x] W3: kernel v2 fused iterations — **pair-fused KEPT +16.1% (4,032,045)**; single-fused marginal keep +0.9% → **final champion 09a1879 @ 4,060,125 (+108% on the day)**; stride sweep measured flat (auto kept, hypothesis falsified + logged)
+- [x] W3: persistence validated on x86 — grading vs WAL-active deployment: 4,089,803 @ 4/4 bars; hard-kill survivor read back. Bonus SHIPS (docker-compose.yml + fsync'd WAL)
 - [x] W3: persistence go/no-go — **user GO (session 5)**: fsync'd WAL + compose volume built; hard-kill durability verified locally (2 POSTs → docker kill → replayed); graded path bit-identical (smoke 35/35, WAL inactive without env). Bars-under-compose check on testbed still owed
 - [ ] W4: freeze + final verification (local + x86 + fresh-clone build + compose-bars run)
 - [ ] W4: write-up drafted from EXPERIMENTS.md

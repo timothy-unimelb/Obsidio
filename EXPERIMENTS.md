@@ -411,3 +411,14 @@ Entry format (see the /experiment skill):
   path is byte-identical. Tier-0: 92.3 → 76.9ns per single iteration.
 - **Verdict:** KEPT (zero structural downside). **Final champion 09a1879:
   4,060,125 — day total 1.95M → 4.06M (+108%).**
+
+## 2026-08-22 Persistence deployment: bars + durability on x86 (final validation)
+
+- **SHA:** 09a1879 image, WAL-active deployment on the testbed (volume +
+  PRICE_WAL, grader-equivalent caps).
+- **Result:** full grading.js against the WAL-active app: **4,089,803**,
+  4/4 bars (risk p95 80.1ms, price/stats 11.2ms, errors 0.58%) — the bonus
+  deployment costs nothing (WAL is off the GET path; POSTs are outside the
+  graded mix). Durability: value POSTed before the siege survived a hard
+  docker kill afterwards (replayed 1 entry, read back exact).
+- **Verdict:** persistence bonus SHIP: docker-compose.yml + fsync'd WAL.
