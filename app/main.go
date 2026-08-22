@@ -9,7 +9,8 @@
 //     async preemption keeps /price handlers responsive (~µs of work) even
 //     while both cores grind sha256.
 //   - /risk kernel allocates nothing per iteration: Sum256 returns a stack
-//     array and hex.Encode writes into a reusable 64-byte buffer.
+//     array and a packed pair-table hex encoder writes into a reusable
+//     64-byte buffer.
 //   - /price 200-responses are prebuilt byte slices (still an in-memory
 //     lookup, exactly the specified work — just no per-request serialization).
 //   - /stats is computed on every request per the contract (two passes over
@@ -19,7 +20,6 @@ package main
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"log"
 	"math"
@@ -418,16 +418,43 @@ func calibrateRisk() {
 // Gosched with no waiter is tens of ns, so worst case is ~0.1% chain cost.
 var riskYieldMask = uint32(4096 - 1)
 
+// hexPairs[b] holds the two lowercase-hex ASCII bytes of b, packed so a
+// little-endian uint16 store writes high nibble first. One table lookup + one
+// 2-byte store per input byte replaces encoding/hex's two nibble lookups and
+// two 1-byte stores. On SHA-NI hardware the hash is so cheap that hex encoding
+// dominates the /risk loop (measured 62% of loop CPU on Sapphire Rapids —
+// benchmarks/experiments/2026-08-22-packed-hex.md), which makes this the
+// highest-leverage kernel change, and it is pure portable Go.
+var hexPairs [256]uint16
+
+func init() {
+	const digits = "0123456789abcdef"
+	for b := 0; b < 256; b++ {
+		hexPairs[b] = uint16(digits[b>>4]) | uint16(digits[b&15])<<8
+	}
+}
+
+// hexEncode64 writes the 64-char lowercase-hex encoding of sum into buf.
+// Equivalent to hex.Encode(buf[:], sum[:]) (verified byte-for-byte over all
+// 256 input values and full 50k chains in main_test.go).
+func hexEncode64(buf *[64]byte, sum *[32]byte) {
+	for j := 0; j < 32; j++ {
+		p := hexPairs[sum[j]]
+		buf[2*j] = byte(p)
+		buf[2*j+1] = byte(p >> 8)
+	}
+}
+
 // riskChain: h = seed; 50,000 × h = hex(sha256(h)). Zero heap allocations in
 // the loop; only the final string(buf) allocates.
 func riskChain(seed string) string {
 	var buf [64]byte
 	sum := sha256.Sum256([]byte(seed))
-	hex.Encode(buf[:], sum[:])
+	hexEncode64(&buf, &sum)
 	mask := riskYieldMask
 	for i := uint32(1); i < 50000; i++ {
 		sum = sha256.Sum256(buf[:])
-		hex.Encode(buf[:], sum[:])
+		hexEncode64(&buf, &sum)
 		if i&mask == 0 {
 			runtime.Gosched()
 		}

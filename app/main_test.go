@@ -22,6 +22,23 @@ func naiveRiskChain(seed string) string {
 	return h
 }
 
+// TestHexEncode64MatchesStdlib checks the packed pair-table encoder against
+// encoding/hex for every possible input byte in every position class.
+func TestHexEncode64MatchesStdlib(t *testing.T) {
+	var sum [32]byte
+	for v := 0; v < 256; v++ {
+		for j := range sum {
+			sum[j] = byte(v)
+		}
+		var got [64]byte
+		hexEncode64(&got, &sum)
+		want := hex.EncodeToString(sum[:])
+		if string(got[:]) != want {
+			t.Fatalf("hexEncode64 mismatch for byte 0x%02x: got %s want %s", v, got, want)
+		}
+	}
+}
+
 func TestRiskChainMatchesReference(t *testing.T) {
 	for _, seed := range []string{"none", "abc", "0.12345", ""} {
 		if got, want := riskChain(seed), naiveRiskChain(seed); got != want {
