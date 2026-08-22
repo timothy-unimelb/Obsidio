@@ -557,3 +557,43 @@ Entry format (see the /experiment skill):
   exactly as the mechanism predicts. k6-visible errors 0.85% on both sides
   (governor accounting unchanged). All bars green. **KEPT.**
 - **New best:** 4,300,332 on c7i-class hardware.
+
+## 2026-08-22 Sprint-2 Item B5: raw-server regime revalidation (all three PASS)
+
+Same image (8f28c93), manual side runs, summaries in benchmarks/results/val-b5-*:
+- **Co-located k6** (on the target box): 3,179,970 @ 0.82% err, bars green
+  (prior co-located ref 2,879,823 — +10.4%: reclaimed net/http CPU is worth
+  MORE when k6 competes for the same cores). No socket-level error storm.
+- **400-VU overdrive**: k6 exit 0 (all graded thresholds held at 2× peak),
+  0.81% err, risk p95 133ms, raw score 1,250,532 (prior build: 996,955).
+- **Slow-box sim** (RISK_KERNEL=off + GODEBUG=cpu.sha=off): 842,056 @ 0.81%,
+  risk p95 438ms, 4/4 bars (prior baseline 812,074 → +3.7% in-slow-regime).
+The hand-rolled server holds in every regime where it could diverge.
+
+## 2026-08-22 Sprint-2 Item C: AVX-512 16-lane multi-buffer kernel (KEPT — 4.3× in the no-SHA-NI regime)
+
+- **What:** vendored minio/sha256-simd v1.0.1 16-lane AVX-512 asm + K-table
+  (Apache-2.0, attribution in sha256x16_amd64.s + LICENSE.minio-sha256-simd;
+  vendoring disclosed here for the write-up). Our fixed-shape wrapper runs
+  one asm call per lockstep chain iteration (message block + constant pad
+  block, 2-round all-lanes mask); riskWorker batches 16 waiters when ≥8 are
+  parked (below 8, serial chains finish sooner than a k/16-efficient batch).
+- **Gate:** !sha_ni && avx512f/dq/bw/vl (minio's own feature set), boot
+  differential + chain self-tests, and a ≥30% boot race vs serial scalar
+  chains. RISK_KERNEL=avx512 forces the no-SHA-NI simulation on testbed
+  hardware (also drops the scalar kernel to AVX2 for honesty).
+- **Walls:** 5k×16-lane differential vs crypto/sha256 + equal-lane leak +
+  full 50k lockstep chains (full & partial batches) + 4-way concurrent
+  hammer, all green under -race on c7i.
+- **Tier-0 (c7i):** 727ns/step ÷ 16 = 45.4ns per chain-iter vs 291.9ns AVX2
+  scalar — 6.4× per chain (plan estimated 2-3×).
+- **C5 forced grading run** (RISK_KERNEL=avx512 + GODEBUG=cpu.sha=off):
+  work_score **3,530,813** vs the 812,074 slow-box baseline = **4.3×**
+  (+335%, keep bar was ≥+30%). Boot race on-box: 6.84×. Risk p95 88.9ms,
+  errors 0.87%, 4/4 bars. A Skylake-class grader without SHA-NI is no
+  longer a 5× score haircut.
+- **C6 SHA-NI-box run** (same image, no env): gate provably silent (0 x16
+  log lines), 4,332,215 @ 0.85% err, bars green — the insurance path costs
+  zero where it must not fire.
+- **Tier-0 footnote that spawned Item D:** 45.4ns/chain-iter BEATS the
+  SHA-NI fused pair path (114.1/2 = 57ns) on SPR — see next entry.

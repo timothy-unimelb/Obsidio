@@ -193,12 +193,12 @@ auto-derives to 88% of the gate) and re-run one grading verification.
 - [x] B2: RISK_HTTP=std kill switch in main() (default = raw; boot log prints http=raw|std)
 - [x] B3: 11 parser unit tests (split reads, pipelining, oversized head, encoded query, POST framing, chunked reject, /risk e2e) + race suite green + smoke 35/35 on BOTH servers (capped containers) + WAL survives docker kill through raw server
 - [x] B4: bracket rawhttp-x86-01 KEPT — candidate 4,300,332 vs champion 4,177,111/4,212,001 (+2.1% vs stronger side), errors 0.85% both sides, bars green; decision recorded
-- [ ] B5: if kept — co-located + overdrive + slow-box revalidation
+- [x] B5: all three regimes PASS — co-located 3,179,970 @ 0.82% (+10.4% vs prior ref); overdrive k6-exit 0 @ 0.81%; slow-box 842,056 @ 0.81% 4/4 bars
 - [x] C1: vendored minio v1.0.1 16-lane asm + K-table verbatim (app/sha256x16_amd64.s, LICENSE.minio-sha256-simd); fixed-shape 2-round wrapper is ours
 - [x] C2: gate (!sha_ni && avx512f/dq/bw/vl) + RISK_KERNEL=avx512 force-env (also drops scalar to AVX2 for honest sim) + boot differential/chain self-tests + ≥30% boot race
 - [x] C3: 16-lane worker batching (≥8-waiter heuristic under riskMu; short pops run serial; pair path untouched)
 - [x] C4: walls green on c7i (-race): 5k×16-lane differential + equal-lane leak + full 50k lockstep chains (full & partial batch) + 4-way concurrent hammer. Tier-0: 727ns/step = 45.4ns/chain-iter vs 291.9 AVX2 scalar (6.4×)
-- [ ] C5: forced-gate Tier-0 + full grading vs 812k baseline (keep if ≥ +30%, 4/4 bars)
-- [ ] C6: SHA-NI-box grading run unchanged (gate must not fire) → keep/no-go recorded
+- [x] C5: KEPT — forced grading 3,530,813 vs 812,074 baseline = 4.3× (+335%), boot race 6.84×, risk p95 88.9ms, 4/4 bars
+- [x] C6: gate silent on SHA-NI box (0 x16 log lines); plain run 4,332,215 @ 0.85%, bars green — unchanged within noise
 - [ ] Freeze: 3× cold-boot bracket of submission commit + fresh-clone build + smoke
 - [ ] EXPERIMENTS/decisions/artifact updated for A, B, C (incl. any revert)
