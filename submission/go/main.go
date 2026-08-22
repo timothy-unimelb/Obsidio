@@ -302,6 +302,8 @@ func calculateRisk(seed string) [sha256.Size * 2]byte {
 // calculateRiskPair runs two independent chains in one loop. Each chain still
 // performs every one of its own 50,000 rounds in order; only the instruction
 // stream is interleaved so the core can overlap the two chains' SHA latency.
+// On x86-64 with SHA extensions, both chains' hashes are computed by one
+// two-lane assembly routine; elsewhere Go's own SHA-256 is used.
 func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]byte) {
 	digestA := sha256.Sum256([]byte(seedA))
 	digestB := sha256.Sum256([]byte(seedB))
@@ -311,16 +313,31 @@ func calculateRiskPair(seedA, seedB string) (resultA, resultB [sha256.Size * 2]b
 	encodedA := unsafe.Slice((*byte)(unsafe.Pointer(&wordsA[0])), sha256.Size*2)
 	encodedB := unsafe.Slice((*byte)(unsafe.Pointer(&wordsB[0])), sha256.Size*2)
 
-	for iteration := 1; iteration < riskIterations; iteration++ {
-		digestA = sha256.Sum256(encodedA)
-		digestB = sha256.Sum256(encodedB)
-		encodeDigest(&wordsA, &digestA)
-		encodeDigest(&wordsB, &digestB)
+	if useSHANIPair {
+		inA := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsA[0]))
+		inB := (*[sha256.Size * 2]byte)(unsafe.Pointer(&wordsB[0]))
+		for iteration := 1; iteration < riskIterations; iteration++ {
+			sum256x2(inA, inB, &digestA, &digestB)
+			encodeDigest(&wordsA, &digestA)
+			encodeDigest(&wordsB, &digestB)
+		}
+	} else {
+		for iteration := 1; iteration < riskIterations; iteration++ {
+			digestA = sha256.Sum256(encodedA)
+			digestB = sha256.Sum256(encodedB)
+			encodeDigest(&wordsA, &digestA)
+			encodeDigest(&wordsB, &digestB)
+		}
 	}
 
 	copy(resultA[:], encodedA)
 	copy(resultB[:], encodedB)
 	return resultA, resultB
+}
+
+// sum256Portable is the reference for the assembly kernel on other platforms.
+func sum256Portable(input *[sha256.Size * 2]byte) [sha256.Size]byte {
+	return sha256.Sum256(input[:])
 }
 
 // calculateRiskQuad is the four-lane form of calculateRiskPair.
