@@ -16,6 +16,9 @@ reaches a gate, or changes what should happen next.
 - **Architecture phase:** the major concurrency and allocation improvements are
   complete. Work has moved into evidence-led compute-kernel and compiler
   optimization.
+- **Latest rejected candidate:** Go 1.26.6 PGO regressed the risk kernel by
+  19.67% and reintroduced 50,000 allocations per request. It was stopped at
+  Level 0 without spending screening or AWS time.
 - **Outstanding finalist evidence:** interleaved six-run milestone,
   optional-instruction portability run, and rerun after the organizers lock the
   grader.
@@ -47,20 +50,22 @@ reaches a gate, or changes what should happen next.
    the stronger control with -0.85% control drift. The exact full bracket showed
    +1.70% versus the stronger control with -0.79% drift. The candidate is kept
    as the current champion.
+7. **Completed: Go PGO Level 0.** A 95-second representative profile was applied
+   with the pinned Go 1.26.6 toolchain. The candidate remained correct but made
+   `BenchmarkRisk` 19.67% slower and changed it from zero allocations to 50,000
+   allocations and 6.4 MB per operation. Verdict: reverted before screening.
 
 ## Candidate queue after the active sequence
 
 Priority is evidence-dependent, not a promise to implement every item:
 
-1. Go profile-guided optimization (low source complexity; must prove portable
-   benefit and reproducible build inputs).
-2. Fixed-shape or multi-lane SHA processing, only if the new profile shows SHA
-   dominates and a portable implementation can beat Go's selected SHA path.
-3. Small HTTP/response-path reductions, only if profiles show they affect score
+1. Fixed-shape or multi-lane SHA processing: SHA still accounts for roughly 24%
+   of CPU, but keep a prototype only if it beats Go's selected SHA path.
+2. Small HTTP/response-path reductions, only if profiles show they affect score
    rather than merely microbenchmarks.
-4. C or Rust kernel integration only after Go-level options are exhausted; the
+3. C or Rust kernel integration only after Go-level options are exhausted; the
    FFI/build complexity and cross-architecture risk require a material gain.
-5. Optional persistence bonus after the core-score finalist is stable.
+4. Optional persistence bonus after the core-score finalist is stable.
 
 ## Stop and recording rules
 
@@ -76,7 +81,8 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** compact hex unrolling is accepted with separated x86 evidence, and
-the AWS stack is destroyed. Next, test Go PGO independently against this new
-champion. Re-provision AWS only after local Level 0 and bracketed screening earn
-an exact x86 comparison; always destroy it when the set completes.
+**Status:** compact hex unrolling remains champion; Go PGO was rejected at Level
+0 and the AWS stack remains destroyed. Next, prototype a portable fixed-shape or
+multi-lane SHA path against the existing Go implementation, beginning with
+independent vectors and focused microbenchmarks. Re-provision AWS only after
+local Level 0 and bracketed screening earn an exact x86 comparison.

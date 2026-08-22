@@ -53,9 +53,9 @@ const checkpoints = [
     requests: 796_456,
     tone: "acid",
   },
-  { number: "05", name: "Go PGO", status: "Next experiment", detail: "Train Go's compiler on the published traffic shape, then compare the resulting binary independently against checkpoint 04.", score: null, requests: null, tone: "pending" },
-  { number: "06", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
-  { number: "07", name: "Fixed-shape SHA path", status: "Not implemented", detail: "Specialize rounds 2–50,000 and verify every digest against reference vectors.", score: null, requests: null, tone: "pending" },
+  { number: "05", name: "Go PGO", status: "Rejected · Level 0", detail: "A representative Go 1.26.6 profile made the risk kernel 19.67% slower and reintroduced 50,000 allocations per request, so it was stopped before load testing.", score: null, requests: null, tone: "pending" },
+  { number: "06", name: "Fixed-shape SHA path", status: "Next experiment", detail: "Prototype the fixed 64-byte rounds and verify every digest against independent reference vectors before any load test.", score: null, requests: null, tone: "pending" },
+  { number: "07", name: "Batched risk kernel", status: "Not implemented", detail: "Record batch sizes 2, 4, and 8; keep only the best full-siege result.", score: null, requests: null, tone: "pending" },
   { number: "08", name: "Native kernel, if justified", status: "Conditional", detail: "Only add a row if profiling still points to the kernel and a C or Rust prototype passes the same tests.", score: null, requests: null, tone: "pending" },
 ];
 
@@ -81,6 +81,7 @@ const evidenceLinks = [
   ["Peak queue timing summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/workers-timing-summary.json"],
   ["Recorded protocol", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/protocol.json"],
   ["Latest x86 comparison report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-packed-champion-profile.md"],
+  ["Rejected PGO experiment", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-go-pgo.md"],
 ];
 
 export default function PerformancePage() {
@@ -128,7 +129,7 @@ export default function PerformancePage() {
       <section className="section progressionSection">
         <div className="sectionHead compact">
           <div><span className="sectionNumber">THE PROGRESSION</span><h2>One checkpoint.<br />One complete siege.</h2></div>
-          <p>The first optimized entry combines work completed before this log existed. Checkpoint 02 isolates scheduling. Checkpoint 03 optimizes hex stores; checkpoint 04 unrolls that loop and earns promotion in a low-drift separated x86 bracket. A six-run finalist milestone remains outstanding.</p>
+          <p>The first optimized entry combines work completed before this log existed. Checkpoint 02 isolates scheduling. Checkpoint 04 earns promotion in a low-drift separated x86 bracket. Checkpoint 05 records a useful failure: PGO regressed at Level 0 and was never promoted. A six-run finalist milestone remains outstanding.</p>
         </div>
         <div className="checkpointList">
           {checkpoints.map((checkpoint) => (

@@ -1,0 +1,31 @@
+{
+  "recorded_at": "2026-08-22T01:25:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "go-pgo-level0-20260822",
+  "candidate": "go-1.26.6-profile-guided-optimization",
+  "verdict": "reverted",
+  "basis": {
+    "stage_reached": "level-0-microbenchmark",
+    "control_median_ns_per_op": 3600342.5,
+    "candidate_median_ns_per_op": 4308546,
+    "candidate_slowdown_percent": 19.6704,
+    "control_allocations_per_op": 0,
+    "candidate_allocations_per_op": 50000,
+    "control_bytes_per_op": 2,
+    "candidate_bytes_per_op": 6400010,
+    "sample_count_per_build": 8,
+    "correctness_passed": true,
+    "portable_correctness_passed": true,
+    "screening_run": false
+  },
+  "profile": {
+    "path": "benchmarks/profiles/pgo-20260822/default.pgo",
+    "sha256": "34c0ca95c0ed4cfb6e3ae3b6360b9382677c3687b6a908786a11c86ba6ce2bbe",
+    "duration_seconds": 95,
+    "training_workload": "benchmarks/screening.js",
+    "go_version": "go1.26.6",
+    "environment": "local-arm64-colima"
+  },
+  "next_evidence": "Do not promote this candidate. Reconsider PGO only after a toolchain change or a separately validated compiler-level mitigation.",
+  "report": "benchmarks/experiments/2026-08-22-go-pgo.md"
+}
