@@ -19,7 +19,7 @@ func testJob(seed string) (riskJob, chan riskResult) {
 	return riskJob{seed: seed, queuedAt: time.Now(), ctx: context.Background(), result: result}, result
 }
 
-func TestGatePopsNewestFirst(t *testing.T) {
+func TestGateServesFIFOWhileWaitsAreShort(t *testing.T) {
 	g := newTestGate(16, time.Second, 0)
 	for _, seed := range []string{"first", "second", "third"} {
 		job, _ := testJob(seed)
@@ -28,11 +28,26 @@ func TestGatePopsNewestFirst(t *testing.T) {
 		}
 	}
 	var batch [maxRiskLanes]riskJob
-	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "third" || batch[1].seed != "second" {
-		t.Fatalf("expected newest-first pop, got %d jobs: %q %q", count, batch[0].seed, batch[1].seed)
+	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "first" || batch[1].seed != "second" {
+		t.Fatalf("expected arrival order, got %d jobs: %q %q", count, batch[0].seed, batch[1].seed)
 	}
-	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "first" {
-		t.Fatalf("expected the remaining oldest job, got %d: %q", count, batch[0].seed)
+	if count := g.take(4, batch[:]); count != 1 || batch[0].seed != "third" {
+		t.Fatalf("expected the remaining job, got %d: %q", count, batch[0].seed)
+	}
+}
+
+func TestGateSwitchesToNewestFirstUnderOverload(t *testing.T) {
+	g := newTestGate(16, time.Second, 0)
+	old, _ := testJob("old")
+	old.queuedAt = time.Now().Add(-600 * time.Millisecond) // past half of patience
+	g.admit(old)
+	for _, seed := range []string{"second", "third"} {
+		job, _ := testJob(seed)
+		g.admit(job)
+	}
+	var batch [maxRiskLanes]riskJob
+	if count := g.take(2, batch[:]); count != 2 || batch[0].seed != "third" || batch[1].seed != "second" {
+		t.Fatalf("expected newest-first under overload, got %d jobs: %q %q", count, batch[0].seed, batch[1].seed)
 	}
 }
 
