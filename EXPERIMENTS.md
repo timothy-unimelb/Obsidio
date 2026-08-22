@@ -533,3 +533,27 @@ Entry format (see the /experiment skill):
   behind `RISK_KERNEL_V3=on` (off by default) for A/B on other silicon;
   differential walls run unconditionally in the test suite, so the disabled
   path stays verified. Estimate was +3-7%; reality 0. Measure, don't argue.
+
+## 2026-08-22 Sprint-2 Item B: raw-TCP HTTP/1.1 fast path (KEPT, +2.5%)
+
+- **Hypothesis:** ~8% of the 2-CPU budget is net/http machinery (~15-20µs/
+  request: header-map allocs, URL parse, ResponseWriter bookkeeping) that a
+  fixed four-endpoint contract never needs; a hand-rolled HTTP/1.1 loop
+  returns that CPU to the hash workers.
+- **Change:** `app/rawserver.go` — byte-wise parser into a reused per-conn
+  Request (split reads, pipelining, Content-Length framing), single-write
+  responses from a preassembled buffer, handlers/WAL/governor REUSED via a
+  writeJSON short-circuit so respOK/respErr accounting is bit-identical.
+  Kill switch RISK_HTTP=std boots stock net/http.
+- **Walls:** 11 parser unit tests (which caught a real buffer-compaction
+  lifetime bug: head slices into buf were clobbered by body-read refill —
+  fixed by interning before the body read); full -race suite; smoke 35/35
+  against BOTH servers in capped containers; WAL durability re-verified
+  through the raw server across docker kill.
+- **Bracket rawhttp-x86-01 (full grading, separate load box):** champion
+  f85f260 4,177,111 / 4,212,001 (drift 0.83%); candidate 0a84c50
+  **4,300,332** = +2.10% vs stronger champion, +2.52% vs mean. Risk p95
+  65.2ms vs ~76ms champion — the reclaimed CPU landed on /risk throughput
+  exactly as the mechanism predicts. k6-visible errors 0.85% on both sides
+  (governor accounting unchanged). All bars green. **KEPT.**
+- **New best:** 4,300,332 on c7i-class hardware.

@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T07:25:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "rawhttp-x86-01",
+  "candidate": "raw-TCP HTTP/1.1 fast path (advait app, 0a84c50)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4177111, 4212001],
+    "candidate_score": 4300332,
+    "candidate_vs_stronger_champion_percent": 2.10,
+    "candidate_vs_champion_average_percent": 2.52,
+    "champion_drift_percent": 0.83,
+    "error_rate_percent": 0.85,
+    "all_latency_gates_passed": true
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "+2.1% vs the stronger champion side with champion drift 0.83% — mechanism (net/http machinery ~15-20us/request returned to the hash workers) matches the score-side gain landing on /risk throughput (risk p95 65.2ms vs 75.4/76.7ms champion)",
+    "error accounting unchanged: k6-visible 0.85% on BOTH sides — the governor's budget/skew relationship survives the hand-rolled server",
+    "kill switch RISK_HTTP=std retained for ship day; co-located/overdrive/slow-box regime revalidation tracked as B5"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Sprint-2 Item B' entry"
+}

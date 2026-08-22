@@ -368,6 +368,17 @@ func riskWorker() {
 		lanes := 1
 		if riskSumPair != nil {
 			lanes = 2
+		} else if riskChainX16 != nil {
+			// 16-lane batch mode (no-SHA-NI + AVX-512): batch only when ≥8
+			// waiters are parked — a k-of-16 batch runs at k/16 efficiency,
+			// and below 8 serial chains finish sooner. Depth is re-checked
+			// inside riskTakeWork's lock; a short pop (dead/stale skipped)
+			// falls back to serial execution below.
+			riskMu.Lock()
+			if riskStackDepth >= 8 {
+				lanes = 16
+			}
+			riskMu.Unlock()
 		}
 		work := riskTakeWork(lanes)
 		if len(work) == 0 {
@@ -381,17 +392,34 @@ func riskWorker() {
 			continue
 		}
 		start := time.Now()
-		if len(work) == 2 {
+		switch {
+		case len(work) >= 8 && riskChainX16 != nil:
+			seeds := make([]string, len(work))
+			for i, w := range work {
+				seeds[i] = w.seed
+			}
+			outs := riskChainX16(seeds)
+			d := time.Since(start)
+			for i, w := range work {
+				observeChainCost(d)
+				w.result <- outs[i]
+			}
+		case len(work) == 2 && riskSumPair != nil:
 			ha, hb := riskChainPair(work[0].seed, work[1].seed)
 			d := time.Since(start)
 			observeChainCost(d)
 			observeChainCost(d)
 			work[0].result <- ha
 			work[1].result <- hb
-		} else {
-			h := riskChain(work[0].seed)
-			observeChainCost(time.Since(start))
-			work[0].result <- h
+		default:
+			// Single chain, or a short 16-lane pop: serial execution
+			// (each waiter's digest delivered as soon as it finishes).
+			for _, w := range work {
+				h := riskChain(w.seed)
+				observeChainCost(time.Since(start))
+				w.result <- h
+				start = time.Now()
+			}
 		}
 	}
 }
@@ -541,6 +569,12 @@ var riskIter1 func(a *[64]byte)
 // (chained-vs-composed); RISK_KERNEL_V3=off keeps the v2 per-iteration path.
 var riskPairIterN func(a, b *[64]byte, n int)
 var riskIter1N func(a *[64]byte, n int)
+
+// riskChainX16, when non-nil, advances up to 16 chains in lockstep through
+// the vendored AVX-512 multi-buffer kernel — the no-SHA-NI x86 insurance
+// path (see shakernel_x16_amd64.go). Set by initRiskKernelX16 only after its
+// differential self-test and a ≥30% boot-race win over serial chains.
+var riskChainX16 func(seeds []string) []string
 
 // riskChainPair advances two chains in lockstep through the pair kernel.
 // Identical math to two riskChain calls (differentially tested); one Gosched
@@ -948,6 +982,7 @@ func main() {
 	initRiskKernel() // before calibration, so calibrateRisk times the active kernel
 	calibrateRisk()  // timed chains; runs before the listener, so /health only reports ready after
 	raceKernelPairing()
+	initRiskKernelX16() // no-SHA-NI insurance path; needs the calibrated scalar kernel for its boot race
 	for i := 0; i < riskSlots; i++ {
 		go riskWorker()
 	}

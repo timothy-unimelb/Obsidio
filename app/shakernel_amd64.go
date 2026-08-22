@@ -122,14 +122,19 @@ func kernelSum64Pair(inA, inB *[64]byte, outA, outB *[32]byte) {
 // initRiskKernel picks the fastest provably-correct hash path for riskChain.
 // Called before calibrateRisk so calibration measures the active kernel.
 func initRiskKernel() {
-	if os.Getenv("RISK_KERNEL") == "off" {
+	mode := os.Getenv("RISK_KERNEL")
+	if mode == "off" {
 		log.Printf("risk kernel: disabled by RISK_KERNEL=off (stdlib path)")
 		return
 	}
 	flags := cpuinfoFlags()
 	has := func(f string) bool { return strings.Contains(flags, " "+f+" ") }
 	// Exactly the stdlib's own dispatch gates for these routines.
-	kernelUseSHANI = has("sha_ni") && has("avx") && has("sse4_1") && has("ssse3")
+	// RISK_KERNEL=avx512 (testbed-only) simulates a no-SHA-NI grader: the
+	// scalar path drops to the AVX2 kernel and the 16-lane AVX-512 batch
+	// path's gate fires (see initRiskKernelX16) — pair with
+	// GODEBUG=cpu.sha=off so the stdlib reference paths are honest too.
+	kernelUseSHANI = has("sha_ni") && has("avx") && has("sse4_1") && has("ssse3") && mode != "avx512"
 	kernelUseAVX2 = !kernelUseSHANI && has("avx") && has("avx2") && has("bmi2")
 	if !kernelUseSHANI && !kernelUseAVX2 {
 		log.Printf("risk kernel: no eligible ISA in cpuinfo (stdlib path)")
