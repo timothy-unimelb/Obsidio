@@ -23,6 +23,9 @@ const (
 	defaultRiskJobs  = 2
 	defaultRiskLanes = 4
 	maxRiskLanes     = 4
+	// x16Lanes is the largest batch a worker takes: the sixteen-lane AVX-512
+	// kernel's width (risk_x16_amd64.go).
+	x16Lanes = 16
 	// defaultYieldRounds bounds how long a worker stays inside the assembly
 	// kernel before letting the scheduler run waiting cheap handlers.
 	defaultYieldRounds = 256
@@ -77,6 +80,7 @@ func main() {
 	// every Go release. Pinning it avoids overscheduling on the grading host.
 	runtime.GOMAXPROCS(2)
 	gate.calibratePatience()
+	initRiskX16()
 	priceWAL.open()
 	defer priceWAL.close()
 	startRiskWorkers()
@@ -249,24 +253,33 @@ func startRiskWorkers() {
 
 // riskWorker takes up to riskLaneLimit live jobs from the gate and hashes
 // them as interleaved lanes on this worker's core. It never waits for a
-// partner: a lone job runs single-lane immediately. Each batch's wall time
-// feeds the patience estimate.
+// partner: a lone job runs single-lane immediately. When the sixteen-lane
+// kernel is live and enough jobs are parked, it takes a batch for that
+// kernel instead; a short pop falls back to the lane kernels. Each batch's
+// wall time feeds the patience estimate.
 func riskWorker() {
-	var batch [maxRiskLanes]*riskJob
+	var batch [x16Lanes]*riskJob
 	for {
-		count := gate.take(riskLaneLimit, batch[:])
+		limit := riskLaneLimit
+		if riskX16Enabled && gate.parkedCount() >= riskX16MinBatch {
+			limit = x16Lanes
+		}
+		count := gate.take(limit, batch[:])
 		started := time.Now()
-		runRiskBatch(batch[:count])
+		if riskX16Enabled && count >= riskX16MinBatch {
+			runRiskBatchX16(batch[:count])
+		} else {
+			for offset := 0; offset < count; offset += maxRiskLanes {
+				runRiskBatch(batch[offset:min(offset+maxRiskLanes, count)])
+			}
+		}
 		gate.observeChainCost(time.Since(started))
 	}
 }
 
 func runRiskBatch(batch []*riskJob) {
 	var hashes [maxRiskLanes][sha256.Size * 2]byte
-	var hashStarted time.Time
-	if emitRiskTiming {
-		hashStarted = time.Now()
-	}
+	hashStarted := riskTimingStart()
 
 	switch len(batch) {
 	case 1:
@@ -279,15 +292,26 @@ func runRiskBatch(batch []*riskJob) {
 	default:
 		hashes = calculateRiskQuad([maxRiskLanes]string{batch[0].seed, batch[1].seed, batch[2].seed, batch[3].seed})
 	}
+	deliverRiskResults(batch, hashes[:], hashStarted)
+}
 
+// riskTimingStart stamps a batch only when diagnostic timing is on.
+func riskTimingStart() time.Time {
+	if emitRiskTiming {
+		return time.Now()
+	}
+	return time.Time{}
+}
+
+// deliverRiskResults hands each job its digest. With diagnostic timing on,
+// hash time is the shared wall time of the whole batch.
+func deliverRiskResults(batch []*riskJob, hashes [][sha256.Size * 2]byte, hashStarted time.Time) {
 	if !emitRiskTiming {
 		for index := range batch {
 			batch[index].result <- riskResult{hash: hashes[index]}
 		}
 		return
 	}
-
-	// Diagnostic only: hash time is the shared wall time of the whole batch.
 	finished := time.Now()
 	for index := range batch {
 		batch[index].result <- riskResult{
