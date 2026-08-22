@@ -114,6 +114,32 @@ and found CPU going to the wrong places, three times over:
 Every step was a bracketed A-B-A run (champion, candidate, champion again,
 same machine, same load), with testbed noise measured under 1%.
 
+## 4. Don't hardcode what you can measure
+
+We don't know the grading hardware's exact speed, so none of the timing
+constants above are hardcoded. At startup the container reads its own CPU
+budget from the cgroup (`cpu.max`) to size the worker pool, then times
+real 50,000-round chains on itself, under contention, to derive the shed
+gate's patience window and the hash loop's yield cadence. A live moving
+average keeps refining that estimate as real requests arrive, so the
+constants track what the box is actually delivering, not a one-time
+guess at boot.
+
+Early boots showed why that mattered: identical builds measured 11.9 to
+15.8 ms per chain across four boots on the same machine, about ±15%
+noise from VM cold-start variance, enough to throw off a boot-derived
+deadline. Running 8 untimed chains before the real measurement fixed it:
+boot-to-boot spread dropped to under 1%.
+
+The test that actually matters: we forced the same build to run without
+its fast SHA-256 path, simulating a slower, no-SHA-NI grading box. It
+re-derived its own constants for the ~2.5x slower chain cost with no code
+changes and no retuning, and all four latency bars still passed. Whatever
+the grading hardware turns out to be, the gate finds out for itself in
+the first second of boot.
+(EXPERIMENTS.md: "Contended calibration... EWMA," "Boot warmup," "Slow-grader
+simulation.")
+
 ## Also shipped
 
 - **Generic HTTP overhead removed.** `net/http`'s header-map allocations
@@ -163,3 +189,7 @@ testbed, so treat the 6.4x as directional, not exact). On x86 hardware
 specifically, where both ends of the comparison are on the same machine,
 profiling and the SHA-256 kernel work were worth 2.45x on their own
 (1,953,437 to 4,789,220).
+
+All of this ran in VMs, not bare metal: local development on an arm64 VM
+(Apple Silicon host), verification on a separate x86 cloud VM pair. Full
+protocol in `benchmarks/PROTOCOL.md`.
