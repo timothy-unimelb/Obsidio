@@ -54,6 +54,7 @@ type riskJob struct {
 type riskGate struct {
 	mu          sync.Mutex
 	parked      []*riskJob
+	late        []*riskJob // re-parked after the hold cap; served before the stack
 	idleWorkers int
 	wake        chan struct{}
 
@@ -184,8 +185,10 @@ func (g *riskGate) wait(job *riskJob) (riskResult, bool) {
 	}
 }
 
-// readmit replaces a stale waiter with a fresh copy at the top of the stack.
-// It returns ok=false when a worker already owns the original.
+// readmit moves a stale waiter to the late queue, which workers drain before
+// the stack: on top of a LIFO stack under sustained load it would sink beneath
+// newer arrivals and never be reached. It returns ok=false when a worker
+// already owns the original.
 func (g *riskGate) readmit(job *riskJob) (*riskJob, bool) {
 	g.mu.Lock()
 	if job.taken {
@@ -194,7 +197,7 @@ func (g *riskGate) readmit(job *riskJob) (*riskJob, bool) {
 	}
 	job.abandoned = true
 	late := &riskJob{seed: job.seed, queuedAt: time.Now(), ctx: job.ctx, result: job.result, late: true}
-	g.parked = append(g.parked, late)
+	g.late = append(g.late, late)
 	g.mu.Unlock()
 	select {
 	case g.wake <- struct{}{}:
@@ -234,6 +237,17 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 		count := 0
 		now := time.Now()
 		stale := g.patience()
+		for count < limit && len(g.late) > 0 {
+			job := g.late[0]
+			g.late[0] = nil
+			g.late = g.late[1:]
+			if job.abandoned || job.ctx.Err() != nil {
+				continue
+			}
+			job.taken = true
+			batch[count] = job
+			count++
+		}
 		for count < limit && len(g.parked) > 0 {
 			var job *riskJob
 			if g.shed {
@@ -258,6 +272,9 @@ func (g *riskGate) take(limit int, batch []*riskJob) int {
 		}
 		if len(g.parked) == 0 && cap(g.parked) > 4*parkBackstop {
 			g.parked = nil
+		}
+		if len(g.late) == 0 {
+			g.late = nil
 		}
 		if count > 0 {
 			g.mu.Unlock()

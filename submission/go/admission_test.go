@@ -199,9 +199,11 @@ func TestHeldWaiterIsServedLateInsteadOfAbandoned(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	count := g.take(4, batch[:])
+	g.admit(testJob("newer-1")) // newer arrivals must not bury the late job
+	g.admit(testJob("newer-2"))
+	count := g.take(1, batch[:])
 	if count != 1 || !batch[0].late || batch[0].seed != "held" {
-		t.Fatalf("expected the re-parked late job, got %d", count)
+		t.Fatalf("expected the late job to be served before the stack, got %d: %q", count, batch[0].seed)
 	}
 	batch[0].result <- riskResult{hash: [64]byte{'x'}}
 	<-done
