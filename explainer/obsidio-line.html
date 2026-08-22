@@ -174,13 +174,27 @@
   .limitpulse { animation:blink 1.4s steps(1) infinite; }
   .servept { animation:blink 1.2s steps(1) infinite; }
   .drain { animation:drain 3.2s linear infinite; }
+  .bubble-cloud { fill:var(--viz-2); stroke:var(--viz-line); stroke-width:1.2; }
+  .book { fill:var(--viz-2); stroke:var(--viz-line); stroke-width:1.4; }
+  .book-line { stroke:var(--viz-muted); stroke-width:2; }
+  .lightsout { animation:lights 4s ease-in-out infinite; }
+  .pre-val { animation:forget 4s ease-in-out infinite; }
+  .pre-q { animation:appear 4s ease-in-out infinite; }
+  .post-val { animation:vdim 4s ease-in-out infinite; }
+  .post-tag { animation:appear 4s ease-in-out infinite; }
+  @keyframes lights { 0%,58%{opacity:0} 62%,72%{opacity:.9} 78%,100%{opacity:0} }
+  @keyframes forget { 0%,58%{opacity:1} 70%,100%{opacity:0} }
+  @keyframes appear { 0%,74%{opacity:0} 84%,100%{opacity:1} }
+  @keyframes vdim { 0%,58%{opacity:1} 64%,70%{opacity:.22} 80%,100%{opacity:1} }
 
   @media (prefers-reduced-motion: reduce) {
     .anim-jit>*,.anim-bob>*,.flow,.jamchip,.simmer,.fall,.sweep,.glowpot,.stir,.qgrow,.glance,.servedchip,.bolt,
-    .agered,.shedchip,.forktok,.flowdot,.kwall,.drain,.prorange,.limitpulse,.servept { animation:none !important; }
+    .agered,.shedchip,.forktok,.flowdot,.kwall,.drain,.prorange,.limitpulse,.servept,
+    .lightsout,.pre-val,.pre-q,.post-val,.post-tag { animation:none !important; }
     .wipe{opacity:.35} .restore{opacity:1}
     .forktok.up{offset-distance:70%} .forktok.dn{offset-distance:55%;opacity:.5}
     .flowdot{transform:translateX(150px)} .timer.drain{transform:scaleX(.5)}
+    .lightsout{opacity:0} .pre-val{opacity:0} .pre-q{opacity:1} .post-val{opacity:1} .post-tag{opacity:1}
   }
 </style>
 
@@ -463,25 +477,48 @@
       <div class="viz">
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
-            <rect class="disk" x="66" y="40" width="68" height="40" rx="6"/><text class="lbl" x="80" y="56">memory</text>
-            <text class="wipe" x="82" y="72" style="font-family:'IBM Plex Mono',monospace;font-size:10px;fill:var(--viz-ink)">190.0</text>
-            <path class="bolt" d="M150 20 L138 56 L150 56 L136 96" stroke="var(--flame)" stroke-width="3" fill="none"/>
-            <text class="txt-b" x="100" y="108" text-anchor="middle" style="font-size:9px">after restart: gone</text>
+            <text class="lbl" x="10" y="14">the price lives only in the chef's head</text>
+            <g transform="translate(44 82)">
+              <rect x="-14" y="-2" width="28" height="26" rx="8" fill="#cfd8de" stroke="#0a0f14"/>
+              <circle cx="0" cy="-13" r="11" fill="#e7cfa8"/>
+              <rect x="-12" y="-31" width="24" height="14" rx="6" fill="#eef3f6"/><rect x="-12" y="-21" width="24" height="4" fill="var(--braise)"/>
+            </g>
+            <circle cx="80" cy="66" r="2.5" fill="var(--viz-2)" stroke="var(--viz-line)"/>
+            <circle cx="90" cy="57" r="3.5" fill="var(--viz-2)" stroke="var(--viz-line)"/>
+            <ellipse class="bubble-cloud" cx="140" cy="47" rx="40" ry="22"/>
+            <text class="pre-val bignum" x="140" y="52" text-anchor="middle" style="font-size:13px;fill:var(--viz-ink)">AAPL 190</text>
+            <text class="pre-q bignum" x="140" y="54" text-anchor="middle" style="font-size:20px;fill:var(--bad)">?</text>
+            <g class="lightsout">
+              <rect x="0" y="0" width="200" height="120" fill="#05080b"/>
+              <circle cx="100" cy="50" r="9" fill="none" stroke="var(--flame)" stroke-width="2"/><line x1="100" y1="40" x2="100" y2="50" stroke="var(--flame)" stroke-width="2"/>
+              <text class="txt-f" x="100" y="76" text-anchor="middle" style="font-size:10px">restart</text>
+            </g>
           </svg></div>
-          <figcaption class="balabel"><span class="badge b">Before</span> in memory only</figcaption>
+          <figcaption class="balabel"><span class="badge b">Before</span> remembered → forgotten</figcaption>
         </figure>
         <figure class="ba">
           <div class="screen"><svg viewBox="0 0 200 120">
-            <rect class="disk" x="60" y="38" width="56" height="42" rx="5"/>
-            <line x1="70" y1="50" x2="106" y2="50" stroke="var(--viz-muted)" stroke-width="2"/><line x1="70" y1="60" x2="106" y2="60" stroke="var(--viz-muted)" stroke-width="2"/><line x1="70" y1="70" x2="96" y2="70" stroke="var(--viz-muted)" stroke-width="2"/>
-            <text class="lbl" x="120" y="44">WAL + fsync</text>
-            <path class="bolt" d="M150 20 L138 52 L150 52 L136 88" stroke="var(--flame)" stroke-width="3" fill="none"/>
-            <text class="restore txt-g" x="100" y="106" text-anchor="middle" style="font-size:9px">after restart: 190.0 ✓</text>
+            <text class="lbl" x="10" y="14">written to the ledger before "done"</text>
+            <g transform="translate(38 82)">
+              <rect x="-14" y="-2" width="28" height="26" rx="8" fill="#cfd8de" stroke="#0a0f14"/>
+              <circle cx="0" cy="-13" r="11" fill="#e7cfa8"/>
+              <rect x="-12" y="-31" width="24" height="14" rx="6" fill="#eef3f6"/><rect x="-12" y="-21" width="24" height="4" fill="var(--braise)"/>
+            </g>
+            <rect class="book" x="92" y="32" width="80" height="54" rx="5"/>
+            <line class="book-line" x1="104" y1="48" x2="160" y2="48"/><line class="book-line" x1="104" y1="60" x2="160" y2="60"/>
+            <text class="post-val bignum" x="132" y="78" text-anchor="middle" style="font-size:13px;fill:var(--viz-ink)">AAPL 190</text>
+            <text class="txt-g" x="132" y="100" text-anchor="middle" style="font-size:8px">saved to disk ✓</text>
+            <g class="lightsout">
+              <rect x="0" y="0" width="200" height="120" fill="#05080b"/>
+              <circle cx="100" cy="50" r="9" fill="none" stroke="var(--flame)" stroke-width="2"/><line x1="100" y1="40" x2="100" y2="50" stroke="var(--flame)" stroke-width="2"/>
+              <text class="txt-f" x="100" y="76" text-anchor="middle" style="font-size:10px">restart</text>
+            </g>
+            <g class="post-tag"><text class="txt-g" x="132" y="26" text-anchor="middle" style="font-size:9px">↺ replayed on restart</text></g>
           </svg></div>
-          <figcaption class="balabel"><span class="badge g">After</span> logged to disk first</figcaption>
+          <figcaption class="balabel"><span class="badge g">After</span> written down → survives</figcaption>
         </figure>
       </div>
-      <p class="say">The bonus rewards surviving a hard restart. No database needed: append each price update to a file and flush it to disk before replying, then replay the file on startup. The scored siege is read-only, so it never pays this cost.</p>
+      <p class="say">The bonus rewards surviving a hard restart. No database needed: append each price update to a file and flush it to disk <em>before</em> replying — the chef writes it in the book before saying "done" — then replay the file on startup. The scored siege is read-only, so it never pays this cost.</p>
       <p class="impact"><span class="k">Result</span><span><b>Survives a hard kill.</b> Free on the scored path — pure additive bonus.</span></p>
     </article>
 
