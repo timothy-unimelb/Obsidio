@@ -13,7 +13,11 @@ on the same machine, they compete for CPU and your numbers get noisy... the
 grader keeps them separate." Absolute throughput numbers (`work_score`,
 req/s) should be read as directional, not as a prediction of grading-day
 numbers. The pass/fail pattern and the *reasons* runs failed are the load-
-bearing part of this log, not the exact figures.
+bearing part of this log, not the exact figures. The final section of this
+log ("Independent verification on real x86 hardware") re-measures the
+shipped commit on separated hardware — the load generator and target on
+different hosts, like the grader — for a number that isn't subject to this
+caveat.
 
 ## Summary table
 
@@ -258,6 +262,58 @@ rejections under contention, and run 9's actual measured `/risk` p95
 (96.7ms, ~6% of the 1500ms budget) is direct evidence the current queue is
 safe in practice, not a rule of thumb to second-guess it against.
 
+### Independent verification on real, separated x86 hardware (AWS)
+
+Every run above shares one limitation, stated in the caveat at the top of this
+document: k6 and the container ran on the same developer machine, competing
+for the same CPU. That's fine for *relative* deltas (did this change help or
+hurt?), which is all any individual run above needed to answer. It's weaker
+evidence for an *absolute* number in a write-up, since same-host contention is
+exactly the kind of noise the actual grading setup avoids by running the load
+generator and the target on separate hardware.
+
+A teammate's `draft` branch had already built exactly this: `benchmarks/aws/`,
+a CloudFormation-provisioned environment matching the grader's shape — a
+`c7i.xlarge` target host (cgroup-capped to the same `--cpus=2 --memory=2g` the
+grader uses, with more visible cores left otherwise unused, precisely so the
+*cgroup quota* is what's under test, not the host's size) and a separate
+`c7i.large` load-generator host, in one subnet so benchmark traffic never
+touches the public internet. Rather than build a parallel setup, joel/draft
+was run through that existing, already-reviewed tooling and its accompanying
+`BENCHMARKING.md` protocol (the same protocol behind advait's own noise-floor
+figures cited earlier in this log).
+
+That tooling's `run-comparison.sh` is built around comparing two
+implementations (champion vs. candidate) in one sequence. There was no second
+implementation to compare against here — the goal was verifying joel/draft's
+own number on clean hardware, not an A/B — so joel/draft's own `starters/go`
+was supplied as *both* champion and candidate. This isn't a workaround so much
+as a convenient way to get the default `A B A` sequence to produce three
+independent, real-hardware samples of the same commit (`3e44428`) rather than
+one, which is exactly what the protocol itself recommends over trusting a
+single run.
+
+**Result — three runs, full `k6/grading.js`, all 0.000% error:**
+
+| Run | `work_score` | `/price` p95 | `/stats` p95 | `/risk` p95 |
+|---|---|---|---|---|
+| a1 (champion) | 1,893,727 | 77.67ms | 77.95ms | 89.93ms |
+| b1 (candidate) | 1,883,098 | 78.50ms | 78.55ms | 91.56ms |
+| a2 (champion) | 1,879,894 | 79.39ms | 79.06ms | 91.49ms |
+
+Median `work_score` **1,883,098**, range under 1% wide — a much tighter spread
+than any pair of same-host local runs in this log, consistent with the load
+generator no longer competing with the target for CPU. This is ~11% higher
+than the local Tier-2 confirmation run taken minutes earlier on the same
+commit (1,690,163), which is the expected direction and rough magnitude for
+removing same-host contention, not evidence of a code difference — same
+binary, same commit, just measured somewhere the noise floor is lower.
+
+This number — not any of the local same-host figures — is the one to cite in
+the write-up: it was produced on hardware shaped like the grader's own
+environment, with the load generator genuinely isolated from the target, and
+as a median of three runs rather than a single sample.
+
 ## What shipped, and why
 
 - **Self-calibration was kept**: unambiguously validated — it derives
@@ -282,7 +338,17 @@ safe in practice, not a rule of thumb to second-guess it against.
   exactly what it claimed (cut fast-path p95 6.6x) but shifted that cost onto
   `/risk` for a net loss on the actual scored metric — a reminder that a
   validated mechanism and a worthwhile change aren't always the same thing.
+- **The final number was verified on separated x86 hardware**, not just
+  trusted from same-host local runs. The local and AWS figures agree on
+  everything that matters (comfortable margin on all four bars, ~11% apart in
+  the direction contention noise predicts), which is itself the useful
+  result: the local same-host numbers throughout this log were directionally
+  honest, not an artifact of the measurement setup.
 
-Final state (run 11): `work_score` 1,559,837, `http_req_failed` 0.00%,
+Final local state (run 11): `work_score` 1,559,837, `http_req_failed` 0.00%,
 `/risk` p95 103.56ms against a 1500ms bar — up from run 8's 936,546 at the
 start of this session, driven almost entirely by the kernel fix.
+
+**Final verified state (AWS, separated hardware, median of 3):** `work_score`
+**1,883,098**, `http_req_failed` 0.00%, `/risk` p95 ~91ms against the 1500ms
+bar. This is the number the write-up should cite.
