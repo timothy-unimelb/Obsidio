@@ -465,3 +465,15 @@ Entry format (see the /experiment skill):
   1.33-1.36× every boot. KEPT — grading-day constants no longer depend on
   cold-start luck. (Ratio note: the earlier 1.62× compared fused pairs to
   UNfused singles; vs fused singles the honest steady ratio is 1.35×.)
+
+## 2026-08-22 Freeze verification (shipped build ×3, x86)
+
+- **SHA:** 7added4 (the submission build) as both bracket sides — three
+  full grading runs across three cold container boots.
+- **Result:** 4,166,303 / 4,166,378 / 4,165,599 — **spread 0.019%**;
+  errors 0.83-0.84% (88bp governor, k6 view); all bars pass every run.
+  The boot-warmup fix is visible end-to-end: same-code boot-to-boot spread
+  was ~2.7% this morning.
+- **Verdict:** FROZEN. Submission headline: **4,166,000 ± 400 work_score**
+  on c7i-class hardware, 2.13× the morning baseline, 4/4 bars with 18×
+  /risk p95 margin and 0.16pp error-gate margin (conservatively counted).
