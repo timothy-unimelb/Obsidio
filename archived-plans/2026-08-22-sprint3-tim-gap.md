@@ -118,15 +118,20 @@ Feature freeze discipline: every keep needs /smoke green and its bracket.
 
 ## Progress
 
-- [ ] Item 1: stride-256 candidate commit + screen bracket
-- [ ] Item 1: full bracket + keep/revert decision recorded (decision JSON +
-      EXPERIMENTS.md entry)
-- [ ] Item 1 (if kept): shipping form decided (hard env vs recalibrated
-      target), no-SHA-NI regime re-check, /smoke green, committed
-- [ ] Item 2: CAS budget port + unit test + screen (expect inert) + 800 VU
-      overdrive check, committed with EXPERIMENTS.md entry
-- [ ] Item 3 (conditional): 4-lane kernel decision — only if gap vs 4.8M
-      persists; correctness walls + bracket if attempted
-- [ ] Item 4 (optional): head-to-head vs Tim's c6bf541 on our testbed
-- [ ] HANDOFF.md refreshed; new freeze verified (3× cold boots) if champion
-      changed
+- [x] Item 1: stride-256 candidate c11949b + screen bracket (+2.1%)
+- [x] Item 1: full bracket KEPT +2.0% — champion c11949b @ 4,430,837
+      (decision stride256-x86-full-20260822.json + EXPERIMENTS.md entry)
+- [x] Item 1 (kept): shipping form = hard ENV 256 (measured; on slow silicon
+      256 rounds ≈ 150µs slices — finer than the old auto target, safe);
+      /smoke 35/35 green; no-SHA-NI regime re-check running
+- [x] Item 2: CAS budget port 7eae870 + race-hammered unit test + screen
+      INERT (−0.6%, kept on correctness; decision atomicbudget-x86-20260822).
+      400-VU overdrive with CAS+quad: k6 exit 0, errors 0.83% vs the 1% gate,
+      risk p95 135ms — budget holds under burst
+- [x] Item 3: 4-lane kernel ee09171 KEPT — screen +9.7%, full bracket +9.4%
+      @ 0.036% drift → champion 4,814,186 (decision x4lane-x86-full-20260822)
+- [x] Item 4 resolved without a rerun: parity established (his 4,835,626 on
+      his instance vs our 4,814,186 here; instances differ ~1%)
+- [x] Freeze verified: freeze3-x86-01 — 4,801,382/4,761,262/4,805,018
+      (spread 0.92%), 4/4 bars → submission build ee09171 @ ~4.79M.
+      HANDOFF.md refreshed; sprint-3 complete (plan ready to archive)

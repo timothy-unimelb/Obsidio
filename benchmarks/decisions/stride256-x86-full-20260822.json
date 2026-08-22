@@ -1,0 +1,32 @@
+{
+  "recorded_at": "2026-08-22T09:20:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "stride256-x86-full-01",
+  "candidate": "RISK_YIELD_STRIDE=256 via Dockerfile ENV (advait app, c11949b)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4344070, 4337511],
+    "candidate_score": 4430837,
+    "candidate_vs_stronger_champion_percent": 2.0,
+    "candidate_vs_champion_average_percent": 2.06,
+    "champion_drift_percent": -0.15,
+    "error_rate_percent": 0.86,
+    "all_latency_gates_passed": true,
+    "screen": { "set": "stride256-x86-01", "champion": [1441285, 1434606], "candidate": 1471477, "percent": 2.1 }
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "+2.0% vs the stronger champion side with champion drift -0.15% — mechanism confirmed: price p95 11.1 -> 7.1ms (cheap handlers stop waiting ~1ms hashing slices for a core), risk p95 63 -> 81ms (more risk arrivals/s, 18x inside its bar), errors flat 0.85/0.86%",
+    "supersedes the sprint-1 'stride sweep flat' verdict: that sweep tested {8192,2048,1024} on devloop only, never 256, and predates the shedding governor whose recycled cheap traffic is the loop this latency gates",
+    "source of the hypothesis: Tim's head-to-head (his advait-vs-tim-x86-full-20260822) showing our frozen build -11.9% with price median 6.8-7.1 vs his 3.35ms at the same error budget; his cadence data (2048 was -9.8% vs 256) said our sweep stopped too coarse",
+    "screen delta (+2.1%) matched full (+2.0%) but both are well short of the +11.9% head-to-head gap — remaining ~9% attributed to 4-lane batching (sprint-3 Item 3), not cadence",
+    "shipping form (hard ENV vs recalibrated auto target ~60-100us slices) still owed before freeze; no-SHA-NI regime re-check still owed"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Sprint-3 Item 1' entry"
+}

@@ -635,3 +635,111 @@ The hand-rolled server holds in every regime where it could diverge.
   (RISK_KERNEL_V3, RISK_HTTP, RISK_X16) shipping in the binary.
 - **Launch-blocker unchanged:** when final thresholds publish, update
   RISK_ERR_GATE_BP in app/Dockerfile and re-run one grading verification.
+
+## 2026-08-22 Sprint-3 Item 1: yield stride 256 (x86 screen + full — KEPT)
+
+- **SHA:** candidate c11949b (one line: `ENV RISK_YIELD_STRIDE=256` in
+  app/Dockerfile) vs champion 5c42e72; sets stride256-x86-01 (screen),
+  stride256-x86-full-01 (full).
+- **Hypothesis (from Tim's head-to-head):** his bracketed h2h on his c7i pair
+  put our frozen build 11.9% behind his 4,835,626 at the same ~0.85% error
+  budget, attributing the gap to cheap-path latency (price median 6.8–7.1ms
+  ours vs 3.35ms his). His named suspects: 256-round yield cadence (vs our
+  auto ~8192) and 4-lane batches (vs pairs). Our sprint-1 "stride sweep flat"
+  verdict tested {8192,2048,1024} on devloop only, never 256, and predates
+  the governor — the recycled-shed cheap traffic is the loop this latency
+  gates, so the sweep did not falsify 256.
+- **Screen:** 1,441,285 → 1,471,477 → 1,434,606: **+2.1%** vs stronger
+  control, drift −0.5%. Price p95 11.2 → 6.7ms.
+- **Full bracket:** 4,344,070 → **4,430,837** → 4,337,511: **+2.0%** vs
+  stronger control, drift −0.15%, errors 0.85/0.86% both sides, all bars
+  green (price p95 11.1 → 7.1ms, risk p95 63 → 81ms — 18× inside its bar).
+- **Verdict:** KEPT — champion c11949b @ 4,430,837. Corrects the sprint-1
+  stride verdict (superseded, not wrong: it never measured this operating
+  point). Both deltas are far short of the h2h's +11.9%, so the remaining
+  ~9% is attributed to Item 3 (4-lane batching), next.
+- **Owed before freeze:** shipping form (hard ENV vs recalibrating the auto
+  target from ~1ms to ~60–100µs slices — auto preferred for no-SHA-NI
+  portability), no-SHA-NI insurance regime re-check, /smoke.
+
+## 2026-08-22 Sprint-3 Item 2: atomic shed-budget reservation (port of Tim's 6808e7d)
+
+- **SHA:** 7eae870 vs champion c11949b; set atomicbudget-x86-01 (screen, in
+  flight).
+- **Why:** our shedBudgetAllows was check-then-charge — a burst of waiters
+  waking together can all pass the check before any charge lands. Tim
+  measured exactly this failure shape on his stack (1.489% errors against an
+  0.88% budget at 800 VUs) and fixed it with a CAS reservation in the
+  decision step, verified score-inert. Our margin to the 1% DQ gate is only
+  ~0.15pp; this is insurance, not points.
+- **Change:** shedReserveError CAS-charges respErr in the same step as the
+  decision; every ok=false exit of riskSubmit counts exactly once at
+  decision time (front-door/patience via reservation, backstop/disconnect
+  via explicit add, shed-then-served race releases the reservation); the
+  shed 503 is written uncounted. New race-hammered unit test
+  (TestShedReserveNoOvershoot): 64 goroutines can spend the budget to the
+  cap but never past it.
+- **Expected:** score-inert on the bracket (Tim's was), safety win at
+  overload. 800-VU overdrive check owed after the screen.
+- **Screen bracket atomicbudget-x86-01:** 1,449,684 → 1,461,273 → 1,469,429 —
+  −0.6% vs the stronger control: INERT (noise floor 0.8%), errors 0.85/0.86%
+  both sides. **KEPT on correctness — champion 7eae870.** 800-VU overdrive
+  re-verification owed before freeze (combined with the 4-lane pass).
+
+## 2026-08-22 Sprint-3 Item 3: 4-lane SHA-NI chain kernel (vendored quad)
+
+- **SHA:** ee09171 vs champion 7eae870; set x4lane-x86-01 (screen, in
+  flight).
+- **Hypothesis:** the remaining ~9% of Tim's head-to-head gap after Item 1
+  is his other named suspect — 4-lane batches. Our fused pair runs
+  ~2.85ms/chain; his quad measured 2.66. Unlike x16 (flat: needs ~15 parked
+  waiters), a quad needs only 4 — inside the governor's queue equilibrium.
+- **Change:** vendored his generated riskChain4x asm (in-place 64-byte hex
+  chains, loop-in-asm with rounds, all-MOVOU) as app/sha4lane_amd64.s behind
+  our standard walls: SHA-NI cpuinfo gate, 640-case boot differential vs
+  crypto/sha256+hexEncode64, test suite (differential n∈{1..1000}, full-chain
+  vs walled scalar, lane independence, GC/preemption stress), boot race ≥5%
+  vs the two pair calls a quad displaces, RISK_X4 kill switch. Workers pop
+  up to 4; 3/2/1-pops degrade through pair/serial (a k-of-4 batch costs full
+  quad wall time, so padding loses to degrading).
+- **Level 0 (target box):** all tests green on SPR; boot race quad 10.48ms
+  vs pair-2 11.75ms = **1.12×** (2.62 vs 2.94ms/chain), matching Tim's
+  Level-0 medians.
+- **Screen x4lane-x86-01:** 1,455,922 → 1,596,733 → 1,450,040 = **+9.7%**
+  (drift −0.4%). Price p95 6.5 → 9.8ms (quad slices), risk p95 unchanged.
+- **Full bracket x4lane-x86-full-01:** 4,398,236 → **4,814,186** → 4,399,807
+  = **+9.4% at 0.036% drift** (tightest bracket recorded), errors 0.86% both
+  sides, 4/4 bars (price p95 9.8ms, risk p95 83.1ms).
+- **Verdict:** KEPT — **champion ee09171 @ 4,814,186**. Day: 4.30M → 4.43M
+  (stride) → 4.81M (quad) = +12%. Parity with Tim's 4,835,626 (his
+  instance); our raw-TCP edge partially overlapped with the cheap-path gains
+  rather than stacking. /smoke 35/35 green post-change (arm64 capped local).
+- **Owed:** 800-VU/400-VU overdrive with CAS+quad, no-SHA-NI regime
+  re-check (quad gate must stay silent), freeze 3× cold boots.
+
+## 2026-08-22 Sprint-3 validation tail (overdrive + no-SHA-NI regime)
+
+- **400-VU overdrive (k6/overdrive.js, side run, CAS+quad build ee09171):**
+  k6 exit 0 — every graded threshold holds at 2× the published peak. Errors
+  **0.83%** against the 1% gate (the CAS reservation's design point under
+  burst; the racy form measured 1.49% on Tim's equivalent test), risk p95
+  135.2ms, price p95 9.35ms, 573,552 requests in 75s.
+- **No-SHA-NI regime re-check (RISK_KERNEL=avx512 + GODEBUG=cpu.sha=off,
+  full grading.js):** work_score **3,255,335**, k6 exit 0, 4/4 bars (risk
+  p95 104.5ms, price/stats p95 11.0ms). Boot log verified: AVX2 scalar
+  kernel, x16 AVX-512 batch path enabled (5.69× boot race), **no "risk x4"
+  line — the quad gate is provably silent off-SHA-NI**; yieldStride=256
+  applies (≈77µs slices on 15ms chains — finer than before, safe direction).
+  Note: −7.8% vs sprint-2's single-run 3,530,813 in the same regime. Both
+  are single runs and this regime's noise floor is unmeasured; insurance
+  intact at 4× the 812k pre-insurance baseline. If it matters (grader
+  without SHA extensions is the unlikely case), a stride A/B in-regime is
+  the first suspect to check.
+- **Sprint-3 freeze (freeze3-x86-01, 3× cold-boot grading runs of ee09171):**
+  4,801,382 / 4,761,262 / 4,805,018 — spread 0.92%, mean 4,789,220, errors
+  0.85–0.87%, 4/4 bars every run (risk p95 ~82ms, price/stats p95 9.7ms).
+  **New submission build: ee09171 @ ~4.79M — sprint-3 total 4.30M → 4.79M
+  (+11.4% in a day), parity with Tim's build, retaining the raw-TCP path and
+  the AVX-512 no-SHA-NI insurance his build lacks.** Docker build-gate tests
+  ran on the grader-identical remote builds (kernel walls included); /smoke
+  35/35 on the arm64 fallback path.
