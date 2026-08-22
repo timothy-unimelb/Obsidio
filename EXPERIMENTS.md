@@ -282,3 +282,20 @@ Entry format (see the /experiment skill):
      hardware: errors pinned just under budget, risk p95 margin 10×.
 - **Verdict:** baseline banked; blocking-list items "true /price p95" and
   "end-to-end grading run" verified. Next: packed-hex A/B on this testbed.
+
+## 2026-08-22 Packed pair-table hex encoder (x86 full A/B — KEPT)
+
+- **SHA:** candidate a446bd0 vs champion 02e4f99, testbed hex-packed-x86-01
+  (c7i.xlarge, bracketed full grading.js, 0.8% measured noise floor).
+- **Hypothesis:** hex.Encode dominates the risk loop on SHA-NI silicon (62%
+  of loop CPU in Tim's SPR profile); a 256-entry uint16 pair table (one load
+  + one 2-byte store per byte) removes most of that cost. Portable Go.
+- **Change:** app/main.go riskChain: hex.Encode → hexEncode64 (packed table);
+  equivalence tests over all 256 byte values + full-chain digests.
+- **Result:** work_score 1,944,994 / **2,098,957** / 1,947,556 (A/B/A) —
+  **+7.8% vs both champion sides** (champion drift 0.13%); errors 0.565%;
+  p95 price/stats 10.7ms, risk 141.6ms (better than champion's ~149ms);
+  all bars pass, k6 exit 0. Decision recorded in benchmarks/history.jsonl.
+- **Verdict:** KEPT — new champion is a446bd0. Gain ~3× Tim's equivalent
+  (+2-3%) because our chain hex-encodes in the hot 50k loop every iteration.
+  New x86 headline: **~2.10M work_score.**
