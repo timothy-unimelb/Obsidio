@@ -134,7 +134,10 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W1: cpu.stat — 37ms total throttled/run: CFS hypothesis dead, GOMAXPROCS=2 validated
 - [x] W2A: x86 verification session — SHA-NI confirmed (2.49×; 1.26-bump bet falsified, 1.22 already had it); baseline 3×grading on c7i.xlarge: **1.95M, 4/4 bars, 0.8% noise floor, true /price p95 10.6ms**; testbed = Tim's harness, stack obsidio-bench-advait
 - [x] W2A (reprioritized): packed pair-table hex encoder — **+7.8% full A/B on testbed, new champion a446bd0, x86 headline ~2.10M** (hex was 62% of loop CPU on SHA-NI silicon; Tim's profile finding, our port)
-- [ ] W2A: post-hex pprof on testbed → decide 2-lane SHA-NI kernel vs hex-unroll vs stop (Amdahl re-check with new split)
+- [x] W2A: post-hex pprof (blockSHANI 65% / wrapper ~15% / hex 9.6%) → kernel lane executed in profile order:
+- [x] W2A: direct 2-block kernel (vendored stdlib asm, fixed-64B path) — **+28.6% full A/B, champion 92f6ecf, headline ~2.71M** (Tier-0 −24%/chain)
+- [x] W2A: 2-lane interleaved SHA-NI kernel (generated from stdlib asm by benchmarks/gen2lane.py) — differential-tested on SPR; in-chain ratio **1.35×** (pair 6.84ms vs serial-2 9.24ms)
+- [~] W3: pairing dispatcher (workers pop 1-2 waiters; admission semantics unchanged; boot race gates pairing) — built, race-clean, smoke 35/35 on dev box; **full A/B in flight (pairing-x86-01)**
 - [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
 - [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
 - [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed

@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T02:50:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "direct-kernel-x86-01",
+  "candidate": "direct-2-block-sha-kernel (advait app, 92f6ecf)",
+  "verdict": "kept",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [2106457, 2102554],
+    "candidate_score": 2707803,
+    "candidate_vs_stronger_champion_percent": 28.55,
+    "champion_drift_percent": 0.19,
+    "error_rate_percent": 0.577,
+    "all_latency_gates_passed": true,
+    "risk_p95_ms_candidate": 111.4
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "champion=a446bd0 (packed hex), candidate=92f6ecf (adds fixed-64B direct 2-block kernel over vendored stdlib asm)",
+    "Tier-0 predicted -24% chain time; end-to-end +28.6% score (chains/s +31%)",
+    "correctness: 256-fill + 50k-random differential, full-chain reference, boot self-test, digest guard in docker build"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Direct 2-block kernel' entry"
+}

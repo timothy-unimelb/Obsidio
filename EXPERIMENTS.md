@@ -317,3 +317,23 @@ Entry format (see the /experiment skill):
   +60-98% Zen) → Amdahl ceiling ~+25% end-to-end; combined ceiling +30-40%.
 - **Verdict:** kernel lane GO, in that order, each step behind differential
   tests + testbed A/B.
+
+## 2026-08-22 Direct 2-block kernel (x86 full A/B — KEPT)
+
+- **SHA:** candidate 92f6ecf vs champion a446bd0 (packed hex), set
+  direct-kernel-x86-01.
+- **Hypothesis:** the /risk input after iteration 1 is always exactly 64
+  bytes = one message block + one CONSTANT padding block; driving the
+  stdlib compression asm (vendored, unmodified) directly deletes the ~15%
+  Digest-wrapper overhead the post-hex profile exposed.
+- **Change:** app/sha256block_amd64.s (vendored), shakernel_amd64.go
+  (kernelSum64: IV + two block calls + BE encode; ISA gate from
+  /proc/cpuinfo = stdlib's own gate; 512-case boot self-test;
+  RISK_KERNEL=off kill switch; stdlib fallback otherwise). Tier-0:
+  6.34 → 4.81ms/chain (−24%).
+- **Result (bracketed full grading.js):** 2,106,457 / **2,707,803** /
+  2,102,554 — **+28.6% vs the stronger champion side** (drift 0.19%);
+  errors 0.577%; risk p95 111.4ms (champion ~140ms); price p95 10.9ms;
+  all bars pass. Chains/s +31% — score tracks chain throughput almost 1:1.
+- **Verdict:** KEPT — champion is now the direct-kernel build.
+  **x86 headline: ~2.71M work_score** (baseline 1.95M two hours earlier).
