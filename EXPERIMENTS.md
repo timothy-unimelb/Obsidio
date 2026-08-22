@@ -242,3 +242,43 @@ Entry format (see the /experiment skill):
   the capped container while the host advertises more cores.
 - **Verdict:** kept — flame-graph-under-load still owed (needs a pprof run,
   ideally on the x86 box).
+
+## 2026-08-22 x86 Tier-0: SHA-NI verified, Go 1.26-vs-1.22 bet falsified
+
+- **SHA:** 02e4f99; testbed = c7i.xlarge (Xeon Platinum 8488C, Sapphire
+  Rapids; sha_ni+avx+sse4_1+ssse3 all present), Tim's provisioned harness.
+- **Hypothesis:** Go 1.25+ added stdlib SHA-NI (~2× /risk) — the basis of our
+  golang:1.22→1.26 image bump.
+- **Result (BenchmarkRiskChain, 50k-chain, benchtime 20-50x):**
+  - Go 1.26 default 6.81ms/chain; GODEBUG=cpu.sha=off 16.96ms (**SHA-NI is
+    selected and worth 2.49×** vs the AVX2 path); cpu.all=off 25.78ms.
+  - Go 1.22 default 6.56ms/chain — **1.22 already uses SHA-NI**. The
+    "added in 1.25" premise was wrong; the amd64 sha_ni path predates it.
+  - 1.26 is ~4% SLOWER than 1.22 on this kernel (6.81 vs 6.56, consistent
+    across 3×20x runs) — small; watch, don't act yet.
+- **Verdict:** the 1.26 bump is NOT a score lever (keep the image for the
+  container-aware runtime + toolchain currency unless the 4% proves real
+  end-to-end). The true finding: any x86 grader with sha_ni runs our chain at
+  ~6.8ms vs ~11.9ms on the local arm64 Docker — hardware, not toolchain.
+  Corrects the open verdict of "Go 1.22 → 1.26 base image" above.
+
+## 2026-08-22 x86 testbed baseline (bracketed, full grading.js × 3)
+
+- **SHA:** 02e4f99 (champion == candidate: same build both sides, so the
+  bracket measures pure testbed noise). c7i.xlarge target + separate c7i.large
+  k6 host, Tim's harness, container capped 2 CPU / 2 GiB, k6 2.2.0 pinned.
+- **Result:** work_score 1,953,437 / 1,953,713 / 1,937,842 (spread 0.8%;
+  identical builds A1-vs-B1 within 0.01%). Errors 0.562-0.564% (governor
+  sitting on its 0.6% target). p95: price 10.6ms, stats 10.6-10.7ms, risk
+  148.7-155.9ms. All bars pass every run, k6 exit 0.
+- **Reads:**
+  1. **x86 headline ≈ 1.95M** = 1.69× our local 1.15M — silicon (SHA-NI),
+     not toolchain. Ties Tim's champion (1.95M) on identical hardware.
+  2. **Testbed noise floor ~0.8%** (vs ~10% local) — small effects are now
+     resolvable; the A/B harness works as advertised.
+  3. **True fast-path p95 = 10.6ms** — the local ~100ms pre-yield readings
+     were Docker-Desktop-VM artifacts, as suspected in the plan.
+  4. Governor + staleness + front-door shed behave identically on fast
+     hardware: errors pinned just under budget, risk p95 margin 10×.
+- **Verdict:** baseline banked; blocking-list items "true /price p95" and
+  "end-to-end grading run" verified. Next: packed-hex A/B on this testbed.

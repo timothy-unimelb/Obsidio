@@ -58,8 +58,8 @@ k6 seed precompute (PRNG crypto-seeded per VU in k6 source; grading.js never cal
 4. Standing item: the moment the LOCKED grading script publishes, diff it and re-derive constants (VU peak, thresholds, randomSeed).
 5. Final /commit-push + submission checklist.
 
-## Must verify on real x86 (blocking list)
-SHA-NI actually selected (full feature gate) · contended chain cost (decides the 12ms-cliff side + all gate constants) · 2-lane correctness on real silicon (QEMU-TCG passes are necessary, NOT sufficient — and Rosetta is unusable: no AVX ⇒ stdlib silently falls back) · interleave ratio on ≥1 Zen and 1 Intel · GC/Gosched deltas carry over · true /price p95 off Docker-Desktop-VM (ours ~100ms is suspected harness artifact; Joel's 7.3ms proves the floor) · one end-to-end grading run with the final build.
+## Must verify on real x86 (blocking list — updated session 4, c7i.xlarge testbed live)
+~~SHA-NI actually selected~~ **VERIFIED 2026-08-22**: Xeon Platinum 8488C (SPR), all four gate flags; 6.81ms/chain vs 16.96ms with cpu.sha=off (2.49×). **Also: Go 1.22 already has SHA-NI (6.56ms) — the 1.26-bump 2× bet is falsified; 1.26 ~4% slower on the kernel, watch.** Still open: contended chain cost (grading run in flight) · 2-lane correctness on real silicon · interleave ratio on ≥1 Zen (c7a spin-up) and 1 Intel · GC/Gosched deltas carry over · true /price p95 off Docker-Desktop-VM · end-to-end grading run with final build. **NEW (Tim's committed x86 profile, benchmarks/experiments/): hex.Encode = 62% of risk-loop CPU on SHA-NI silicon, SHA block only 22% — re-evaluate the 2-lane kernel lane against a hex-first optimization (packed pair table / PSHUFB) after OUR pprof confirms the split.**
 
 ## Verification protocol (every wave)
 Kernel change ⇒ differential test + Tier-0 + /smoke (full 50k digests) before any bench. Scheduling/gate change ⇒ devloop A/B (≥5% resolvable), Tier-2 recorded before claiming, /experiment always. One bench at a time; nothing CPU-heavy during a bench. Deltas <10% = noise; 10-30% = A/B protocol; >30% = one confirming re-run. Write-up cites medians+ranges only.
@@ -132,7 +132,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W1: Gosched yield — /price p95 140→12ms devloop (~12×), score-flat, kept; auto-stride from calibration
 - [x] W1: Step-0 microbench → **GO: 1.65× interleave ratio measured on arm64** (digest verified vs hashlib)
 - [x] W1: cpu.stat — 37ms total throttled/run: CFS hypothesis dead, GOMAXPROCS=2 validated
-- [ ] W2A: x86 VM verification session (SHA-NI, ratios, grading run)
+- [x] W2A: x86 verification session — SHA-NI confirmed (2.49×; 1.26-bump bet falsified, 1.22 already had it); baseline 3×grading on c7i.xlarge: **1.95M, 4/4 bars, 0.8% noise floor, true /price p95 10.6ms**; testbed = Tim's harness, stack obsidio-bench-advait
 - [ ] W2A: 2-lane SHA-NI kernel v1 + differential tests
 - [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
 - [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
