@@ -393,6 +393,12 @@ func riskWorker() {
 			}
 			riskMu.Unlock()
 		}
+		if lanes == 1 && riskChainQuad != nil {
+			// 4-lane pop: a full quad runs ~2.66ms/chain vs ~2.85 paired; a
+			// short pop degrades through the pair/serial paths below, which
+			// beat a padded quad (a k-of-4 batch costs full quad wall time).
+			lanes = 4
+		}
 		if lanes == 1 && riskSumPair != nil {
 			lanes = 2
 		}
@@ -419,6 +425,18 @@ func riskWorker() {
 				observeChainCost(d)
 				w.result <- outs[i]
 			}
+			continue
+		}
+		if riskChainQuad != nil && len(work) == 4 {
+			h0, h1, h2, h3 := riskChainQuad(work[0].seed, work[1].seed, work[2].seed, work[3].seed)
+			d := time.Since(start)
+			for range work {
+				observeChainCost(d)
+			}
+			work[0].result <- h0
+			work[1].result <- h1
+			work[2].result <- h2
+			work[3].result <- h3
 			continue
 		}
 		// Pair up what we hold (covers the normal 2-pop and short 16-lane
@@ -587,6 +605,11 @@ var riskIter1 func(a *[64]byte)
 // (chained-vs-composed); RISK_KERNEL_V3=off keeps the v2 per-iteration path.
 var riskPairIterN func(a, b *[64]byte, n int)
 var riskIter1N func(a *[64]byte, n int)
+
+// riskChainQuad: full 50k-iteration chains for four seeds interleaved on one
+// core (sha4lane_amd64.go). Installed only after its boot self-test AND a
+// boot race win ≥5% over the two pair calls it displaces; nil elsewhere.
+var riskChainQuad func(s0, s1, s2, s3 string) (string, string, string, string)
 
 // riskChainX16, when non-nil, advances up to 16 chains in lockstep through
 // the vendored AVX-512 multi-buffer kernel (see shakernel_x16_amd64.go).
@@ -1030,6 +1053,7 @@ func main() {
 	initRiskKernel() // before calibration, so calibrateRisk times the active kernel
 	calibrateRisk()  // timed chains; runs before the listener, so /health only reports ready after
 	raceKernelPairing()
+	initRiskKernelX4()  // 4-lane SHA-NI batch path; races against the pair path it displaces
 	initRiskKernelX16() // no-SHA-NI insurance path; needs the calibrated scalar kernel for its boot race
 	for i := 0; i < riskSlots; i++ {
 		go riskWorker()
