@@ -532,15 +532,15 @@
             <rect class="ticket" x="24" y="44" width="118" height="13" rx="3"/><rect class="timer w drain" x="26" y="46" width="114" height="9" rx="2"/>
             <rect class="ticket" x="24" y="62" width="118" height="13" rx="3"/><rect class="timer w drain" x="26" y="64" width="114" height="9" rx="2" style="animation-delay:-1.5s"/>
             <rect class="ticket" x="24" y="80" width="118" height="13" rx="3"/><rect class="timer b" x="26" y="82" width="7" height="9" rx="2"/>
-            <text class="lbl" x="38" y="89.5" style="font-size:6.5px">late queue · served next</text>
+            <text class="lbl" x="38" y="89.5" style="font-size:6.5px">past patience · held, not served late</text>
             <g class="shedchip"><rect class="chip b" x="150" y="84" width="30" height="14" rx="3"/><text class="txt-b" x="155" y="94" style="font-size:8px">503</text></g>
             <text class="lbl" x="10" y="110" style="font-size:7.5px">error budget: ≤ 0.88% of responses</text>
           </svg></div>
           <figcaption class="balabel"><span class="badge g">After</span> serve who can finish</figcaption>
         </figure>
       </div>
-      <p class="say">In a rush you can't clear, the oldest order will blow its deadline even if you serve it now — and a customer parked at the stove orders nothing. So serve the newest who can still make it, and turn the overflow away at the door in a millisecond, spending a small error budget to do it. A customer waved off comes straight back and orders drinks; one left waiting earns you nothing. Anyone held past twice their patience goes to a late queue that's served next — late, not lost.</p>
-      <p class="impact"><span class="k">Result</span><span><b>+17% — separated x86.</b> 4.14M → 4.85M at 0.85% errors (gate: 1%); risk p95 215 → 80 ms. The late queue cut the worst wait from 60 s to 2.4 s. At 4× the published peak it still passes every bar at 0.8% errors.</span></p>
+      <p class="say">In a rush you can't clear, the oldest order will blow its deadline even if you serve it now — and a customer parked at the stove orders nothing. So serve the newest who can still make it, and turn the overflow away at the door in a millisecond, spending a small error budget to do it. A customer waved off comes straight back and orders drinks; one left waiting earns you nothing. The budget is charged in the same breath as the decision, so a crowd of waiters can't all slip through at once. And the rare order that ages past its patience while the budget is spent is simply held: we tried serving those late, and at four times the published load it pushed the slow-dish p95 past its bar — so it was measured, and reverted.</p>
+      <p class="impact"><span class="k">Result</span><span><b>+17% — separated x86.</b> 4.14M → 4.85M at 0.85% errors (gate: 1%); risk p95 215 → 80 ms. At 4× the published peak it still passes every bar at 0.88% errors and a risk p95 of 167 ms. Same design as Advait's governor; head-to-head on one box, ours serves +12% at the same error budget because the drink counter answers in 3.4 ms rather than 7.</span></p>
     </article>
 
     <!-- 09 WAL -->
@@ -598,7 +598,7 @@
 
   <footer>
     <div>Every percentage is a real measured delta from the project's benchmark trail — bracketed champion → candidate → champion runs on a separated x86-64 reference (a <span class="mono">c7i.xlarge</span> target with a separate load host), unless marked otherwise. Each card's gain is versus its own control, not a running total.</div>
-    <div>Where it stands: the current build scores <b>4.85M</b> on the reference pair at 0.85% errors, with a price median of 3.4 ms and a risk p95 of 80 ms while the braise runs flat out.</div>
+    <div>Where it stands: the current build (<span class="mono">6808e7d</span>) scores <b>4.85M</b> on the reference pair at 0.85% errors, with a price median of 3.4 ms and a risk p95 of 80 ms while the braise runs flat out. Bracketed against Advait's frozen build on the same box: 4.84M vs 4.32M / 4.29M. Absolute scores move ~15% between instances; every delta here is within one bracket. <span class="mono">RISK_SHED=0</span> gives the zero-error variant at about 17% less score.</div>
     <div class="mono">the challenge: keep /price fast while /risk runs 50,000 SHA-256 rounds · qualify: p95 200 / 500 / 1500 ms, errors &lt; 1%</div>
   </footer>
 </div>
