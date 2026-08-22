@@ -356,15 +356,30 @@ func calculateRiskQuad(seeds [maxRiskLanes]string) (results [maxRiskLanes][sha25
 	encoded2 := unsafe.Slice((*byte)(unsafe.Pointer(&words2[0])), sha256.Size*2)
 	encoded3 := unsafe.Slice((*byte)(unsafe.Pointer(&words3[0])), sha256.Size*2)
 
-	for iteration := 1; iteration < riskIterations; iteration++ {
-		digest0 = sha256.Sum256(encoded0)
-		digest1 = sha256.Sum256(encoded1)
-		digest2 = sha256.Sum256(encoded2)
-		digest3 = sha256.Sum256(encoded3)
-		encodeDigest(&words0, &digest0)
-		encodeDigest(&words1, &digest1)
-		encodeDigest(&words2, &digest2)
-		encodeDigest(&words3, &digest3)
+	if useSHANIPair {
+		in0 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words0[0]))
+		in1 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words1[0]))
+		in2 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words2[0]))
+		in3 := (*[sha256.Size * 2]byte)(unsafe.Pointer(&words3[0]))
+		for iteration := 1; iteration < riskIterations; iteration++ {
+			sum256x2(in0, in1, &digest0, &digest1)
+			sum256x2(in2, in3, &digest2, &digest3)
+			encodeDigest(&words0, &digest0)
+			encodeDigest(&words1, &digest1)
+			encodeDigest(&words2, &digest2)
+			encodeDigest(&words3, &digest3)
+		}
+	} else {
+		for iteration := 1; iteration < riskIterations; iteration++ {
+			digest0 = sha256.Sum256(encoded0)
+			digest1 = sha256.Sum256(encoded1)
+			digest2 = sha256.Sum256(encoded2)
+			digest3 = sha256.Sum256(encoded3)
+			encodeDigest(&words0, &digest0)
+			encodeDigest(&words1, &digest1)
+			encodeDigest(&words2, &digest2)
+			encodeDigest(&words3, &digest3)
+		}
 	}
 
 	copy(results[0][:], encoded0)
