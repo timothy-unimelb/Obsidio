@@ -17,6 +17,7 @@ import (
 // `docker build` via the RUN go test gate.
 func TestMain(m *testing.M) {
 	initRiskKernel()
+	initRiskKernelX16() // mirrors main(): x16 boot race + self-tests run in CI too
 	os.Exit(m.Run())
 }
 

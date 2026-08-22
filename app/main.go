@@ -366,19 +366,20 @@ func riskTakeWork(want int) []*riskWaiter {
 func riskWorker() {
 	for {
 		lanes := 1
-		if riskSumPair != nil {
-			lanes = 2
-		} else if riskChainX16 != nil {
-			// 16-lane batch mode (no-SHA-NI + AVX-512): batch only when ≥8
-			// waiters are parked — a k-of-16 batch runs at k/16 efficiency,
-			// and below 8 serial chains finish sooner. Depth is re-checked
-			// inside riskTakeWork's lock; a short pop (dead/stale skipped)
-			// falls back to serial execution below.
+		if riskChainX16 != nil {
+			// 16-lane batch mode: batch only when ≥riskX16MinBatch waiters
+			// are parked — a k-of-16 batch runs at k/16 efficiency, so small
+			// pops are cheaper through the pair/serial paths below. A short
+			// pop (dead/stale skipped inside riskTakeWork's lock) also falls
+			// through to those paths.
 			riskMu.Lock()
-			if riskStackDepth >= 8 {
+			if riskStackDepth >= riskX16MinBatch {
 				lanes = 16
 			}
 			riskMu.Unlock()
+		}
+		if lanes == 1 && riskSumPair != nil {
+			lanes = 2
 		}
 		work := riskTakeWork(lanes)
 		if len(work) == 0 {
@@ -392,8 +393,7 @@ func riskWorker() {
 			continue
 		}
 		start := time.Now()
-		switch {
-		case len(work) >= 8 && riskChainX16 != nil:
+		if riskChainX16 != nil && len(work) >= riskX16MinBatch {
 			seeds := make([]string, len(work))
 			for i, w := range work {
 				seeds[i] = w.seed
@@ -404,22 +404,25 @@ func riskWorker() {
 				observeChainCost(d)
 				w.result <- outs[i]
 			}
-		case len(work) == 2 && riskSumPair != nil:
+			continue
+		}
+		// Pair up what we hold (covers the normal 2-pop and short 16-lane
+		// pops alike), then finish any leftover serially.
+		for len(work) >= 2 && riskSumPair != nil {
 			ha, hb := riskChainPair(work[0].seed, work[1].seed)
 			d := time.Since(start)
 			observeChainCost(d)
 			observeChainCost(d)
 			work[0].result <- ha
 			work[1].result <- hb
-		default:
-			// Single chain, or a short 16-lane pop: serial execution
-			// (each waiter's digest delivered as soon as it finishes).
-			for _, w := range work {
-				h := riskChain(w.seed)
-				observeChainCost(time.Since(start))
-				w.result <- h
-				start = time.Now()
-			}
+			work = work[2:]
+			start = time.Now()
+		}
+		for _, w := range work {
+			h := riskChain(w.seed)
+			observeChainCost(time.Since(start))
+			w.result <- h
+			start = time.Now()
 		}
 	}
 }
@@ -571,10 +574,18 @@ var riskPairIterN func(a, b *[64]byte, n int)
 var riskIter1N func(a *[64]byte, n int)
 
 // riskChainX16, when non-nil, advances up to 16 chains in lockstep through
-// the vendored AVX-512 multi-buffer kernel — the no-SHA-NI x86 insurance
-// path (see shakernel_x16_amd64.go). Set by initRiskKernelX16 only after its
-// differential self-test and a ≥30% boot-race win over serial chains.
+// the vendored AVX-512 multi-buffer kernel (see shakernel_x16_amd64.go).
+// Two regimes enable it, both via initRiskKernelX16's self-tests + boot race:
+// the no-SHA-NI insurance case (vs serial AVX2, ≥30% win required) and the
+// SHA-NI case (vs the fused pair path, ≥10% at full batch — on SPR the
+// 16-lane batch is ~45ns/chain-iter vs 57ns paired). RISK_X16=off kills it.
 var riskChainX16 func(seeds []string) []string
+
+// riskX16MinBatch: the fewest live waiters worth batching through the
+// 16-lane kernel — a k-of-16 batch costs the same wall time as a full one,
+// so k must be large enough that batch/k beats the displaced path's
+// per-chain cost. Derived from the boot race (floor 8 for latency).
+var riskX16MinBatch = 8
 
 // riskChainPair advances two chains in lockstep through the pair kernel.
 // Identical math to two riskChain calls (differentially tested); one Gosched

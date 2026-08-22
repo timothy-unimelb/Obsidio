@@ -134,14 +134,15 @@ func x16ChainRun(seeds []string) []string {
 // initRiskKernel and calibrateRisk.
 func initRiskKernelX16() {
 	forced := os.Getenv("RISK_KERNEL") == "avx512"
+	if os.Getenv("RISK_X16") == "off" {
+		log.Printf("risk kernel x16: disabled by RISK_X16=off")
+		return
+	}
 	flags := cpuinfoFlags()
 	has := func(f string) bool { return strings.Contains(flags, " "+f+" ") }
 	avx512 := has("avx512f") && has("avx512dq") && has("avx512bw") && has("avx512vl")
 	if !avx512 {
 		return // forced or not: without the ISA the asm cannot run
-	}
-	if !forced && kernelUseSHANI {
-		return // SHA-NI paths always win where they exist
 	}
 	if !forced && os.Getenv("RISK_KERNEL") == "off" {
 		return
@@ -191,9 +192,12 @@ func initRiskKernelX16() {
 		return
 	}
 
-	// Boot race: one 16-lane batch vs 16 serial chains through the active
-	// scalar kernel. Keep only on a >=30%% aggregate win — the insurance
-	// path must never make an unknown grader slower.
+	// Boot race: one 16-lane batch vs the path it would displace, timed on
+	// this machine right now. The reference run doubles as a digest
+	// cross-check against an independently-verified path. Keep bars: the
+	// no-SHA-NI insurance case must win ≥30%; the SHA-NI case competes with
+	// the already-fast fused pair path, so ≥10%% at full batch qualifies it
+	// (the A/B bracket is the real judge; RISK_X16=off is the kill switch).
 	seeds := make([]string, 16)
 	for i := range seeds {
 		seeds[i] = "x16-race-" + strconv.Itoa(i)
@@ -201,30 +205,54 @@ func initRiskKernelX16() {
 	t0 := time.Now()
 	batchOut := x16ChainRun(seeds)
 	batch := time.Since(t0)
+
+	var displaced time.Duration // reference cost per 16 chains
+	refName := "serial16"
 	t0 = time.Now()
-	for _, s := range seeds[:4] { // 4 serial chains, scaled ×4: bounds boot cost
-		if riskChain(s) != batchOut[indexOf(seeds, s)] {
-			log.Printf("risk kernel x16: RACE DIGEST MISMATCH — path disabled")
-			return
+	if riskSumPair != nil {
+		refName = "pair16"
+		for i := 0; i < 8; i += 2 { // 4 pair calls = 8 chains, scaled ×2
+			ha, hb := riskChainPair(seeds[i], seeds[i+1])
+			if ha != batchOut[i] || hb != batchOut[i+1] {
+				log.Printf("risk kernel x16: RACE DIGEST MISMATCH — path disabled")
+				return
+			}
 		}
+		displaced = time.Since(t0) * 2
+	} else {
+		for i := 0; i < 4; i++ { // 4 serial chains, scaled ×4
+			if riskChain(seeds[i]) != batchOut[i] {
+				log.Printf("risk kernel x16: RACE DIGEST MISMATCH — path disabled")
+				return
+			}
+		}
+		displaced = time.Since(t0) * 4
 	}
-	serial16 := time.Since(t0) * 4
-	if batch*13 >= serial16*10 { // batch must be ≤ ~77%% of serial (≥30%% win)
-		log.Printf("risk kernel x16: DISABLED by boot race (batch16 %s vs serial16≈%s — win < 30%%)", batch, serial16)
+	num := int64(13) // ≥30%% win bar (no-SHA-NI insurance case)
+	if riskSumPair != nil {
+		num = 11 // ≥10%% bar vs the fused pair path
+	}
+	if batch.Nanoseconds()*num >= displaced.Nanoseconds()*10 {
+		log.Printf("risk kernel x16: DISABLED by boot race (batch16 %s vs %s %s — win below bar)",
+			batch, refName, displaced)
 		return
 	}
-	riskChainX16 = x16ChainRun
-	log.Printf("risk kernel x16: 16-lane AVX-512 batch path enabled (batch16 %s vs serial16≈%s, ratio %.2fx)",
-		batch, serial16, float64(serial16)/float64(batch))
-}
-
-func indexOf(ss []string, s string) int {
-	for i, v := range ss {
-		if v == s {
-			return i
-		}
+	// Batch floor: a k-of-16 batch costs full batch wall time, so require
+	// batch/k to beat the displaced per-chain cost with ~10%% margin.
+	perChain := displaced.Nanoseconds() / 16
+	minBatch := 16
+	if perChain > 0 {
+		minBatch = int(batch.Nanoseconds()*10/(perChain*9)) + 1
 	}
-	return -1
+	if minBatch < 8 {
+		minBatch = 8
+	} else if minBatch > 16 {
+		minBatch = 16
+	}
+	riskX16MinBatch = minBatch
+	riskChainX16 = x16ChainRun
+	log.Printf("risk kernel x16: 16-lane AVX-512 batch path enabled (batch16 %s vs %s %s, ratio %.2fx, minBatch %d)",
+		batch, refName, displaced, float64(displaced)/float64(batch), minBatch)
 }
 
 var x16Table = [512]uint64{
