@@ -77,11 +77,30 @@ stack after the experiment.
 key pair, and ignored local private key. CloudFormation tags every resource with
 `Project=ObsidioBench` for identification.
 
-## Benchmark runner status
+## Run a comparison
 
-Provisioning and host validation are implemented here first. The remote runner
-must preserve the existing protocol: build each image once, verify independent
-correctness, enforce and inspect the target cgroup, execute k6 only on the load
-host, download every raw summary, and append environment metadata to the local
-evidence trail. Do not improvise a scored run manually; add and validate that
-runner before collecting comparison evidence.
+The remote runner accepts two local, committed Docker build contexts. It uploads
+them independently, runs correctness tests without optional CPU acceleration,
+builds each image once on the x86 target, checks the Docker limits before every
+run, runs pinned k6 only on the separate load host, downloads every raw summary,
+and appends remote environment metadata to the local history.
+
+```sh
+BENCH_COMPARISON_SET=pgo-screen-20260822 \
+RUN_PREFIX=pgo-screen \
+./benchmarks/aws/run-comparison.sh \
+  /path/to/champion/submission/go \
+  /path/to/candidate/submission/go \
+  screen
+```
+
+Default sequences are `A B A` for either profile. Override only according to
+the protocol, for example the milestone sequence:
+
+```sh
+BENCH_SEQUENCE="A B B A A B" ... ./benchmarks/aws/run-comparison.sh ... full
+```
+
+The runner pins the multi-architecture k6 2.2.0 image index by digest; Docker
+selects its Linux amd64 manifest on the load host. Do not change that pin inside
+a comparison set.

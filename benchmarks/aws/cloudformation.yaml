@@ -194,7 +194,7 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
-          dnf install -y docker git jq tar
+          dnf install -y curl docker git jq tar
           systemctl enable --now docker
           usermod -aG docker ec2-user
           mkdir -p /opt/obsidio
@@ -229,7 +229,7 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           set -euxo pipefail
-          dnf install -y docker git jq tar
+          dnf install -y curl docker git jq tar
           systemctl enable --now docker
           usermod -aG docker ec2-user
           mkdir -p /opt/obsidio
