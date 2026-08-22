@@ -200,5 +200,6 @@ auto-derives to 88% of the gate) and re-run one grading verification.
 - [x] C4: walls green on c7i (-race): 5k×16-lane differential + equal-lane leak + full 50k lockstep chains (full & partial batch) + 4-way concurrent hammer. Tier-0: 727ns/step = 45.4ns/chain-iter vs 291.9 AVX2 scalar (6.4×)
 - [x] C5: KEPT — forced grading 3,530,813 vs 812,074 baseline = 4.3× (+335%), boot race 6.84×, risk p95 88.9ms, 4/4 bars
 - [x] C6: gate silent on SHA-NI box (0 x16 log lines); plain run 4,332,215 @ 0.85%, bars green — unchanged within noise
+- [x] Item D (unplanned, evidence-driven): x16 batching on SHA-NI boxes — Tier-0 +25%/chain and boot race +24%, but bracket FLAT (−0.26%); reverted to RISK_X16=on opt-in, decision + EXPERIMENTS recorded
 - [ ] Freeze: 3× cold-boot bracket of submission commit + fresh-clone build + smoke
 - [ ] EXPERIMENTS/decisions/artifact updated for A, B, C (incl. any revert)

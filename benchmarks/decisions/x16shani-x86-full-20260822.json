@@ -1,0 +1,29 @@
+{
+  "recorded_at": "2026-08-22T09:05:00Z",
+  "type": "comparison_decision",
+  "comparison_set": "x16shani-x86-01",
+  "candidate": "x16 16-lane batching opened to SHA-NI boxes (advait app, 72592e5)",
+  "verdict": "reverted",
+  "basis": {
+    "sequence": ["champion-a1", "candidate-b1", "champion-a2"],
+    "champion_scores": [4314709, 4318378],
+    "candidate_score": 4304919,
+    "candidate_vs_stronger_champion_percent": -0.31,
+    "candidate_vs_champion_average_percent": -0.26,
+    "champion_drift_percent": 0.08,
+    "error_rate_percent": 0.86,
+    "all_latency_gates_passed": true
+  },
+  "environment": {
+    "id": "obsidio-bench-advait-ap-southeast-2-ap-southeast-2a",
+    "target": "c7i.xlarge (SPR) with Docker capped to 2 CPUs and 2 GiB",
+    "load_generator": "separate c7i.large",
+    "k6": "grafana/k6:2.2.0 pinned by image-index digest"
+  },
+  "notes": [
+    "Tier-0 said 45.4ns/chain-iter batched vs 57ns paired (+25%), and the on-box boot race measured a 24% full-batch win — but under the real load mix the /risk queue equilibrium sits below the ~15-waiter batch floor that pair-displacement economics require, so batches rarely fire and the result is flat (-0.26%, noise floor 0.8%, champion drift 0.08%)",
+    "reverted to opt-in (RISK_X16=on) on SHA-NI boxes; the no-SHA-NI insurance enablement (4.3x, C5) is untouched",
+    "run ids x16shani2-* (first launch aborted on a leftover validation container holding port 8080 — no data recorded)"
+  ],
+  "report": "EXPERIMENTS.md '2026-08-22 Sprint-2 Item D' entry"
+}

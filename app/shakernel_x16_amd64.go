@@ -147,6 +147,14 @@ func initRiskKernelX16() {
 	if !forced && os.Getenv("RISK_KERNEL") == "off" {
 		return
 	}
+	if kernelUseSHANI && !forced && os.Getenv("RISK_X16") != "on" {
+		// SHA-NI boxes: measured FLAT vs the fused pair path under real
+		// grading load (bracket x16shani2-x86-01: -0.26%, inside noise —
+		// the queue equilibrium sits below the ~15-waiter batch floor the
+		// per-chain economics demand). Opt-in via RISK_X16=on for A/Bs;
+		// the no-SHA-NI insurance case below is unaffected (4.3x there).
+		return
+	}
 
 	// Differential wall: 16-lane batch vs crypto/sha256, random + equal-lane.
 	rnd := rand.New(rand.NewSource(0xa5f31600))

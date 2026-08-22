@@ -597,3 +597,22 @@ The hand-rolled server holds in every regime where it could diverge.
   zero where it must not fire.
 - **Tier-0 footnote that spawned Item D:** 45.4ns/chain-iter BEATS the
   SHA-NI fused pair path (114.1/2 = 57ns) on SPR — see next entry.
+
+## 2026-08-22 Sprint-2 Item D: x16 batching on SHA-NI boxes (FLAT — reverted to opt-in)
+
+- **Hypothesis:** Tier-0 showed the 16-lane AVX-512 batch at 45.4ns/chain-
+  iter vs 57ns for fused pairs (+25%), and the displaced-path boot race on
+  the target measured a 24% full-batch win — opening the x16 path to SHA-NI
+  boxes (batch when ≥minBatch waiters parked, minBatch derived from measured
+  per-chain economics ≈ 15 vs pairs) should lift peak /risk throughput.
+- **Bracket x16shani2-x86-01:** champion 3883c6b 4,314,709 / 4,318,378
+  (drift 0.08%); candidate 72592e5 4,304,919 = **−0.26%, FLAT** (noise floor
+  0.8%). Bars green, errors 0.86% both sides.
+- **Why flat:** the batch only beats pairs at k≥~15 of 16 lanes, and under
+  the real 200-VU mix the governor's front-door shed holds the /risk queue
+  equilibrium below that — batches rarely fire. A kernel that wins per-chain
+  can still lose to queue dynamics; the bracket, not Tier-0, is the judge.
+- **Verdict:** REVERTED to opt-in (RISK_X16=on) for SHA-NI boxes. The
+  no-SHA-NI insurance enablement (C5: 4.3×) is unchanged. Boot race on the
+  HT-sibling dev box (c7i.large, one physical core) had already measured the
+  win at only 3.8% — the per-machine race is doing its job.
