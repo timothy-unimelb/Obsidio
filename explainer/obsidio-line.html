@@ -59,6 +59,31 @@
   .fact b { color:var(--ink); font-weight:600; }
   .fact .d { color:var(--drink); } .fact .s { color:var(--salad); } .fact .b { color:var(--braise); }
 
+  /* setup / analogy */
+  .setup { margin:0 0 2rem; display:flex; flex-direction:column; gap:1rem; }
+  .sec-eyebrow { font-family:"IBM Plex Mono",monospace; font-size:.66rem; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin:0; }
+  .setup h2 { font-family:"Fraunces",serif; font-weight:600; font-size:clamp(1.5rem,3.2vw,2.1rem); line-height:1.04; letter-spacing:-.01em; margin:.05rem 0 0; text-wrap:balance; }
+  .setup .lead { font-size:clamp(1rem,1.5vw,1.12rem); color:var(--ink); max-width:68ch; margin:0; }
+  .setup .lead b { font-weight:600; }
+  .menu { display:grid; grid-template-columns:repeat(3,1fr); gap:clamp(.7rem,1.5vw,1rem); }
+  @media (max-width:680px) { .menu { grid-template-columns:1fr; } }
+  .dish { background:var(--panel); border:1px solid var(--line); border-top:3px solid var(--dish); border-radius:12px;
+    padding:1rem 1.05rem; display:flex; flex-direction:column; gap:.55rem; box-shadow:var(--shadow); }
+  .dish.d { --dish:var(--drink); } .dish.s { --dish:var(--salad); } .dish.b { --dish:var(--braise); }
+  .dish .top { display:flex; align-items:center; gap:.75rem; }
+  .dishic { width:42px; height:42px; flex:none; }
+  .dish .name { font-family:"Fraunces",serif; font-weight:600; font-size:1.2rem; line-height:1; }
+  .dish .ep { font-family:"IBM Plex Mono",monospace; font-size:.72rem; color:var(--muted); margin-top:.25rem; display:block; }
+  .dish .desc { font-size:.88rem; color:var(--ink); margin:0; }
+  .dish .meta { margin-top:auto; font-family:"IBM Plex Mono",monospace; font-size:.7rem; color:var(--muted);
+    display:flex; gap:.5rem; align-items:center; padding-top:.5rem; border-top:1px dashed var(--line); }
+  .dish .w { color:var(--dish); font-weight:600; }
+  .tension { border:1px solid var(--line); border-left:4px solid var(--flame); background:var(--panel-2);
+    border-radius:10px; padding:.9rem 1.1rem; font-size:.95rem; margin:0; }
+  .tension b { color:var(--ink); font-weight:600; }
+  .rule { display:flex; align-items:center; gap:.8rem; color:var(--muted); font-family:"IBM Plex Mono",monospace; font-size:.72rem; margin:.2rem 0 .1rem; }
+  .rule::before, .rule::after { content:""; height:1px; background:var(--line); flex:1; }
+
   .grid { display:grid; gap:clamp(1rem,2vw,1.5rem); grid-template-columns:1fr; }
   @media (min-width:760px) { .grid { grid-template-columns:1fr 1fr; } }
 
@@ -202,13 +227,56 @@
   <header>
     <p class="eyebrow">Obsidio · a performance siege, one idea at a time</p>
     <h1>The Obsidio <span class="em">Line</span></h1>
-    <p class="dek">Nine optimizations took a small backend from buckling under load to serving every request on time. Here is each one on its own — what the kitchen was doing wrong, and the single change that fixed it. Read them in any order.</p>
-    <div class="facts">
-      <span class="fact"><b>2 CPUs · 2 GB</b> — the whole box</span>
-      <span class="fact">mix <span class="d">60% /price</span> · <span class="s">30% /stats</span> · <span class="b">10% /risk</span></span>
-      <span class="fact">score = <span class="d">1×</span> + <span class="s">3×</span> + <span class="b">10×</span> served on time</span>
-    </div>
+    <p class="dek">How a small backend went from buckling under load to serving every order on time — told as the kitchen it really is, one fix at a time.</p>
   </header>
+
+  <section class="setup">
+    <p class="sec-eyebrow">First — the kitchen</p>
+    <h2>One tiny kitchen, three dishes</h2>
+    <p class="lead">You're running a small price-analytics API, and it lives in a <b>two-chef kitchen</b>: 2 CPU cores and 2 GB of memory, total — you can't hire a third chef or rent a bigger room. All through service, orders pour in from a fixed crowd in a set <b>6 : 3 : 1</b> mix, cheap to expensive:</p>
+    <div class="menu">
+      <article class="dish d">
+        <div class="top">
+          <svg class="dishic" viewBox="0 0 44 44" aria-hidden="true">
+            <path d="M13 9 H31 L28 33 Q27.5 38 23 38 H21 Q16.5 38 16 33 Z" fill="none" stroke="var(--dish)" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M15 23 H29 L27.7 33.5 Q27.3 37 23.5 37 H20.5 Q16.7 37 16.3 33.5 Z" fill="var(--dish)"/>
+            <line x1="27" y1="6" x2="30" y2="18" stroke="var(--dish)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <div><div class="name">The drink</div><span class="ep">GET /price</span></div>
+        </div>
+        <p class="desc">Pre-poured: look up a symbol's latest price and hand it back. An in-memory lookup — almost no work.</p>
+        <div class="meta"><span>60% of orders</span>·<span class="w">worth 1</span></div>
+      </article>
+      <article class="dish s">
+        <div class="top">
+          <svg class="dishic" viewBox="0 0 44 44" aria-hidden="true">
+            <path d="M9 22 A13 12 0 0 0 35 22 Z" fill="var(--dish)"/>
+            <line x1="7" y1="22" x2="37" y2="22" stroke="var(--dish)" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="16" cy="17" r="3.2" fill="var(--dish)"/><circle cx="23" cy="14.5" r="3.6" fill="var(--dish)"/><circle cx="29" cy="17.5" r="3.2" fill="var(--dish)"/>
+          </svg>
+          <div><div class="name">The salad</div><span class="ep">GET /stats</span></div>
+        </div>
+        <p class="desc">Chopped to order: mean, min, max and standard deviation over 500 recent prices — recomputed every time.</p>
+        <div class="meta"><span>30% of orders</span>·<span class="w">worth 3</span></div>
+      </article>
+      <article class="dish b">
+        <div class="top">
+          <svg class="dishic" viewBox="0 0 44 44" aria-hidden="true">
+            <rect x="10" y="19" width="24" height="17" rx="3" fill="var(--dish)"/>
+            <rect x="7" y="15" width="30" height="5" rx="2.5" fill="var(--dish)"/>
+            <rect x="20" y="11" width="4" height="4" rx="1" fill="var(--dish)"/>
+            <path d="M17 11 q3 -4 0 -7" fill="none" stroke="var(--dish)" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+            <path d="M24 11 q3 -4 0 -7" fill="none" stroke="var(--dish)" stroke-width="1.6" stroke-linecap="round" opacity=".55"/>
+          </svg>
+          <div><div class="name">The braise</div><span class="ep">GET /risk</span></div>
+        </div>
+        <p class="desc">A 50,000-step slow cook: hash a seed with SHA-256, feed the result back in, repeat 50,000 times. Deliberately expensive.</p>
+        <div class="meta"><span>10% of orders</span>·<span class="w">worth 10</span></div>
+      </article>
+    </div>
+    <p class="tension">Here's the trap: the braise is so slow it can <b>clog the whole line</b> — so even a drink that needs no work ends up stuck behind it. Your score is the weighted count of orders served correctly <em>and on time</em>. So the goal is easy to say and hard to do: <b>keep the fast dishes flying while the braise simmers — on two chefs.</b> Every card below is one move toward that.</p>
+    <p class="rule">the nine moves</p>
+  </section>
 
   <div class="grid">
 
