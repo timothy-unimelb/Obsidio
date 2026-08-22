@@ -445,15 +445,21 @@ func hexEncode64(buf *[64]byte, sum *[32]byte) {
 	}
 }
 
+// riskSum64 hashes the fixed 64-byte hex buffer of the chain's hot loop.
+// Default: stdlib. initRiskKernel swaps in the direct 2-block kernel on
+// amd64 when the ISA gate + boot self-test pass (see shakernel_amd64.go).
+var riskSum64 = func(in *[64]byte, out *[32]byte) { *out = sha256.Sum256(in[:]) }
+
 // riskChain: h = seed; 50,000 × h = hex(sha256(h)). Zero heap allocations in
 // the loop; only the final string(buf) allocates.
 func riskChain(seed string) string {
 	var buf [64]byte
-	sum := sha256.Sum256([]byte(seed))
+	sum := sha256.Sum256([]byte(seed)) // seed is variable-length: stdlib path
 	hexEncode64(&buf, &sum)
 	mask := riskYieldMask
+	sum64 := riskSum64
 	for i := uint32(1); i < 50000; i++ {
-		sum = sha256.Sum256(buf[:])
+		sum64(&buf, &sum)
 		hexEncode64(&buf, &sum)
 		if i&mask == 0 {
 			runtime.Gosched()
@@ -639,7 +645,8 @@ func main() {
 	}
 	runtime.GOMAXPROCS(riskSlots)
 	bootFingerprint()
-	calibrateRisk() // timed chains; runs before the listener, so /health only reports ready after
+	initRiskKernel() // before calibration, so calibrateRisk times the active kernel
+	calibrateRisk()  // timed chains; runs before the listener, so /health only reports ready after
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

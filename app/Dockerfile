@@ -1,9 +1,10 @@
 # Obsidio engineered backend: Go. Multi-stage, pinned images, reproducible.
-# Go >=1.25 required: stdlib crypto/sha256 gains a SHA-NI path on amd64 (~2x /risk
-# on Zen/Ice Lake+ hardware); 1.22-1.24 top out at AVX2.
+# (Measured 2026-08-22 on SPR: stdlib SHA-NI predates 1.25 — 1.22 and 1.26 are
+# kernel-flat. 1.26 kept for toolchain currency + container-aware runtime. The
+# vendored sha256block_amd64.s must match this toolchain's stdlib version.)
 FROM golang:1.26-bookworm AS build
 WORKDIR /app
-COPY go.mod main.go main_test.go ./
+COPY go.mod *.go *.s ./
 # The digest-guard test is a BUILD GATE: a kernel change that breaks the /risk
 # digest scores zero at grading — better to fail the image build than to ship it.
 RUN go test ./...
