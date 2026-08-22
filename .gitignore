@@ -1,3 +1,4 @@
 bench/last-summary.json
 node_modules/
 __pycache__/
+app/obsidio-app
