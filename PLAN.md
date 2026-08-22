@@ -144,7 +144,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [ ] W3: pairing dispatcher + boot kernel racing
 - [x] W3: x86 bench matrix — superseded by four bracketed full comparisons (baseline/hex/kernel/pairing sets in benchmarks/history.jsonl) + GODEBUG cpu.sha kill-switch measurements: every layer measured on/off on the same testbed, stronger evidence than the planned grid
 - [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; flame-graph-equivalent = committed posthex pprof profile
-- [~] W3: kernel v2 (fused pair iteration: precomputed constant-block-2 W+K schedule + in-asm BE/hex) — IN PROGRESS session 5, behind same differential-test + boot-self-test + A/B wall
+- [~] W3: kernel v2 fused iterations — BUILT + verified (999a87f pair: 143→114ns/pair-iter, in-chain ratio 1.62×; 09a1879 single: 92→77ns/iter for ramp chains); **pair-fused full A/B in flight (fused-x86-01)**, then single+stride bracket; yield-stride sweep queued (cheap path now ~60% of score, med 7ms = scheduler wait knob)
 - [x] W3: persistence go/no-go — **user GO (session 5)**: fsync'd WAL + compose volume built; hard-kill durability verified locally (2 POSTs → docker kill → replayed); graded path bit-identical (smoke 35/35, WAL inactive without env). Bars-under-compose check on testbed still owed
 - [ ] W4: freeze + final verification (local + x86 + fresh-clone build + compose-bars run)
 - [ ] W4: write-up drafted from EXPERIMENTS.md
