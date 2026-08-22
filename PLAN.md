@@ -141,7 +141,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
 - [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
 - [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed
-- [ ] W3: pairing dispatcher + boot kernel racing
+- [x] W3: pairing dispatcher + boot kernel racing (duplicate of the item below — done: workers, blockSHANI2, boot race with ≥5% win gate)
 - [x] W3: x86 bench matrix — superseded by four bracketed full comparisons (baseline/hex/kernel/pairing sets in benchmarks/history.jsonl) + GODEBUG cpu.sha kill-switch measurements: every layer measured on/off on the same testbed, stronger evidence than the planned grid
 - [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; flame-graph-equivalent = committed posthex pprof profile
 - [x] W3: kernel v2 fused iterations — **pair-fused KEPT +16.1% (4,032,045)**; single-fused marginal keep +0.9% → **final champion 09a1879 @ 4,060,125 (+108% on the day)**; stride sweep measured flat (auto kept, hypothesis falsified + logged)
