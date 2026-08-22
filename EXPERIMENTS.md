@@ -224,3 +224,21 @@ Entry format (see the /experiment skill):
 - **Verdict:** KEPT — score-flat robustness: gate constants now track real
   contended cost on unknown grading hardware instead of a one-shot idle boot
   sample. Boot-jitter gotcha closed.
+
+## 2026-08-22 W3 hardening bundle (no perf claim)
+
+- **SHA:** 161db98, dirty tree
+- **Hypothesis:** none — robustness/receipts bundle, expected score-flat.
+- **Change:** app/main.go — riskSlots sized from the cgroup CPU quota
+  (cpu.max, v1 fallback; RISK_SLOTS env override; clamp [1,4]; GOMAXPROCS
+  follows), boot fingerprint log (arch, host cores vs cgroup budget, cpu
+  model, SHA-ISA flags — the "runtime detection, not hard-coded ISA" receipt),
+  cpu.stat throttle logging (shutdown + OBSIDIO_TELEMETRY=1 periodic),
+  ReadHeaderTimeout 5s + MaxHeaderBytes 8KB, SIGTERM graceful drain,
+  env-gated pprof on :6060 (OBSIDIO_PPROF=1, off the graded port).
+- **Result (devloop):** 320,401 → 338,810 (+5.7% with no mechanism → noise,
+  not claimed); errors 0.53%; risk p95 332.7ms; all thresholds pass;
+  /smoke 35/35. Boot log verified: cgroup_cpus=2.00 read correctly inside
+  the capped container while the host advertises more cores.
+- **Verdict:** kept — flame-graph-under-load still owed (needs a pprof run,
+  ideally on the x86 box).

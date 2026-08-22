@@ -139,8 +139,8 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed
 - [ ] W3: pairing dispatcher + boot kernel racing
 - [ ] W3: x86 bench matrix, recorded
-- [ ] W3: hardening bundle (cgroup, fingerprint, HTTP polish, pprof graph)
-- [ ] W3: (if ahead) kernel v2 hex / micro-trims / RISK_SLOTS
+- [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; devloop flat, smoke 35/35. Flame graph still owed (x86 pprof run)
+- [ ] W3: (if ahead) kernel v2 hex / micro-trims (RISK_SLOTS done in hardening)
 - [ ] W3: 18:00 persistence go/no-go (user)
 - [ ] W4: freeze + final verification (local + x86 + fresh-clone build)
 - [ ] W4: write-up drafted from EXPERIMENTS.md
