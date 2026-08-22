@@ -146,6 +146,7 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [x] W3: hardening bundle — cgroup-sized riskSlots (+RISK_SLOTS knob), boot fingerprint, cpu.stat receipts, HTTP polish, env-gated pprof; flame-graph-equivalent = committed posthex pprof profile
 - [x] W3: kernel v2 fused iterations — **pair-fused KEPT +16.1% (4,032,045)**; single-fused marginal keep +0.9% → **final champion 09a1879 @ 4,060,125 (+108% on the day)**; stride sweep measured flat (auto kept, hypothesis falsified + logged)
 - [x] W3: persistence validated on x86 — grading vs WAL-active deployment: 4,089,803 @ 4/4 bars; hard-kill survivor read back. Bonus SHIPS (docker-compose.yml + fsync'd WAL)
+- [x] W3: shed-budget sweep + 88bp bracket — **KEPT +1.4%: FINAL champion ee2d73a @ 4,168,373 (+113% on the day)**; k6-visible errors 0.83% vs the 1% gate, internal counter strictly conservative (preemptive stale charging). Improvement work CLOSED — kernel at silicon floor, stride falsified, budget at safe edge
 - [x] W3: persistence go/no-go — **user GO (session 5)**: fsync'd WAL + compose volume built; hard-kill durability verified locally (2 POSTs → docker kill → replayed); graded path bit-identical (smoke 35/35, WAL inactive without env). Bars-under-compose check on testbed still owed
 - [ ] W4: freeze + final verification (local + x86 + fresh-clone build + compose-bars run)
 - [ ] W4: write-up drafted from EXPERIMENTS.md
