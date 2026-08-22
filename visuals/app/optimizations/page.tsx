@@ -127,7 +127,7 @@ const options = [
     helps: "This can protect the qualifying latency bars during bursts without changing any response or skipping required work.",
     cost: "A noisy feedback signal can oscillate, and protecting price too aggressively lowers valuable risk throughput.",
     evidence: "Per-endpoint p95 during the ramp; worker utilization; weighted score",
-    outcome: "Kept as the yield: chunking the kernel every 256 rounds cut /price p95 43 → 10 ms and scored +53.8%. Load shedding stays opt-in: at 800 VUs it traded 3.5% errors for +28% score",
+    outcome: "Kept twice. The yield (chunk the kernel every 256 rounds) cut /price p95 43 → 10 ms for +53.8%. Then a budgeted governor — instant 503 when no worker is idle, newest-first service, 88bp error budget reserved atomically — added +17.2% at 0.85% errors and passes every bar at 4× the peak. Serving stale waiters late was measured to break two bars and reverted",
   },
   {
     number: "08",

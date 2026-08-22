@@ -83,38 +83,56 @@ const checkpoints = [
   {
     number: "09",
     name: "In-kernel hex + yield between chunks",
-    status: "Measured · current champion · separated x86 full bracket · +53.8%",
+    status: "Measured · separated x86 full bracket · +53.8%",
     detail: "Hex encoding moved into the kernel (−10% per chain) showed nothing at the screen: cheap requests were waiting ~17 ms for a core behind an unpreemptible assembly loop. Calling the kernel in 256-round chunks with a yield between them cut /price p95 from 43 ms to 10 ms and let the closed-loop request rate rise.",
     score: 3_598_675,
     requests: 1_440_622,
     environment: "x86 · c7i",
     tone: "acid",
   },
-  { number: "10", name: "Overload gate + durable POST /price", status: "Measured · inert under the published load", detail: "An fsynced write-ahead log survives docker kill for the persistence bonus. Load shedding stays opt-in: at 800 VUs the plain design still passed every gate with zero errors while shedding bought +28% score at 3.5% errors.", score: null, requests: null, environment: "x86 · c7i", tone: "pending" },
+  { number: "10", name: "Durable POST /price", status: "Measured · inert under the published load", detail: "An fsynced write-ahead log on a /data volume survives docker kill for the persistence bonus. The scored siege is read-only, so the bracket was flat: 3,607,469 → 3,601,743 → 3,611,091 with zero errors.", score: null, requests: null, environment: "x86 · c7i", tone: "pending" },
+  {
+    number: "11",
+    name: "Budgeted shedding governor",
+    status: "Measured · current champion · separated x86 full bracket · +17.2%",
+    detail: "Ported from Advait's design: when no worker is idle and anyone is already parked, a new /risk arrival is refused in a millisecond inside an 88bp error budget; waiters are served newest-first and stale ones skipped; the budget is reserved atomically. A refused client comes straight back with cheap scoring traffic. Runs at 0.85% errors by design; RISK_SHED=0 restores the zero-error build.",
+    score: 4_854_704,
+    requests: 2_009_080,
+    environment: "x86 · c7i (later instance)",
+    tone: "acid",
+  },
+  { number: "12", name: "Late-serve tail fix", status: "Rejected · 800-VU stress", detail: "Serving held stale waiters after twice their patience bounded the worst wait at 2.4 s and was flat at the published load, but at four times the peak late serves exceeded 5% of risk samples: errors 1.49% and risk p95 2.4 s. Reverted; held waiters stay held.", score: null, requests: null, environment: "x86 · c7i", tone: "pending" },
+];
+
+const headToHead = [
+  { build: "Advait's frozen build c0c8f95 (control A1)", score: "4,321,831", errors: "0.84%", price: "6.79 ms", risk: "76 ms" },
+  { build: "Ours c6bf541", score: "4,835,626", errors: "0.87%", price: "3.35 ms", risk: "89 ms" },
+  { build: "Advait's frozen build c0c8f95 (control A2)", score: "4,285,200", errors: "0.85%", price: "7.06 ms", risk: "74 ms" },
 ];
 
 const metrics = [
-  { label: "Work score", baseline: "2,090,598", current: "3,598,675", delta: "+72.1%", bar: "higher is better" },
-  { label: "Weighted work / sec", baseline: "7,743", current: "13,328", delta: "+72.1%", bar: "higher is better" },
-  { label: "Completed requests", baseline: "835,451", current: "1,440,622", delta: "+72.4%", bar: "higher is better" },
-  { label: "Requests / sec", baseline: "3,094", current: "5,336", delta: "+72.4%", bar: "higher is better" },
-  { label: "/price p95", baseline: "23.52 ms", current: "10.43 ms", delta: "−55.7%", bar: "< 200 ms" },
-  { label: "/stats p95", baseline: "23.65 ms", current: "10.44 ms", delta: "−55.9%", bar: "< 500 ms" },
-  { label: "/risk p95", baseline: "400.09 ms", current: "257.99 ms", delta: "−35.5%", bar: "< 1,500 ms" },
-  { label: "HTTP errors", baseline: "0.00%", current: "0.00%", delta: "no change", bar: "< 1%" },
+  { label: "Work score", baseline: "4,143,222", current: "4,854,704", delta: "+17.2%", bar: "higher is better" },
+  { label: "Weighted work / sec", baseline: "15,345", current: "17,980", delta: "+17.2%", bar: "higher is better" },
+  { label: "Completed requests", baseline: "1,659,471", current: "2,009,080", delta: "+21.1%", bar: "higher is better" },
+  { label: "Requests / sec", baseline: "6,146", current: "7,441", delta: "+21.1%", bar: "higher is better" },
+  { label: "/price p95", baseline: "10.91 ms", current: "9.35 ms", delta: "−14.3%", bar: "< 200 ms" },
+  { label: "/stats p95", baseline: "10.93 ms", current: "9.34 ms", delta: "−14.5%", bar: "< 500 ms" },
+  { label: "/risk p95", baseline: "215.35 ms", current: "79.50 ms", delta: "−63.1%", bar: "< 1,500 ms" },
+  { label: "HTTP errors", baseline: "0.00%", current: "0.85%", delta: "by design", bar: "< 1%" },
 ];
 
 const latency = [
-  { endpoint: "/price", limit: "200 ms", baseline: "23.52", current: "10.43", baselineWidth: "11.8%", currentWidth: "5.2%", tone: "mint" },
-  { endpoint: "/stats", limit: "500 ms", baseline: "23.65", current: "10.44", baselineWidth: "4.7%", currentWidth: "2.1%", tone: "amber" },
-  { endpoint: "/risk", limit: "1,500 ms", baseline: "400.09", current: "257.99", baselineWidth: "26.7%", currentWidth: "17.2%", tone: "coral" },
+  { endpoint: "/price", limit: "200 ms", baseline: "10.91", current: "9.35", baselineWidth: "5.5%", currentWidth: "4.7%", tone: "mint" },
+  { endpoint: "/stats", limit: "500 ms", baseline: "10.93", current: "9.34", baselineWidth: "2.2%", currentWidth: "1.9%", tone: "amber" },
+  { endpoint: "/risk", limit: "1,500 ms", baseline: "215.35", current: "79.50", baselineWidth: "14.4%", currentWidth: "5.3%", tone: "coral" },
 ];
 
 const evidenceLinks = [
   ["All raw k6 summaries", "https://github.com/timothy-unimelb/Obsidio/tree/draft/benchmarks/results"],
   ["Peak queue timing summary", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/results/workers-timing-summary.json"],
   ["Recorded protocol", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/protocol.json"],
-  ["Current champion report: in-kernel hex and yield", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-kernel-hex-yield.md"],
+  ["Current champion report: the shedding governor", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-governor.md"],
+  ["In-kernel hex and yield report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-kernel-hex-yield.md"],
   ["SHA-NI kernel report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-shani-kernel.md"],
   ["Multi-lane batching report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-risk-lanes.md"],
   ["Compact hex unrolling report", "https://github.com/timothy-unimelb/Obsidio/blob/draft/benchmarks/experiments/2026-08-22-packed-champion-profile.md"],
@@ -133,13 +151,13 @@ export default function PerformancePage() {
           <div>
             <h1>Performance,<br /><em>run by run.</em></h1>
             <p className="lede lightText">A checkpoint enters this record only after a complete published siege. Measured stages show raw results; unimplemented ideas stay visibly empty.</p>
-            <div className="recordStatus"><span>GRADER-SHAPED RUNS</span><b>8 measured</b><i>2 rejected at Level 0 · 1 inert</i></div>
+            <div className="recordStatus"><span>GRADER-SHAPED RUNS</span><b>9 measured</b><i>2 rejected at Level 0 · 1 rejected under overload · 1 inert</i></div>
           </div>
-          <div className="scoreComparison" aria-label="In the latest separated x86 full bracket, work score increased from 2,339,747 for the stronger champion reference to 3,598,675 for the yielding kernel">
+          <div className="scoreComparison" aria-label="In the latest separated x86 full bracket, work score increased from 4,143,222 for the stronger zero-error reference to 4,854,704 for the shedding governor">
             <div className="scoreCompareHead"><span>LATEST X86 FULL BRACKET</span><small>separate load host · same script · same caps</small></div>
-            <div className="scoreBar baselineScore"><span>SHA-NI KERNEL A2</span><i /><strong>2,339,747</strong></div>
-            <div className="scoreBar currentScore"><span>+ HEX + YIELD B1</span><i /><strong>3,598,675</strong></div>
-            <div className="scoreDelta"><strong>+53.8%</strong><span>vs stronger side</span><small>+0.05% control drift · 0 errors</small></div>
+            <div className="scoreBar baselineScore"><span>ZERO-ERROR BUILD A1</span><i /><strong>4,143,222</strong></div>
+            <div className="scoreBar currentScore"><span>+ GOVERNOR B1</span><i /><strong>4,854,704</strong></div>
+            <div className="scoreDelta"><strong>+17.2%</strong><span>vs stronger side</span><small>−0.03% control drift · 0.85% errors by design</small></div>
           </div>
         </div>
       </section>
@@ -167,7 +185,7 @@ export default function PerformancePage() {
       <section className="section progressionSection">
         <div className="sectionHead compact">
           <div><span className="sectionNumber">THE PROGRESSION</span><h2>One checkpoint.<br />One complete siege.</h2></div>
-          <p>Checkpoints 00–03 are local Apple Silicon medians; from 04 onward every row is a separated x86 bracket, so absolute scores are only comparable within each environment. Checkpoints 05 and 06 record useful failures. Checkpoint 09 is the current champion: the kernel made risk cheap, and yielding let the cheap path use the time it freed. A six-run finalist milestone remains outstanding.</p>
+          <p>Checkpoints 00–03 are local Apple Silicon medians; from 04 onward every row is a separated x86 bracket, so absolute scores are only comparable within each environment — and between AWS instances they move by about 15% (the zero-error build scored 3.60M on one box and 4.14M on another). Checkpoints 05, 06, and 12 record useful failures. Checkpoint 11 is the current champion: it spends an error budget on instant refusals so that refused clients keep ordering cheap work. A six-run finalist milestone remains outstanding.</p>
         </div>
         <div className="checkpointList">
           {checkpoints.map((checkpoint) => (
@@ -183,9 +201,9 @@ export default function PerformancePage() {
       </section>
 
       <section className="metricsSection">
-        <div className="metricsIntro"><span className="sectionNumber inverse">KERNEL → KERNEL + YIELD</span><h2>The x86<br />reference.</h2><p>Both columns come from the same separated x86 comparison set on 22 August 2026: the SHA-NI kernel control and the current champion, each a complete 4m30s published siege. A six-run interleaved milestone will replace these single brackets with medians and ranges.</p></div>
+        <div className="metricsIntro"><span className="sectionNumber inverse">ZERO-ERROR → GOVERNOR</span><h2>The x86<br />reference.</h2><p>Both columns come from the same separated x86 comparison set on 22 August 2026: the zero-error control and the current champion, each a complete 4m30s published siege. The champion trades 0.85% refused risk requests for 21% more completed requests. A six-run interleaved milestone will replace these single brackets with medians and ranges.</p></div>
         <div className="metricTable" role="table" aria-label="Starter and permanent-worker benchmark metrics">
-          <div className="metricHeader" role="row"><span>METRIC</span><span>KERNEL</span><span>CHAMPION</span><span>CHANGE</span><span>BAR</span></div>
+          <div className="metricHeader" role="row"><span>METRIC</span><span>ZERO-ERROR</span><span>CHAMPION</span><span>CHANGE</span><span>BAR</span></div>
           {metrics.map((metric) => (
             <div className="metricRow" role="row" key={metric.label}><b>{metric.label}</b><span>{metric.baseline}</span><span>{metric.current}</span><strong>{metric.delta}</strong><small>{metric.bar}</small></div>
           ))}
@@ -197,7 +215,7 @@ export default function PerformancePage() {
           <div><span className="sectionNumber">LATENCY HEADROOM</span><h2>Distance from<br />each p95 bar.</h2></div>
           <p>Each track ends at the published threshold. Shorter bars mean more headroom; they do not imply the final grader will produce the same absolute time.</p>
         </div>
-        <div className="latencyLegend"><span><i className="baseline" />SHA-NI kernel</span><span><i className="current" />current champion</span></div>
+        <div className="latencyLegend"><span><i className="baseline" />zero-error build</span><span><i className="current" />current champion</span></div>
         <div className="latencyTracks">
           {latency.map((item) => (
             <article key={item.endpoint}>
@@ -209,12 +227,16 @@ export default function PerformancePage() {
             </article>
           ))}
         </div>
-        <div className="riskTimingCard" aria-label="Before yielding, a price lookup waited a median of 17.6 milliseconds for a core; after yielding its p95 was 10 milliseconds">
-          <div><span className="sectionNumber">INSIDE A PEAK /PRICE REQUEST</span><h3>The wait was the cost.</h3><p>A lookup takes microseconds. Its 17.6 ms median was time spent behind an assembly loop the scheduler could not interrupt.</p></div>
+        <div className="riskTimingCard" aria-label="Head to head on one x86 box, ours served 4,835,626 against Advait's 4,321,831 and 4,285,200 at the same error budget">
+          <div><span className="sectionNumber">HEAD TO HEAD · SAME BOX · SAME BUDGET</span><h3>Two governors, one difference.</h3><p>Advait's frozen build bracketed ours on the exact grader. Risk latency is equivalent; the gap is the cheap path — a price median of 3.4 ms against 6.8–7.1 ms — which a budget-limited closed loop converts directly into requests.</p></div>
           <div className="riskTimingVisual">
-            <div className="riskTimingBar"><i className="hashSlice" /><i className="queueSlice" /></div>
-            <div className="riskTimingValues"><span><b>17.6 ms</b>median before yield</span><span><b>10.4 ms</b>p95 after yield</span></div>
-            <small>x86 screens at 200 VUs · yielding every 256 rounds · 2,048 rounds measured −9.8%</small>
+            <div className="metricTable" role="table" aria-label="Head-to-head results">
+              <div className="metricHeader" role="row"><span>BUILD</span><span>SCORE</span><span>ERRORS</span><span>PRICE MEDIAN</span><span>RISK P95</span></div>
+              {headToHead.map((row) => (
+                <div className="metricRow" role="row" key={row.build}><b>{row.build}</b><span>{row.score}</span><span>{row.errors}</span><strong>{row.price}</strong><small>{row.risk}</small></div>
+              ))}
+            </div>
+            <small>+11.9% vs the stronger control · −0.85% drift · candidates for the gap: 256-round yield cadence vs ~8,192, 4-lane batches vs pairs</small>
           </div>
         </div>
       </section>
@@ -223,7 +245,7 @@ export default function PerformancePage() {
         <div className="evidenceIntro"><span className="sectionNumber inverse">AUDIT TRAIL</span><h2>Keep the evidence<br />beside the claim.</h2><p>The raw summaries, recorded environment, runner, and script fingerprint remain in the repository so future rows can be checked and reproduced.</p></div>
         <div className="fingerprintCard">
           <div><small>GRADING SCRIPT SHA-256</small><code>d7b259eb36cd…9f56998d20f</code></div>
-          <div><small>LATEST COMPARISON SET</small><strong>2026-08-22 · shani-yield-x86-full</strong></div>
+          <div><small>LATEST COMPARISON SET</small><strong>2026-08-22 · governor-x86-full · advait-vs-tim-x86-full</strong></div>
           <div><small>REPETITION STATUS</small><strong>A → B → A full bracket · pending six-run milestone</strong></div>
         </div>
         <div className="evidenceLinks">
