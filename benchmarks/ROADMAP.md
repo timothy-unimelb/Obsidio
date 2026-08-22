@@ -67,8 +67,8 @@ Priority is evidence-dependent, not a promise to implement every item:
 
 ## Resume marker
 
-**Status:** `6808e7d` accepted (governor +17.2% over the zero-error build,
-+11.9% over Advait's frozen build; passes all bars at 800 VUs at 0.878%
-errors). AWS destroyed. Next: (1) attribute the head-to-head gap (yield
-cadence vs lanes) in two screens; (2) update submission README/RESILIENCE,
-visuals, and the results artifact for the governor; (3) HTTP-path profile.
+**Status:** `draft` at `432b27d` is a complete verified submission (champion
+`6808e7d`). Porting Advait's raw HTTP server (done, untested under load) and
+AVX-512 x16 kernel (not started) is in progress on branch
+`port-advait-items-b-c`; see `HANDOVER.md` at the repo root for exact state
+and the freeze checklist.
