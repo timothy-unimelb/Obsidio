@@ -43,6 +43,64 @@ func TestKernelSum64MatchesStdlib(t *testing.T) {
 	}
 }
 
+// TestKernelPairMatchesStdlib: both lanes of the interleaved routine must be
+// bit-identical to crypto/sha256, including when lanes carry unequal data.
+func TestKernelPairMatchesStdlib(t *testing.T) {
+	if !kernelPairOK {
+		t.Skip("2-lane pair path not active on this machine")
+	}
+	rnd := rand.New(rand.NewSource(7))
+	var inA, inB [64]byte
+	var gotA, gotB [32]byte
+	for i := 0; i < 50000; i++ {
+		rnd.Read(inA[:])
+		rnd.Read(inB[:])
+		kernelSum64Pair(&inA, &inB, &gotA, &gotB)
+		if want := sha256.Sum256(inA[:]); gotA != want {
+			t.Fatalf("case %d lane A: %x != %x", i, gotA, want)
+		}
+		if want := sha256.Sum256(inB[:]); gotB != want {
+			t.Fatalf("case %d lane B: %x != %x", i, gotB, want)
+		}
+	}
+	// Lanes must not leak into each other: same input on both lanes.
+	for i := 0; i < 1000; i++ {
+		rnd.Read(inA[:])
+		inB = inA
+		kernelSum64Pair(&inA, &inB, &gotA, &gotB)
+		if gotA != gotB || gotA != sha256.Sum256(inA[:]) {
+			t.Fatalf("case %d equal-lane mismatch", i)
+		}
+	}
+}
+
+// BenchmarkPairVsSerial measures the interleave ratio on this silicon:
+// compare ns/op of Serial2 (two sequential kernelSum64) against Pair.
+func BenchmarkKernelSerial2(b *testing.B) {
+	if !kernelPairOK {
+		b.Skip("pair path inactive")
+	}
+	var inA, inB [64]byte
+	var outA, outB [32]byte
+	inA[0], inB[0] = 1, 2
+	for i := 0; i < b.N; i++ {
+		kernelSum64(&inA, &outA)
+		kernelSum64(&inB, &outB)
+	}
+}
+
+func BenchmarkKernelPair(b *testing.B) {
+	if !kernelPairOK {
+		b.Skip("pair path inactive")
+	}
+	var inA, inB [64]byte
+	var outA, outB [32]byte
+	inA[0], inB[0] = 1, 2
+	for i := 0; i < b.N; i++ {
+		kernelSum64Pair(&inA, &inB, &outA, &outB)
+	}
+}
+
 func riskChainN(seed string, n int) string {
 	var buf [64]byte
 	sum := sha256.Sum256([]byte(seed))

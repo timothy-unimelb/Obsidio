@@ -36,6 +36,14 @@ func blockAVX2(dig *shaDigest, p []byte)
 //go:noescape
 func blockSHANI(dig *shaDigest, p []byte)
 
+// blockSHANI2 compresses one 64-byte block into each of two INDEPENDENT
+// digests, instruction-interleaved so the second chain's sha256rnds2 ops fill
+// the first chain's instruction latency on one core (generated — see
+// sha256block2_amd64.s header). SHA-NI gate only.
+//
+//go:noescape
+func blockSHANI2(da, db *shaDigest, pa, pb *[64]byte)
+
 var shaIV = [8]uint32{
 	0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
 	0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
@@ -65,6 +73,20 @@ func kernelSum64(in *[64]byte, out *[32]byte) {
 		out[4*i+1] = byte(v >> 16)
 		out[4*i+2] = byte(v >> 8)
 		out[4*i+3] = byte(v)
+	}
+}
+
+// kernelSum64Pair hashes two independent 64-byte inputs on one core via the
+// interleaved 2-lane routine. Caller must ensure kernelUseSHANI.
+func kernelSum64Pair(inA, inB *[64]byte, outA, outB *[32]byte) {
+	da := shaDigest{h: shaIV}
+	db := shaDigest{h: shaIV}
+	blockSHANI2(&da, &db, inA, inB)
+	blockSHANI2(&da, &db, &shaPad64, &shaPad64)
+	for i := 0; i < 8; i++ {
+		va, vb := da.h[i], db.h[i]
+		outA[4*i], outA[4*i+1], outA[4*i+2], outA[4*i+3] = byte(va>>24), byte(va>>16), byte(va>>8), byte(va)
+		outB[4*i], outB[4*i+1], outB[4*i+2], outB[4*i+3] = byte(vb>>24), byte(vb>>16), byte(vb>>8), byte(vb)
 	}
 }
 
@@ -103,8 +125,27 @@ func initRiskKernel() {
 	if kernelUseAVX2 {
 		path = "AVX2"
 	}
-	log.Printf("risk kernel: direct 2-block %s kernel enabled (512-case self-test passed)", path)
+	// 2-lane interleave: SHA-NI only, and only after its own self-test.
+	if kernelUseSHANI {
+		var inB [64]byte
+		var gotA, gotB [32]byte
+		kernelPairOK = true
+		for i := 0; i < 256; i++ {
+			rnd.Read(in[:])
+			rnd.Read(inB[:])
+			kernelSum64Pair(&in, &inB, &gotA, &gotB)
+			if gotA != sha256.Sum256(in[:]) || gotB != sha256.Sum256(inB[:]) {
+				kernelPairOK = false
+				log.Printf("risk kernel: 2-lane SELF-TEST FAILED on case %d — pair path disabled", i)
+				break
+			}
+		}
+	}
+	log.Printf("risk kernel: direct 2-block %s kernel enabled (self-test passed; 2-lane pair available=%v)", path, kernelPairOK)
 }
+
+// kernelPairOK: the interleaved 2-lane path passed its boot self-test.
+var kernelPairOK bool
 
 // cpuinfoFlags returns the x86 feature-flag line padded with spaces for
 // whole-word matching, or "" if unreadable (kernel stays off — safe).
