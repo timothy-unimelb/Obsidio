@@ -2,3 +2,6 @@
 !go.mod
 !main.go
 !profile.go
+!risk_amd64.go
+!risk_amd64.s
+!risk_other.go
