@@ -114,8 +114,8 @@ front-door shed (see TREE STATE above) completed the fix. Fallback remains
 x86 VM session NOT STARTED (user provides box/credentials — Joel's Windows PC
 and/or cloud VM); 2-lane kernel NOT STARTED (references: Go stdlib avo
 generator `sha256block_amd64.go` fork, Linux finup2x register map, constant
-block-2 W+K table); overdrive exhibit NOT RUN (build k6/overdrive.js = devloop
-at 400 VUs when gate is fixed); contended-calibration/EWMA NOT STARTED.
+block-2 W+K table); overdrive exhibit DONE session 3 (see Progress);
+contended-calibration/EWMA NOT STARTED.
 
 **Recommended next-session order:** (1) staleness rule → trilogy re-run →
 grading run → commit green; (2) overdrive exhibit FIFO-vs-governor;
@@ -135,8 +135,8 @@ kernel ratios); (4) 2-lane kernel behind boot racing; (5) hardening bundle;
 - [ ] W2A: x86 VM verification session (SHA-NI, ratios, grading run)
 - [ ] W2A: 2-lane SHA-NI kernel v1 + differential tests
 - [x] W2B: adaptive-LIFO gate — governor v2 (staleness-skip at grant + front-door budgeted shed): grading 1,097,306 @ 4/4 bars, risk p95 243.6ms, errors 0.55% — SHIPPABLE
-- [ ] W2B: 400-VU overdrive FIFO-vs-governor exhibit (after staleness rule)
-- [ ] W2B: contended calibration + EWMA (also fixes boot-jitter gotcha)
+- [x] W2B: 400-VU overdrive exhibit (k6/overdrive.js): FIFO+deadline DQs at 5.03% errors; governor v2 passes all bars at 0.59% — judged exhibit banked
+- [x] W2B: contended calibration + EWMA — idle 12.8 vs contended 15.8ms (+23%) measured; grading 1,154,460 (= keeper level) @ 4/4 bars; boot-jitter gotcha closed
 - [ ] W3: pairing dispatcher + boot kernel racing
 - [ ] W3: x86 bench matrix, recorded
 - [ ] W3: hardening bundle (cgroup, fingerprint, HTTP polish, pprof graph)

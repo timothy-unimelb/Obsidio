@@ -43,9 +43,9 @@ func BenchmarkRiskChain(b *testing.B) {
 // window must NOT be served (its duration sample would land past the 1500ms
 // bar); the granter unlinks it and retires the slot instead.
 func TestStaleWaiterSkippedAtGrant(t *testing.T) {
-	savedTimeout := riskWaitTimeout
-	riskWaitTimeout = 50 * time.Millisecond
-	defer func() { riskWaitTimeout = savedTimeout }()
+	savedPatience := riskPatienceNs.Load()
+	riskPatienceNs.Store(int64(50 * time.Millisecond))
+	defer riskPatienceNs.Store(savedPatience)
 
 	if !riskAcquire(context.Background()) || !riskAcquire(context.Background()) {
 		t.Fatal("could not fill the execution slots")
@@ -69,7 +69,7 @@ func TestStaleWaiterSkippedAtGrant(t *testing.T) {
 		time.Sleep(time.Millisecond)
 	}
 
-	time.Sleep(100 * time.Millisecond) // age the waiter past riskWaitTimeout
+	time.Sleep(100 * time.Millisecond) // age the waiter past the patience window
 
 	releaseRiskSlot()
 	select {

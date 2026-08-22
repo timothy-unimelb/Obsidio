@@ -183,3 +183,44 @@ Entry format (see the /experiment skill):
   keeper, /risk p95 margin 4× wider (244ms vs 1500ms bar), and the
   FIFO-shed cliff (self-DQ on slow hardware) is structurally gone: sheds are
   budget-capped at 0.6% by construction, overflow parks instead of storming.
+
+## 2026-08-22 400-VU overdrive exhibit: FIFO+deadline vs governor v2
+
+- **SHA:** efeec33 (governor) vs f1379c4 app/ (FIFO+deadline), new k6/overdrive.js
+  (devloop stages at 400 VUs = 2× grading peak; side runs, NOT in history.jsonl)
+- **Hypothesis:** the fleet's FIFO-shed-cliff prediction — on hardware/load where
+  demand exceeds the deadline-shed equilibrium, the FIFO gate's 503 storm feeds
+  itself (closed loop: rejected VU returns in ~50ms) and blows the 1% error gate,
+  while the budget-governed gate degrades instead of collapsing.
+- **Result (back-to-back, same machine):**
+  - FIFO+deadline: **http_req_failed 5.03% → DISQUALIFIED** (5× the gate);
+    raw work_score 436,143 (worthless — shed volume scores until the error gate
+    voids the run); risk p95 1.21s.
+  - Governor v2: **0.59% errors, all four thresholds pass**; work_score 289,108
+    (−11% vs its own 200-VU devloop = graceful degradation); risk p95 611.7ms;
+    price/stats p95 12.3ms.
+- **Verdict:** exhibit banked for the write-up/video — same machine, same 2×
+  overload, old gate disqualifies itself, new gate sheds exactly its budget
+  (0.59% ≈ the 0.6% target) and keeps all bars green.
+
+## 2026-08-22 Contended calibration (c=2) + live chain-cost EWMA
+
+- **SHA:** efeec33, dirty tree
+- **Hypothesis:** boot unitCost jitters ±15% across boots (recorded gotcha) and
+  idle cost understates the contended cost the gate actually experiences; a
+  contended boot measurement + live EWMA of real chain times should stabilise
+  the patience/staleness window at zero score cost.
+- **Change:** app/main.go — calibrateRisk adds a c=2 contended round (median
+  seeds the EWMA); observeChainCost (α=1/8, samples clamped 1-500ms) re-derives
+  patience after every chain; patience/staleness now atomic (riskPatienceNs),
+  read per acquire/grant. Boot log confirms the gap: idle 12.8ms vs contended
+  15.8ms (+23%).
+- **Result (devloop, vs governor v2):** work_score 323,808 → 320,401 (−1.1%,
+  noise); risk p95 335 → 386ms; errors 0.52% → 0.54%; all thresholds pass.
+- **Result (grading.js):** work_score 1,097,306 → 1,154,460 — back to the
+  Wave-1 keeper's exact level (1,154,625), confirming governor v2's −5% was
+  noise; p95 price 11.9ms, stats 12.0ms, risk 233.2ms; errors 0.547%;
+  4/4 bars; peak RSS 484MiB.
+- **Verdict:** KEPT — score-flat robustness: gate constants now track real
+  contended cost on unknown grading hardware instead of a one-shot idle boot
+  sample. Boot-jitter gotcha closed.

@@ -62,6 +62,9 @@ func buildPriceResp(sym string, p float64) []byte {
 }
 
 func init() {
+	// Pre-calibration default; calibrateRisk overwrites both before the
+	// listener starts (tests run against this default).
+	riskPatienceNs.Store(int64(time.Second))
 	for sym, base := range basePrices {
 		prices[sym] = base
 		priceResp[sym] = buildPriceResp(sym, base)
@@ -94,16 +97,50 @@ type riskWaiter struct {
 
 var (
 	riskMu         sync.Mutex
-	riskRunning    int  // chains executing now (≤ cpuCap)
+	riskRunning    int // chains executing now (≤ cpuCap)
 	riskStackTop   *riskWaiter
 	riskStackDepth int
-	// Calibrated waiter patience (see calibrateRisk). Without a deadline,
-	// starved stack-bottom waiters hold their closed-loop VUs hostage for
-	// k6's full 60s request timeout, shrinking the active VU population and
-	// idling hash slots — measured −22% work_score. With it, stale waiters
-	// are shed and their VUs recycle into fresh traffic within ~50ms.
-	riskWaitTimeout time.Duration = time.Second
 )
+
+// Patience / staleness window: how old a waiter may get and still be worth
+// serving (granted older, its duration sample would land past the 1500ms bar).
+// Seeded by contended boot calibration and then live-updated from an EWMA of
+// real chain wall times (see observeChainCost) — boot-time unitCost jitter was
+// measured at ±15% across boots on the dev Mac, and idle cost understates the
+// contended cost the gate actually needs. Atomic: read on every acquire/grant,
+// written on every chain completion.
+var riskPatienceNs atomic.Int64
+
+// EWMA of observed chain wall time (ns), α=1/8. Concurrent updates may drop a
+// sample (load/store, no CAS loop) — harmless at ~2 writers and 150 samples/s.
+var riskChainEWMANs atomic.Int64
+
+const (
+	riskLatencyBudget = 1500 * time.Millisecond // the graded /risk p95 bar
+	riskSafetyMargin  = 300 * time.Millisecond  // response overhead + jitter room
+)
+
+func riskPatience() time.Duration { return time.Duration(riskPatienceNs.Load()) }
+
+// observeChainCost folds one completed chain's wall time into the EWMA and
+// re-derives the patience window. Samples are clamped so a freak stall (GC of
+// last resort, VM hiccup) can't crater patience in one step; the EWMA recovers
+// on its own either way.
+func observeChainCost(d time.Duration) {
+	if d < time.Millisecond {
+		d = time.Millisecond
+	} else if d > 500*time.Millisecond {
+		d = 500 * time.Millisecond
+	}
+	old := riskChainEWMANs.Load()
+	ewma := old + (int64(d)-old)/8
+	riskChainEWMANs.Store(ewma)
+	p := int64(riskLatencyBudget) - ewma - int64(riskSafetyMargin)
+	if p < int64(100*time.Millisecond) {
+		p = int64(100 * time.Millisecond)
+	}
+	riskPatienceNs.Store(p)
+}
 
 // Memory backstop only (~10× the 200-VU grading peak), never a latency valve:
 // each waiter is one parked goroutine + a small struct.
@@ -140,7 +177,7 @@ func riskAcquire(ctx context.Context) bool {
 	riskStackDepth++
 	riskMu.Unlock()
 
-	patience := time.NewTimer(riskWaitTimeout)
+	patience := time.NewTimer(riskPatience())
 	defer patience.Stop()
 wait:
 	for {
@@ -181,6 +218,7 @@ wait:
 func releaseRiskSlot() {
 	riskMu.Lock()
 	now := time.Now()
+	stale := riskPatience()
 	for {
 		w := riskStackTop
 		if w == nil {
@@ -193,7 +231,7 @@ func releaseRiskSlot() {
 		if w.abandoned || w.ctx.Err() != nil {
 			continue // dead waiter; its goroutine has left or will shed
 		}
-		if now.Sub(w.enqueued) > riskWaitTimeout {
+		if now.Sub(w.enqueued) > stale {
 			// Stale: granted now it would finish past the 1500ms bar, and that
 			// duration sample would drag the graded p95 with it (measured: the
 			// governor served stragglers at 2-4s and breached the bar). Unlink
@@ -209,10 +247,13 @@ func releaseRiskSlot() {
 	}
 }
 
-// calibrateRisk times real 50k chains on this container (median of 3, so one
-// boot-time scheduling hiccup can't skew it). The measured unit cost sizes the
-// yield stride; admission needs no derived limits since the LIFO gate has no
-// deadline (see riskAcquire).
+// calibrateRisk times real 50k chains on this container. Two measurements:
+// serial median-of-3 (idle unit cost → yield stride) and a contended round —
+// cpuCap goroutines hashing at once, exactly the regime the gate admits —
+// whose median seeds the chain-cost EWMA and the patience window. Idle cost
+// understates contended cost (both cores hashing + fast-path traffic), and a
+// one-shot boot measure jitters ±15% under the Docker VM; the live EWMA
+// (observeChainCost) corrects both from real traffic within seconds.
 func calibrateRisk() {
 	samples := make([]time.Duration, 3)
 	for i := range samples {
@@ -223,15 +264,36 @@ func calibrateRisk() {
 	sort.Slice(samples, func(i, j int) bool { return samples[i] < samples[j] })
 	unitCost := samples[1]
 
-	// Waiter patience: a waiter granted at the deadline must still fit one
-	// full chain plus response overhead inside the 1500ms bar. Floor of 100ms
-	// so a freak slow calibration can't make the gate shed everything.
-	const riskLatencyBudget = 1500 * time.Millisecond
-	const riskSafetyMargin = 300 * time.Millisecond
-	riskWaitTimeout = riskLatencyBudget - unitCost - riskSafetyMargin
-	if riskWaitTimeout < 100*time.Millisecond {
-		riskWaitTimeout = 100 * time.Millisecond
+	const contendedRounds = 2 // cpuCap chains each → 2×cpuCap samples, ~50ms
+	contended := make([]time.Duration, 0, contendedRounds*cpuCap)
+	var cmu sync.Mutex
+	for r := 0; r < contendedRounds; r++ {
+		var wg sync.WaitGroup
+		for c := 0; c < cpuCap; c++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				start := time.Now()
+				riskChain("obsidio-calibration")
+				d := time.Since(start)
+				cmu.Lock()
+				contended = append(contended, d)
+				cmu.Unlock()
+			}()
+		}
+		wg.Wait()
 	}
+	sort.Slice(contended, func(i, j int) bool { return contended[i] < contended[j] })
+	contendedCost := contended[len(contended)/2]
+
+	// Seed the EWMA and patience from the contended cost; live samples take
+	// over from the first real chain (same floor logic as observeChainCost).
+	riskChainEWMANs.Store(int64(contendedCost))
+	p := int64(riskLatencyBudget) - int64(contendedCost) - int64(riskSafetyMargin)
+	if p < int64(100*time.Millisecond) {
+		p = int64(100 * time.Millisecond)
+	}
+	riskPatienceNs.Store(p)
 
 	// Yield stride: target ~1ms hashing slices on THIS hardware. On a slow box
 	// (30ms chains) that's a small stride; on SHA-NI x86 (~4ms) a large one.
@@ -254,8 +316,8 @@ func calibrateRisk() {
 	} else {
 		riskYieldMask = stride - 1
 	}
-	log.Printf("risk calibration: unitCost=%s patience=%s yieldStride=%d (LIFO gate, backstop %d)",
-		unitCost, riskWaitTimeout, stride, riskStackBackstop)
+	log.Printf("risk calibration: unitCost=%s contended=%s patience=%s yieldStride=%d (LIFO gate, backstop %d)",
+		unitCost, contendedCost, riskPatience(), stride, riskStackBackstop)
 }
 
 // riskYieldMask: yield the P every (mask+1) iterations. All nine recorded runs
@@ -408,7 +470,9 @@ func handleRisk(w http.ResponseWriter, r *http.Request) {
 	// (~40% of score) for the rest of the run. net/http recovers handler
 	// panics per-connection, so without the defer a leak would be silent.
 	defer releaseRiskSlot()
+	chainStart := time.Now()
 	h := riskChain(seed)
+	observeChainCost(time.Since(chainStart))
 	// seed is arbitrary user input → JSON-escape it properly.
 	seedJSON, _ := json.Marshal(seed)
 	b := make([]byte, 0, 96+len(seedJSON))
